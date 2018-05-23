@@ -16,6 +16,9 @@ final class CjkBytes {
     0x2B73F, 0x2B740, 0x2B81F, 0x2B820, 0x2CEAF, 0x2CEB0, 0x2EBEF
   };
 
+  // Collection of utilities. Should not be instantiated.
+  CjkBytes() {}
+
   static byte[] decode(int[] data) {
     int[] nibbles = new int[data.length * 2];
     for (int i = 0; i < data.length; ++i) {

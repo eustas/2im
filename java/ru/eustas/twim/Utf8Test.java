@@ -17,13 +17,18 @@ public class Utf8Test {
   }
 
   @Test
+  public void testCoverage() {
+    new Utf8();
+  }
+
+  @Test
   public void testEmpty() {
     checkRoundtrip(new int[0]);
   }
 
   @Test
   public void testAllRanges() {
-    checkRoundtrip(new int[] {0x80 - 42, 0x80 + 42, 0x10000 - 1961, 0x10000 + 1961});
+    checkRoundtrip(new int[] {42, 0x90, 0x900, 0x1100});
   }
 
   @Test

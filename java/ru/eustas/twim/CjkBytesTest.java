@@ -16,6 +16,11 @@ public class CjkBytesTest {
   }
 
   @Test
+  public void testCoverage() {
+    new CjkBytes();
+  }
+
+  @Test
   public void testEmpty() {
     checkRoundtrip(new byte[0]);
   }
@@ -23,6 +28,13 @@ public class CjkBytesTest {
   @Test
   public void testOneByte() {
     checkRoundtrip(new byte[] {42});
+  }
+
+  @Test
+  public void testZeroTruncation() {
+    int[] codePoints = CjkBytes.encode(new byte[] {42, 0, 0, 0, 0, 0, 43, 0, 0, 0});
+    byte[] decoded = CjkBytes.decode(codePoints);
+    assertArrayEquals(new byte[] {42, 0, 0, 0, 0, 0, 43}, decoded);
   }
 
   @Test

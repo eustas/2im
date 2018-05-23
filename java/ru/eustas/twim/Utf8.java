@@ -4,6 +4,9 @@ import java.io.ByteArrayOutputStream;
 
 final class Utf8 {
 
+  // Collection of utilities. Should not be instantiated.
+  Utf8() {}
+
   static int[] decode(byte[] data) {
     int[] buffer = new int[data.length];
     int bufferSize = 0;
