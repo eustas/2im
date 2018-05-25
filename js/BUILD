@@ -16,6 +16,22 @@ closure_js_library(
     srcs = ["range.js"],
 )
 
+closure_js_library(
+    name = "main",
+    srcs = ["main.js"],
+    deps = [
+        ":cjkbytes",
+        ":range",
+    ],
+)
+
+load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_binary")
+
+closure_js_binary(
+    name = "app",
+    deps = [":main"],
+)
+
 #load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")
 #closure_js_test(
 #    name = "all_tests",

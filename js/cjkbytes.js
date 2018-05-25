@@ -78,5 +78,7 @@ function encode(data) {
   return result;
 }
 
-exports.decode = decode;
-exports.encode = encode;
+/** @export */
+var cjkbytes = {};
+cjkbytes.decode = decode;
+cjkbytes.encode = encode;

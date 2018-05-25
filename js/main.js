@@ -1,6 +1,3 @@
-const cjkbytes = require('./cjkbytes.js');
-const range = require('./range.js');
-
 document.addEventListener('DOMContentLoaded', function() {
   var content = /** @type{!Node} */ (document.getElementById("content"));
   var input = /** @type {!HTMLInputElement} */ (document.getElementById('encoded'));
@@ -30,11 +27,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   /** @return{!Array<number>} */
   function doEncode() {
-    var e = new range.Encoder();
-    var maxValue = 43;
-    for (var i = 0; i < 2560; ++i) {
-      var value = (i * i + i) % maxValue;
+    var e = new range.OptimalEncoder();
+    var maxValue = 16;
+    for (var i = 0; i < 256000; ++i) {
+      //var value = (i * i + i) % maxValue;
       //var value = Math.floor(maxValue * Math.random());
+      var value = 15;
       e.encodeRange(value, value + 1, maxValue);
     }
     return e.finish();
@@ -45,12 +43,13 @@ document.addEventListener('DOMContentLoaded', function() {
    * @return{number}
    */
   function doDecode(data) {
-    var maxValue = 43;
+    var maxValue = 16;
     var bad = 0;
     var d = new range.Decoder(data);
-    for (var i = 0; i < 2560; ++i) {
+    for (var i = 0; i < 256000; ++i) {
       var value = d.currentCount(maxValue);
-      var expected = (i * i + i) % maxValue;
+      //var expected = (i * i + i) % maxValue;
+      var expected = 15;
       if (value != expected) {
         bad++;
       }
@@ -62,15 +61,15 @@ document.addEventListener('DOMContentLoaded', function() {
   function measure() {
     var a = (new Date()).getTime();
     var res = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    for (var j = 0; j < 10000; ++j) {
-      var b = doEncode();
-      //var bad = doDecode(b);
-      var c = b.length;
-      c = c - 1734;
+    //for (var j = 0; j < 10000; ++j) {
+      var enc = doEncode();
+      var bad = doDecode(enc);
+      var c = enc.length;
+      c = c - 127999;
       res[c] = 1 + (res[c] | 0);
-    }
+    //}
     var b = (new Date()).getTime();
-    report((b - a) + ":" + res.join(", "));
+    report((b - a) + ":" + res.join(", ") + " # " + bad);
   }
 
   measure();

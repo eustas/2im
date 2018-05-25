@@ -30,7 +30,7 @@ class Decoder {
     this.low = 0;
     /** @private{number} */
     this.range = 281474976710656;
-    /** @private{!Array<number>} */
+    /** @const @private{!Array<number>} */
     this.data = data;
     /** @private{number} */
     this.offset = 0;
@@ -113,9 +113,9 @@ class Encoder {
 
 class OptimalEncoder {
   constructor() {
-    /** @private{!Encoder} */
+    /** @const @private{!Encoder} */
     this.encoder = new Encoder();
-    /** @private{!Array<number>} */
+    /** @const @private{!Array<number>} */
     this.raw = [];
   }
 
@@ -160,6 +160,8 @@ class OptimalEncoder {
   }
 }
 
-exports.Decoder = Decoder;
-exports.Encoder = Encoder;
-exports.OptimalEncoder = OptimalEncoder;
+/** @export */
+var range = {};
+range.Decoder = Decoder;
+range.Encoder = Encoder;
+range.OptimalEncoder = OptimalEncoder;
