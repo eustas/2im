@@ -11,16 +11,17 @@ final class Range {
 
   private static final int NUM_NIBBLES = 6;
   private static final int NIBBLE_BITS = 8;
-  private static final long NIBBLE_MASK = (1L << NIBBLE_BITS) - 1L;
+  private static final int NIBBLE_MASK = (1 << NIBBLE_BITS) - 1;
   private static final int VALUE_BITS = NUM_NIBBLES * NIBBLE_BITS;
   private static final long VALUE_MASK = (1L << VALUE_BITS) - 1L;
   private static final int HEAD_NIBBLE_SHIFT = VALUE_BITS - NIBBLE_BITS;
-  private static final long HEAD_NIBBLE_MASK = NIBBLE_MASK << HEAD_NIBBLE_SHIFT;
-  private static final long RANGE_MASK = (1L << (3 * NIBBLE_BITS)) - 1L;
+  private static final long HEAD_START = 1L << HEAD_NIBBLE_SHIFT;
+  private static final int RANGE_LIMIT_BITS = HEAD_NIBBLE_SHIFT - NIBBLE_BITS;
+  private static final long RANGE_LIMIT_MASK = (1L << RANGE_LIMIT_BITS) - 1L;
 
   static final class Decoder {
     private long low;
-    private long range = 1L << VALUE_BITS;
+    private long range = VALUE_MASK;
     private long code;
     private byte[] data;
     private int offset;
@@ -29,27 +30,27 @@ final class Range {
       this.data = data;
       long code = 0;
       for (int i = 0; i < NUM_NIBBLES; ++i) {
-        code = (code << NIBBLE_BITS) + readByte();
+        code = (code << NIBBLE_BITS) | readNibble();
       }
       this.code = code;
     }
 
-    private int readByte() {
-      return (offset < data.length) ? (data[offset++] & 0xFF) : 0;
+    private int readNibble() {
+      return (offset < data.length) ? (data[offset++] & NIBBLE_MASK) : 0;
     }
 
     final void removeRange(int bottom, int top) {
       low += bottom * range;
       range *= top - bottom;
-      while ((range & HEAD_NIBBLE_MASK) == 0) {
-        if ((low ^ (low + range - 1)) > HEAD_NIBBLE_MASK) {
-          if (range > RANGE_MASK) {
+      while (true) {
+        if ((low ^ (low + range - 1)) >= HEAD_START) {
+          if (range > RANGE_LIMIT_MASK) {
             break;
           }
-          range = RANGE_MASK - (low & RANGE_MASK);
+          range = -low & RANGE_LIMIT_MASK;
         }
-        code = (code << NIBBLE_BITS) & VALUE_MASK + readByte();
-        range = range << NIBBLE_BITS;
+        code = ((code << NIBBLE_BITS) & VALUE_MASK) | readNibble();
+        range = (range << NIBBLE_BITS) & VALUE_MASK;
         low = (low << NIBBLE_BITS) & VALUE_MASK;
       }
     }
@@ -62,27 +63,29 @@ final class Range {
 
   static final class Encoder {
     private long low;
-    private long range = 1L << VALUE_BITS;
+    private long range = VALUE_MASK;
     private ByteArrayOutputStream data = new ByteArrayOutputStream();
 
     final void encodeRange(int bottom, int top, int totalRange) {
       range /= totalRange;
       low += bottom * range;
       range *= top - bottom;
-      while ((range & HEAD_NIBBLE_MASK) == 0) {
-        if ((low ^ (low + range - 1)) > HEAD_NIBBLE_MASK) {
-          if (range > RANGE_MASK) break;
-          range = RANGE_MASK - (low & RANGE_MASK);
+      while (true) {
+        if ((low ^ (low + range - 1)) >= HEAD_START) {
+          if (range > RANGE_LIMIT_MASK) {
+            break;
+          }
+          range = -low & RANGE_LIMIT_MASK;
         }
         data.write((byte) (low >> HEAD_NIBBLE_SHIFT));
-        range = range << NIBBLE_BITS;
+        range = (range << NIBBLE_BITS) & VALUE_MASK;
         low = (low << NIBBLE_BITS) & VALUE_MASK;
       }
     }
 
     final byte[] finish() {
       for (int i = 0; i < NUM_NIBBLES; ++i) {
-        data.write((byte) (low >> HEAD_NIBBLE_SHIFT));
+        data.write((byte)(low >> HEAD_NIBBLE_SHIFT));
         low = (low << NIBBLE_BITS) & VALUE_MASK;
       }
       return data.toByteArray();
@@ -120,20 +123,14 @@ final class Range {
     final byte[] finish() {
       byte[] data = this.encoder.finish();
       int dataLength = data.length;
-      while (true) {
-        if (dataLength == 0) {
-          break;
-        }
+      while (dataLength > 0) {
         byte lastByte = data[--dataLength];
-        if (lastByte == 0) {
-          continue;
-        }
-        int delta = testData(data, raw);
-        if (delta == 0) {
+        data[dataLength] = 0;
+        if (lastByte == 0 || testData(data, raw) == 0) {
           continue;
         }
         int offset = dataLength - 1;
-        while (offset >= 0 && data[offset] == -1) {  // -1 & 0xFF == 255
+        while (offset >= 0 && data[offset] == -1) {
           offset--;
         }
         if (offset < 0) {
@@ -144,8 +141,7 @@ final class Range {
         for (int i = offset + 1; i < dataLength; ++i) {
           data[i] = 0;
         }
-        delta = testData(data, this.raw);
-        if (delta == 0) {
+        if (testData(data, this.raw) == 0) {
           continue;
         }
         data[offset]--;
