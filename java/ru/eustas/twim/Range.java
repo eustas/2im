@@ -103,7 +103,7 @@ final class Range {
       encoder.encodeRange(bottom, top, totalRange);
     }
 
-    private static int testData(byte[] data, List<Integer> raw) {
+    private static int checkData(byte[] data, List<Integer> raw) {
       Decoder d = new Decoder(data);
       for (int i = 0; i < raw.size(); i += 3) {
         int bottom = raw.get(i);
@@ -126,7 +126,7 @@ final class Range {
       while (dataLength > 0) {
         byte lastByte = data[--dataLength];
         data[dataLength] = 0;
-        if (lastByte == 0 || testData(data, raw) == 0) {
+        if (lastByte == 0 || checkData(data, raw) == 0) {
           continue;
         }
         int offset = dataLength - 1;
@@ -141,7 +141,7 @@ final class Range {
         for (int i = offset + 1; i < dataLength; ++i) {
           data[i] = 0;
         }
-        if (testData(data, this.raw) == 0) {
+        if (checkData(data, this.raw) == 0) {
           continue;
         }
         data[offset]--;

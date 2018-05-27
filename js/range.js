@@ -1,9 +1,9 @@
 // NUM_NIBBLES = 6
 // NIBBLE_BITS = 8
-// NIBBLE_MULT = 256 = (1 << NIBBLE_BITS)
+// NIBBLE_MUL = 256 = (1 << NIBBLE_BITS)
 // NIBBLE_MASK = 255 = (1 << NIBBLE_BITS) - 1
 // VALUE_BITS = 48 = NUM_NIBBLES * NIBBLE_BITS
-// VALUE_MULT = 281474976710656 = (1 << VALUE_BITS)
+// VALUE_MUL = 281474976710656 = (1 << VALUE_BITS)
 // VALUE_MASK = 281474976710655 = (1 << VALUE_BITS) - 1
 // HEAD_NIBBLE_SHIFT = 40 = VALUE_BITS - NIBBLE_BITS
 // HEAD_START = 1099511627776 = 1 << HEAD_NIBBLE_SHIFT
@@ -15,7 +15,7 @@
  * @param{!Array<number>} raw flattened original triplets
  * @return{number}
  */
-function testData(data, raw) {
+function checkData(data, raw) {
   let d = new Decoder(data);
   for (let i = 0; i < raw.length; i += 3) {
     let c = d.currentCount(raw[i + 2]);
@@ -154,7 +154,7 @@ class OptimalEncoder {
         return data;
       }
       let lastByte = data.pop();
-      if ((lastByte === 0) || (testData(data, this.raw) === 0)) {
+      if ((lastByte === 0) || (checkData(data, this.raw) === 0)) {
         continue;
       }
       let offset = data.length - 1;
@@ -169,7 +169,7 @@ class OptimalEncoder {
       for (let i = offset + 1; i < data.length; ++i) {
         data[i] = 0;
       }
-      if (testData(data, this.raw) === 0) continue;
+      if (checkData(data, this.raw) === 0) continue;
       data[offset]--;
       for (let i = offset + 1; i < data.length; ++i) {
         data[i] = 255;

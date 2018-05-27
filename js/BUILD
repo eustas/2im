@@ -32,13 +32,22 @@ closure_js_binary(
     deps = [":main"],
 )
 
-#load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")
-#closure_js_test(
-#    name = "all_tests",
-#    srcs = ["decode_test.js"],
-#    deps = [
-#        ":decode",
-#        ":polyfill",
-#        "@io_bazel_rules_closure//closure/library:testing",
-#    ],
-#)
+load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")
+
+closure_js_test(
+    name = "cjkbytes_test",
+    srcs = ["cjkbytes_test.js"],
+    deps = [
+        ":cjkbytes",
+        "@io_bazel_rules_closure//closure/library:testing",
+    ],
+)
+
+closure_js_test(
+    name = "range_test",
+    srcs = ["range_test.js"],
+    deps = [
+        ":range",
+        "@io_bazel_rules_closure//closure/library:testing",
+    ],
+)
