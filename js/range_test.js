@@ -201,7 +201,7 @@ function testGolden() {
     64, 235, 62, 22, 82, 159, 239, 61, 105, 178, 10, 7, 35, 78, 167, 154, 50, 181, 255, 229, 103, 216, 190, 15
   ];
 
-  let encoder = new range.OptimalEncoder();
+  let encoder = new RangeOptimalEncoder();
   for (let i = 0; i < triplets.length; i += 3) {
     encoder.encodeRange(triplets[i], triplets[i + 1], triplets[i + 2]);
   }
@@ -209,7 +209,7 @@ function testGolden() {
 
   assertArrayEquals(expected, data);
 
-  let decoder = new range.Decoder(data);
+  let decoder = new RangeDecoder(data);
   for (let i = 0; i < triplets.length; i += 3) {
     let val = decoder.currentCount(triplets[i + 2]);
     assertTrue((val >= triplets[i]) && (val < triplets[i + 1]));
@@ -218,7 +218,7 @@ function testGolden() {
 }
 
 function testOptimizer() {
-  let encoder = new range.OptimalEncoder();
+  let encoder = new RangeOptimalEncoder();
   encoder.encodeRange(1, 2, 257);
   let output = encoder.finish();
   assertArrayEquals([1], output);
