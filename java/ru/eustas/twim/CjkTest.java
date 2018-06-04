@@ -7,17 +7,19 @@ import org.junit.runners.JUnit4;
 import static org.junit.Assert.assertArrayEquals;
 
 @RunWith(JUnit4.class)
-public class CjkBytesTest {
+public class CjkTest {
 
   private void checkRoundtrip(byte[] bytes) {
-    int[] codePoints = CjkBytes.encode(bytes);
-    byte[] decoded = CjkBytes.decode(codePoints);
+    int[] codePoints = CjkEncoder.encode(bytes);
+    byte[] decoded = CjkDecoder.decode(codePoints);
     assertArrayEquals(bytes, decoded);
   }
 
   @Test
   public void testCoverage() {
-    new CjkBytes();
+    new CjkDecoder();
+    new CjkEncoder();
+    new CjkTransform();
   }
 
   @Test
@@ -32,8 +34,8 @@ public class CjkBytesTest {
 
   @Test
   public void testZeroTruncation() {
-    int[] codePoints = CjkBytes.encode(new byte[] {42, 0, 0, 0, 0, 0, 43, 0, 0, 0});
-    byte[] decoded = CjkBytes.decode(codePoints);
+    int[] codePoints = CjkEncoder.encode(new byte[] {42, 0, 0, 0, 0, 0, 43, 0, 0, 0});
+    byte[] decoded = CjkDecoder.decode(codePoints);
     assertArrayEquals(new byte[] {42, 0, 0, 0, 0, 0, 43}, decoded);
   }
 

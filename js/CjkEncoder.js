@@ -1,9 +1,12 @@
+goog.provide("twim.CjkEncoder");
+
+goog.require("twim.CjkTransform");
+
 /**
  * @param{!Array<number>} data bytes
  * @return{!Array<number>} CJK code-points
  */
-function encode(data) {
-  let cjkBlocks = CjkRanges.blocks;
+twim.CjkEncoder.encode = function(data) {
   let nibbles = [];
   let offset = 0;
   while (offset < data.length * 8) {
@@ -17,26 +20,15 @@ function encode(data) {
       p = Math.floor(p / 296);
     }
   }
+  /** @type{!Array<number>} */
   let result = [];
   for (let i = 0; i < nibbles.length; i += 2) {
     let ord = (nibbles[i] | 0) + 296 * (nibbles[i + 1] | 0);
-    let chr = 0;
-    for (let j = 0; j < cjkBlocks.length; j += 2) {
-      let size = cjkBlocks[j + 1] - cjkBlocks[j] + 1;
-      if (ord < size) {
-        chr = ord + cjkBlocks[j];
-        break;
-      }
-      ord -= size;
-    }
-    result.push(chr);
+    result.push(twim.CjkTransform.ordinalToUnicode(ord));
   }
-  while (result[result.length - 1] === cjkBlocks[0]) {
+  let unicodeZero = twim.CjkTransform.ordinalToUnicode(0);
+  while (result[result.length - 1] === unicodeZero) {
     result.pop();
   }
   return result;
-}
-
-/** @export */
-const CjkEncoder = {};
-CjkEncoder.encode = encode;
+};

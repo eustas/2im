@@ -4,8 +4,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-import java.util.Random;
-
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -14,7 +12,7 @@ public class RangeTest {
 
   @Test
   public void testCoverage() {
-    new Range();
+    new RangeCode();
   }
 
   @Test
@@ -219,7 +217,7 @@ public class RangeTest {
       -89, -102, 50, -75, -1, -27, 103, -40, -66, 15
     };
 
-    Range.OptimalEncoder encoder = new Range.OptimalEncoder();
+    RangeOptimalEncoder encoder = new RangeOptimalEncoder();
     for (int i = 0; i < triplets.length; i += 3) {
       encoder.encodeRange(triplets[i], triplets[i + 1], triplets[i + 2]);
     }
@@ -227,7 +225,7 @@ public class RangeTest {
 
     assertArrayEquals(expected, data);
 
-    Range.Decoder decoder = new Range.Decoder(data);
+    RangeDecoder decoder = new RangeDecoder(data);
     for (int i = 0; i < triplets.length; i += 3) {
       int val = decoder.currentCount(triplets[i + 2]);
       assertTrue((val >= triplets[i]) && (val < triplets[i + 1]));
@@ -237,7 +235,7 @@ public class RangeTest {
 
   @Test
   public void testOptimizer() {
-    Range.OptimalEncoder encoder = new Range.OptimalEncoder();
+    RangeOptimalEncoder encoder = new RangeOptimalEncoder();
     encoder.encodeRange(1, 2, 257);
     byte[] output = encoder.finish();
     assertArrayEquals(new byte[] {1}, output);

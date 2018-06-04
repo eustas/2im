@@ -9,18 +9,18 @@ load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_library")
 closure_js_library(
     name = "CjkDecoder",
     srcs = ["CjkDecoder.js"],
-    deps = [":CjkRanges"],
+    deps = [":CjkTransform"],
 )
 
 closure_js_library(
     name = "CjkEncoder",
     srcs = ["CjkEncoder.js"],
-    deps = [":CjkRanges"],
+    deps = [":CjkTransform"],
 )
 
 closure_js_library(
-    name = "CjkRanges",
-    srcs = ["CjkRanges.js"],
+    name = "CjkTransform",
+    srcs = ["CjkTransform.js"],
 )
 
 closure_js_library(

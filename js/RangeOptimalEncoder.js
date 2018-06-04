@@ -1,10 +1,15 @@
+goog.provide("twim.RangeOptimalEncoder");
+
+goog.require('twim.RangeDecoder');
+goog.require('twim.RangeEncoder');
+
 /**
  * @param{!Array<number>} data encoded bytes
  * @param{!Array<number>} raw flattened original triplets
  * @return{number}
  */
 function checkData(data, raw) {
-  let d = new Decoder(data);
+  let d = new twim.RangeDecoder(data);
   for (let i = 0; i < raw.length; i += 3) {
     let c = d.currentCount(raw[i + 2]);
     if (c < raw[i]) {
@@ -17,66 +22,64 @@ function checkData(data, raw) {
   return 0;
 }
 
-class OptimalEncoder {
-  constructor() {
-    /**
-     * @const
-     * @private{!Encoder}
-     */
-    this.encoder = new RangeEncoder();
-    /**
-     * @const
-     * @private{!Array<number>}
-     */
-    this.raw = [];
-  }
-
+/**
+ * @constructor
+ */
+twim.RangeOptimalEncoder = function() {
   /**
-   * @param{number} bottom
-   * @param{number} top
-   * @param{number} totalRange
-   * @return {void}
+   * @const
+   * @private{!twim.RangeEncoder}
    */
-  encodeRange(bottom, top, totalRange) {
-    this.raw.push(bottom, top, totalRange);
-    this.encoder.encodeRange(bottom, top, totalRange);
-  }
-
+  this.encoder = new twim.RangeEncoder();
   /**
-   * @return{!Array<number>}
+   * @const
+   * @private{!Array<number>}
    */
-  finish() {
-    let data = this.encoder.finish();
-    while (true) {
-      if (data.length === 0) {
-        return data;
-      }
-      let lastByte = data.pop();
-      if ((lastByte === 0) || (checkData(data, this.raw) === 0)) {
-        continue;
-      }
-      let offset = data.length - 1;
-      while (offset >= 0 && data[offset] === 255) {
-        offset--;
-      }
-      if (offset < 0) {
-        data.push(lastByte);
-        return data;
-      }
-      data[offset]++;
-      for (let i = offset + 1; i < data.length; ++i) {
-        data[i] = 0;
-      }
-      if (checkData(data, this.raw) === 0) continue;
-      data[offset]--;
-      for (let i = offset + 1; i < data.length; ++i) {
-        data[i] = 255;
-      }
+  this.raw = [];
+};
+
+/**
+ * @param{number} bottom
+ * @param{number} top
+ * @param{number} totalRange
+ * @return {void}
+ */
+twim.RangeOptimalEncoder.prototype.encodeRange = function(bottom, top, totalRange) {
+  this.raw.push(bottom, top, totalRange);
+  this.encoder.encodeRange(bottom, top, totalRange);
+};
+
+/**
+ * @return{!Array<number>}
+ */
+twim.RangeOptimalEncoder.prototype.finish = function() {
+  let data = this.encoder.finish();
+  while (true) {
+    if (data.length === 0) {
+      return data;
+    }
+    let lastByte = data.pop();
+    if ((lastByte === 0) || (checkData(data, this.raw) === 0)) {
+      continue;
+    }
+    let offset = data.length - 1;
+    while (offset >= 0 && data[offset] === 255) {
+      offset--;
+    }
+    if (offset < 0) {
       data.push(lastByte);
       return data;
     }
+    data[offset]++;
+    for (let i = offset + 1; i < data.length; ++i) {
+      data[i] = 0;
+    }
+    if (checkData(data, this.raw) === 0) continue;
+    data[offset]--;
+    for (let i = offset + 1; i < data.length; ++i) {
+      data[i] = 255;
+    }
+    data.push(lastByte);
+    return data;
   }
-}
-
-/** @export */
-const RangeOptimalEncoder = OptimalEncoder;
+};

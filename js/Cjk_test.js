@@ -1,12 +1,14 @@
 goog.require('goog.testing.asserts');
 goog.require('goog.testing.jsunit');
+goog.require('twim.CjkDecoder');
+goog.require('twim.CjkEncoder');
 
 /**
  * @param{!Array<number>} bytes
  */
 function checkRoundtrip(bytes) {
-  let codePoints = CjkEncoder.encode(bytes);
-  let decoded = CjkDecoder.decode(codePoints);
+  let codePoints = twim.CjkEncoder.encode(bytes);
+  let decoded = twim.CjkDecoder.decode(codePoints);
   assertArrayEquals(bytes, decoded);
 }
 
@@ -19,8 +21,8 @@ function testOneByte() {
 }
 
 function testZeroTruncation() {
-  let codePoints = CjkEncoder.encode([42, 0, 0, 0, 0, 0, 43, 0, 0, 0]);
-  let decoded = CjkDecoder.decode(codePoints);
+  let codePoints = twim.CjkEncoder.encode([42, 0, 0, 0, 0, 0, 43, 0, 0, 0]);
+  let decoded = twim.CjkDecoder.decode(codePoints);
   assertArrayEquals([42, 0, 0, 0, 0, 0, 43], decoded);
 }
 

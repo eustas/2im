@@ -8,17 +8,18 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.fail;
 
 @RunWith(JUnit4.class)
-public class Utf8Test {
+public class UtfTest {
 
   private void checkRoundtrip(int[] codePoints) {
-    byte[] encoded = Utf8.encode(codePoints);
-    int[] decoded = Utf8.decode(encoded);
+    byte[] encoded = UtfEncoder.encode(codePoints);
+    int[] decoded = UtfDecoder.decode(encoded);
     assertArrayEquals(codePoints, decoded);
   }
 
   @Test
   public void testCoverage() {
-    new Utf8();
+    new UtfDecoder();
+    new UtfEncoder();
   }
 
   @Test
@@ -34,7 +35,7 @@ public class Utf8Test {
   @Test
   public void testCodePointOutOfRange() {
     try {
-      Utf8.encode(new int[] {1 << 21});
+      UtfEncoder.encode(new int[] {1 << 21});
     } catch (IllegalArgumentException ex) {
       return;
     }
@@ -44,7 +45,7 @@ public class Utf8Test {
   @Test
   public void testUnexpectedContinuation() {
     try {
-      Utf8.decode(new byte[] {(byte) 0x81});
+      UtfDecoder.decode(new byte[] {(byte) 0x81});
     } catch (IllegalArgumentException ex) {
       return;
     }
@@ -54,7 +55,7 @@ public class Utf8Test {
   @Test
   public void testUnexpectedLength() {
     try {
-      Utf8.decode(new byte[] {(byte) 0xF8});
+      UtfDecoder.decode(new byte[] {(byte) 0xF8});
     } catch (IllegalArgumentException ex) {
       return;
     }
@@ -64,7 +65,7 @@ public class Utf8Test {
   @Test
   public void testUnfinishedRune() {
     try {
-      Utf8.decode(new byte[] {(byte) 0xC0});
+      UtfDecoder.decode(new byte[] {(byte) 0xC0});
     } catch (IllegalArgumentException ex) {
       return;
     }
@@ -74,7 +75,7 @@ public class Utf8Test {
   @Test
   public void testBrokenRune() {
     try {
-      Utf8.decode(new byte[] {(byte) 0xC0, 0});
+      UtfDecoder.decode(new byte[] {(byte) 0xC0, 0});
     } catch (IllegalArgumentException ex) {
       return;
     }

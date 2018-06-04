@@ -1,21 +1,15 @@
+goog.provide("twim.CjkDecoder");
+
+goog.require("twim.CjkTransform");
+
 /**
  * @param{!Array<number>} data CKJ code-points
  * @return{!Array<number>} bytes
  */
-function decode(data) {
-  let cjkBlocks = CjkRanges.blocks;
+twim.CjkDecoder.decode = function(data) {
   let nibbles = [];
   for (let i = 0; i < data.length; ++i) {
-    let chr = data[i] | 0;
-    let ord = 0;
-    for (let j = 0; j < cjkBlocks.length; j += 2) {
-      let size = cjkBlocks[j + 1] - cjkBlocks[j] + 1;
-      if (chr >= cjkBlocks[j] && chr <= cjkBlocks[j + 1]) {
-        ord += chr - cjkBlocks[j];
-        break;
-      }
-      ord += size;
-    }
+    let ord = twim.CjkTransform.unicodeToOrdinal(data[i] | 0);
     nibbles.push((ord % 296) | 0);
     nibbles.push(Math.floor(ord / 296) | 0);
   }
@@ -41,8 +35,4 @@ function decode(data) {
     result.pop();
   }
   return result;
-}
-
-/** @export */
-const CjkDecoder = {};
-CjkDecoder.decode = decode;
+};

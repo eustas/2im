@@ -3,43 +3,86 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])  # MIT
 
 java_library(
-    name = "cjkbytes",
-    srcs = ["CjkBytes.java"],
+    name = "cjk_decoder",
+    srcs = ["CjkDecoder.java"],
+    deps = [":cjk_transform"],
+)
+
+java_library(
+    name = "cjk_encoder",
+    srcs = ["CjkEncoder.java"],
+    deps = [":cjk_transform"],
+)
+
+java_library(
+    name = "cjk_transform",
+    srcs = ["CjkTransform.java"],
 )
 
 java_test(
-    name = "CjkBytesTest",
-    srcs = ["CjkBytesTest.java"],
+    name = "CjkTest",
+    srcs = ["CjkTest.java"],
     deps = [
-        ":cjkbytes",
+        ":cjk_decoder",
+        ":cjk_encoder",
+        ":cjk_transform",
         "@junit_junit//jar",
     ]
 )
 
 java_library(
-    name = "range",
-    srcs = ["Range.java"],
+    name = "range_code",
+    srcs = ["RangeCode.java"],
+)
+
+java_library(
+    name = "range_decoder",
+    srcs = ["RangeDecoder.java"],
+    deps = [":range_code"],
+)
+
+java_library(
+    name = "range_encoder",
+    srcs = ["RangeEncoder.java"],
+    deps = [":range_code"],
+)
+
+java_library(
+    name = "range_optimal_encoder",
+    srcs = ["RangeOptimalEncoder.java"],
+    deps = [
+        ":range_decoder",
+        ":range_encoder",
+    ],
 )
 
 java_test(
     name = "RangeTest",
     srcs = ["RangeTest.java"],
     deps = [
-        ":range",
+        ":range_code",
+        ":range_decoder",
+        ":range_optimal_encoder",
         "@junit_junit//jar",
     ]
 )
 
 java_library(
-    name = "utf8",
-    srcs = ["Utf8.java"],
+    name = "utf_decoder",
+    srcs = ["UtfDecoder.java"],
+)
+
+java_library(
+    name = "utf_encoder",
+    srcs = ["UtfEncoder.java"],
 )
 
 java_test(
-    name = "Utf8Test",
-    srcs = ["Utf8Test.java"],
+    name = "UtfTest",
+    srcs = ["UtfTest.java"],
     deps = [
-        ":utf8",
+        ":utf_decoder",
+        ":utf_encoder",
         "@junit_junit//jar",
     ]
 )
