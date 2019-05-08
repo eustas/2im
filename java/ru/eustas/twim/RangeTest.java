@@ -217,7 +217,7 @@ public class RangeTest {
       -89, -102, 50, -75, -1, -27, 103, -40, -66, 15
     };
 
-    RangeOptimalEncoder encoder = new RangeOptimalEncoder();
+    RangeEncoder encoder = new RangeEncoder();
     for (int i = 0; i < triplets.length; i += 3) {
       encoder.encodeRange(triplets[i], triplets[i + 1], triplets[i + 2]);
     }
@@ -231,13 +231,5 @@ public class RangeTest {
       assertTrue((val >= triplets[i]) && (val < triplets[i + 1]));
       decoder.removeRange(triplets[i], triplets[i + 1]);
     }
-  }
-
-  @Test
-  public void testOptimizer() {
-    RangeOptimalEncoder encoder = new RangeOptimalEncoder();
-    encoder.encodeRange(1, 2, 257);
-    byte[] output = encoder.finish();
-    assertArrayEquals(new byte[] {1}, output);
   }
 }

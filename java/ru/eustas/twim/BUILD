@@ -47,22 +47,12 @@ java_library(
     deps = [":range_code"],
 )
 
-java_library(
-    name = "range_optimal_encoder",
-    srcs = ["RangeOptimalEncoder.java"],
-    deps = [
-        ":range_decoder",
-        ":range_encoder",
-    ],
-)
-
 java_test(
     name = "RangeTest",
     srcs = ["RangeTest.java"],
     deps = [
         ":range_code",
         ":range_decoder",
-        ":range_optimal_encoder",
         "@junit_junit//jar",
     ]
 )
