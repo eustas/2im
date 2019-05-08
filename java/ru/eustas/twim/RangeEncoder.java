@@ -52,7 +52,7 @@ final class RangeEncoder {
     return out.toByteArray();
   }
 
-  private static class DecoderState {
+  private static class Decoder {
     private byte[] data;
     private int dataLength;
     private int offset;
@@ -65,7 +65,7 @@ final class RangeEncoder {
       this.dataLength = dataLength;
     }
 
-    private void copy(DecoderState other) {
+    private void copy(Decoder other) {
       this.offset = other.offset;
       this.code = other.code;
       this.low = other.low;
@@ -102,14 +102,14 @@ final class RangeEncoder {
       return data;
     }
 
-    DecoderState current = new DecoderState();
+    Decoder current = new Decoder();
     current.init(data, data.length);
     for (int i = 0; i < NUM_NIBBLES; ++i) {
       current.code = (current.code << NIBBLE_BITS) | (current.data[current.offset++] & 0xFF);
     }
     current.range = VALUE_MASK;
 
-    DecoderState good = new DecoderState();
+    Decoder good = new Decoder();
     good.copy(current);
     int tripletsSize = triplets.size();
     int i = 0;
@@ -145,7 +145,6 @@ final class RangeEncoder {
     }
     data = Arrays.copyOf(data, data.length - bestCut);
     data[data.length - 1] = (byte)(data[data.length - 1] + bestCutDelta);
-    System.err.print("DELTA " + (NUM_NIBBLES - bestCut));
     return data;
   }
 

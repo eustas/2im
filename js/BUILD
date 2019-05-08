@@ -34,15 +34,6 @@ closure_js_library(
 )
 
 closure_js_library(
-    name = "RangeOptimalEncoder",
-    srcs = ["RangeOptimalEncoder.js"],
-    deps = [
-        ":RangeDecoder",
-        ":RangeEncoder",
-    ],
-)
-
-closure_js_library(
     name = "main",
     srcs = ["main.js"],
     deps = [":CjkDecoder"],
@@ -72,7 +63,7 @@ closure_js_test(
     srcs = ["Range_test.js"],
     deps = [
         ":RangeDecoder",
-        ":RangeOptimalEncoder",
+        ":RangeEncoder",
         "@io_bazel_rules_closure//closure/library:testing",
     ],
 )

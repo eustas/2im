@@ -1,7 +1,7 @@
 goog.require('goog.testing.asserts');
 goog.require('goog.testing.jsunit');
 goog.require('twim.RangeDecoder');
-goog.require('twim.RangeOptimalEncoder');
+goog.require('twim.RangeEncoder');
 
 function testGolden() {
   let triplets = [
@@ -203,7 +203,7 @@ function testGolden() {
     64, 235, 62, 22, 82, 159, 239, 61, 105, 178, 10, 7, 35, 78, 167, 154, 50, 181, 255, 229, 103, 216, 190, 15
   ];
 
-  let encoder = new twim.RangeOptimalEncoder();
+  let encoder = new twim.RangeEncoder();
   for (let i = 0; i < triplets.length; i += 3) {
     encoder.encodeRange(triplets[i], triplets[i + 1], triplets[i + 2]);
   }
@@ -220,8 +220,9 @@ function testGolden() {
 }
 
 function testOptimizer() {
-  let encoder = new twim.RangeOptimalEncoder();
+  let encoder = new twim.RangeEncoder();
+  for (let i = 42; i < 48; ++i) encoder.encodeRange(i, i + 1, 256);
   encoder.encodeRange(1, 2, 257);
   let output = encoder.finish();
-  assertArrayEquals([1], output);
+  assertArrayEquals([42, 43, 44, 45, 45, 217, 213], output);
 }

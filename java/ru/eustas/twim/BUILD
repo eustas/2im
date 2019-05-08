@@ -53,6 +53,7 @@ java_test(
     deps = [
         ":range_code",
         ":range_decoder",
+        ":range_encoder",
         "@junit_junit//jar",
     ]
 )

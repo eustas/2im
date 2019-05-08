@@ -232,4 +232,13 @@ public class RangeTest {
       decoder.removeRange(triplets[i], triplets[i + 1]);
     }
   }
+
+  @Test
+  public void testOptimizer() {
+    RangeEncoder encoder = new RangeEncoder();
+    for (int i = 42; i < 48; ++i) encoder.encodeRange(i, i + 1, 256);
+    encoder.encodeRange(1, 2, 257);
+    byte[] output = encoder.finish();
+    assertArrayEquals(new byte[] {42, 43, 44, 45, 45, -39, -43}, output);
+  }
 }
