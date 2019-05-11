@@ -3,6 +3,20 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])  # MIT
 
 java_library(
+    name = "crc64",
+    srcs = ["Crc64.java"],
+)
+
+java_test(
+    name = "Crc64Test",
+    srcs = ["Crc64Test.java"],
+    deps = [
+        ":crc64",
+        "@junit_junit//jar",
+    ]
+)
+
+java_library(
     name = "cjk_decoder",
     srcs = ["CjkDecoder.java"],
     deps = [":cjk_transform"],

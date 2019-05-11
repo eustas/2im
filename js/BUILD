@@ -13,6 +13,11 @@ closure_js_library(
 )
 
 closure_js_library(
+    name = "Crc64",
+    srcs = ["Crc64.js"],
+)
+
+closure_js_library(
     name = "CjkEncoder",
     srcs = ["CjkEncoder.js"],
     deps = [":CjkTransform"],
@@ -47,6 +52,15 @@ closure_js_binary(
 )
 
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")
+
+closure_js_test(
+    name = "Crc64Test",
+    srcs = ["Crc64_test.js"],
+    deps = [
+        ":Crc64",
+        "@io_bazel_rules_closure//closure/library:testing",
+    ],
+)
 
 closure_js_test(
     name = "CjkTest",
