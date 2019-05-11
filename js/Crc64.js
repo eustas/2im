@@ -13,7 +13,7 @@ let CRC_64_POLY = new Uint32Array([0xD7870F42, 0xC96C5795]);
  *
  * @param{!Uint32Array} crc
  * @param{number} next
- * @return{void}
+ * @return{!Uint32Array}
  */
 twim.Crc64.update = function(crc, next) {
   crc[2] = (crc[0] ^ next) & 0xFF; crc[3] = 0;
@@ -27,6 +27,7 @@ twim.Crc64.update = function(crc, next) {
   }
   crc[4] = (crc[0] >>> 8) | ((crc[1] & 0xFF) << 24); crc[5] = crc[1] >>> 8;
   crc[0] = crc[2] ^ crc[4]; crc[1] = crc[3] ^ crc[5];
+  return crc;
 };
 
 /**

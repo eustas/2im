@@ -6,7 +6,7 @@ public class Crc64 {
   /**
    * Roll CRC64 calculation.
    *
-   * <p> {@code CRC64(data) = -1 ^ update((... update(-1, firstByte), ...), lastByte);}
+   * <p> {@code CRC64(data) = finish(update((... update(init(), firstByte), ...), lastByte));}
    * <p> This simple and reliable checksum is chosen to make is easy to calculate the same value
    * across the variety of languages (C++, Java, Go, ...).
    */
@@ -18,5 +18,19 @@ public class Crc64 {
       c = b ? (CRC_64_POLY ^ d) : d;
     }
     return c ^ (crc >>> 8);
+  }
+
+  public static long init() {
+    return -1;
+  }
+
+  public static String finish(long crc) {
+    crc = ~crc;
+    char[] buffer = new char[16];
+    for (int i = 15; i >= 0; --i) {
+      buffer[i] = "0123456789ABCDEF".charAt((int)crc & 0xF);
+      crc >>>= 4;
+    }
+    return new String(buffer);
   }
 }

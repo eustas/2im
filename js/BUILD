@@ -39,6 +39,11 @@ closure_js_library(
 )
 
 closure_js_library(
+    name = "SinCos",
+    srcs = ["SinCos.js"],
+)
+
+closure_js_library(
     name = "main",
     srcs = ["main.js"],
     deps = [":CjkDecoder"],
@@ -78,6 +83,16 @@ closure_js_test(
     deps = [
         ":RangeDecoder",
         ":RangeEncoder",
+        "@io_bazel_rules_closure//closure/library:testing",
+    ],
+)
+
+closure_js_test(
+    name = "SinCosTest",
+    srcs = ["SinCos_test.js"],
+    deps = [
+        ":Crc64",
+        ":SinCos",
         "@io_bazel_rules_closure//closure/library:testing",
     ],
 )

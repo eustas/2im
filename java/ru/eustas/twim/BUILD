@@ -73,6 +73,21 @@ java_test(
 )
 
 java_library(
+    name = "sin_cos",
+    srcs = ["SinCos.java"],
+)
+
+java_test(
+    name = "SinCosTest",
+    srcs = ["SinCosTest.java"],
+    deps = [
+        ":crc64",
+        ":sin_cos",
+        "@junit_junit//jar",
+    ]
+)
+
+java_library(
     name = "utf_decoder",
     srcs = ["UtfDecoder.java"],
 )
