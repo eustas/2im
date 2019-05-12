@@ -7,12 +7,9 @@ package ru.eustas.twim;
  * To convert CJK to UTF-8 text and back use {@link UtfDecoder} and {@link UtfEncoder}.
  */
 final class CjkTransform {
-
   /* Pairs of values representing first and last scalars in CJK ranges. */
-  private static final int[] CJK = new int[] {
-    0x04E00, 0x09FFF, 0x03400, 0x04DBF, 0x20000, 0x2A6DF, 0x2A700,
-    0x2B73F, 0x2B740, 0x2B81F, 0x2B820, 0x2CEAF, 0x2CEB0, 0x2EBEF
-  };
+  private static final int[] CJK = new int[] {0x04E00, 0x09FFF, 0x03400, 0x04DBF, 0x20000, 0x2A6DF,
+      0x2A700, 0x2B73F, 0x2B740, 0x2B81F, 0x2B820, 0x2CEAF, 0x2CEB0, 0x2EBEF};
 
   // Collection of utilities. Should not be instantiated.
   CjkTransform() {}

@@ -3,6 +3,11 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])  # MIT
 
 java_library(
+    name = "codec_params",
+    srcs = ["CodecParams.java"],
+)
+
+java_library(
     name = "crc64",
     srcs = ["Crc64.java"],
 )
@@ -45,6 +50,11 @@ java_test(
 )
 
 java_library(
+    name = "decoder",
+    srcs = ["Decoder.java"],
+)
+
+java_library(
     name = "range_code",
     srcs = ["RangeCode.java"],
 )
@@ -70,6 +80,15 @@ java_test(
         ":range_encoder",
         "@junit_junit//jar",
     ]
+)
+
+java_library(
+    name = "region",
+    srcs = ["Region.java"],
+    deps = [
+        ":codec_params",
+        ":sin_cos",
+    ],
 )
 
 java_library(

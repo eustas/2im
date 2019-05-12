@@ -1,4 +1,4 @@
-goog.provide("twim.SinCos");
+goog.provide('twim.SinCos');
 
 /** @const @type{number} */
 twim.SinCos.SCALE_BITS = 20;

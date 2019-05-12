@@ -1,4 +1,4 @@
-goog.provide("twim.CjkTransform");
+goog.provide('twim.CjkTransform');
 
 /**
  * @const @type{!Array<number>}

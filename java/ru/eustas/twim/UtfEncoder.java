@@ -3,7 +3,6 @@ package ru.eustas.twim;
 import java.io.ByteArrayOutputStream;
 
 final class UtfEncoder {
-
   // Collection of utilities. Should not be instantiated.
   UtfEncoder() {}
 

@@ -1,6 +1,6 @@
-goog.provide("twim.CjkDecoder");
+goog.provide('twim.CjkDecoder');
 
-goog.require("twim.CjkTransform");
+goog.require('twim.CjkTransform');
 
 /**
  * @param{!Array<number>} data CKJ code-points

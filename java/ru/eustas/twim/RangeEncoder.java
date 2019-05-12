@@ -1,16 +1,16 @@
 package ru.eustas.twim;
 
-import java.io.ByteArrayOutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import static ru.eustas.twim.RangeCode.HEAD_NIBBLE_SHIFT;
 import static ru.eustas.twim.RangeCode.HEAD_START;
 import static ru.eustas.twim.RangeCode.NIBBLE_BITS;
 import static ru.eustas.twim.RangeCode.NUM_NIBBLES;
 import static ru.eustas.twim.RangeCode.RANGE_LIMIT_MASK;
 import static ru.eustas.twim.RangeCode.VALUE_MASK;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 final class RangeEncoder {
   private final List<Integer> triplets = new ArrayList<>();
@@ -40,13 +40,13 @@ final class RangeEncoder {
           }
           range = -low & RANGE_LIMIT_MASK;
         }
-        out.write((int)(low >> HEAD_NIBBLE_SHIFT));
+        out.write((int) (low >> HEAD_NIBBLE_SHIFT));
         range = (range << NIBBLE_BITS) & VALUE_MASK;
         low = (low << NIBBLE_BITS) & VALUE_MASK;
       }
     }
     for (int i = 0; i < NUM_NIBBLES; ++i) {
-      out.write((int)(low >> HEAD_NIBBLE_SHIFT));
+      out.write((int) (low >> HEAD_NIBBLE_SHIFT));
       low = (low << NIBBLE_BITS) & VALUE_MASK;
     }
     return out.toByteArray();
@@ -74,7 +74,7 @@ final class RangeEncoder {
 
     boolean decodeRange(int totalRange, int bottom, int top) {
       range /= totalRange;
-      int count = (int)((code - low) / range);
+      int count = (int) ((code - low) / range);
       if ((count < bottom) || (count >= top)) {
         return false;
       }
@@ -129,7 +129,7 @@ final class RangeEncoder {
       byte originalTail = data[current.dataLength - 1];
       for (int delta = -1; delta <= 1; ++delta) {
         current.copy(good);
-        data[current.dataLength - 1] = (byte)(originalTail + delta);
+        data[current.dataLength - 1] = (byte) (originalTail + delta);
         int j = i;
         boolean ok = true;
         while (ok && (j < tripletsSize)) {
@@ -144,7 +144,7 @@ final class RangeEncoder {
       data[current.dataLength - 1] = originalTail;
     }
     data = Arrays.copyOf(data, data.length - bestCut);
-    data[data.length - 1] = (byte)(data[data.length - 1] + bestCutDelta);
+    data[data.length - 1] = (byte) (data[data.length - 1] + bestCutDelta);
     return data;
   }
 

@@ -4,7 +4,6 @@ package ru.eustas.twim;
  * Byte array to CJK string encoder.
  */
 final class CjkEncoder {
-
   // Collection of utilities. Should not be instantiated.
   CjkEncoder() {}
 
@@ -24,7 +23,7 @@ final class CjkEncoder {
       p = (p >> (offset & 7)) & 0x1FFFFFFFFFFL;
       offset += 41;
       for (int i = 0; i < 5; ++i) {
-        nibbles[nibbleIdx++] = (int)(p % 296L);
+        nibbles[nibbleIdx++] = (int) (p % 296L);
         p = p / 296L;
       }
     }

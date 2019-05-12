@@ -1,7 +1,6 @@
 package ru.eustas.twim;
 
 final class UtfDecoder {
-
   // Collection of utilities. Should not be instantiated.
   UtfDecoder() {}
 

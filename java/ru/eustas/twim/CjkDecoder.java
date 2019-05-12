@@ -6,7 +6,6 @@ import java.io.ByteArrayOutputStream;
  * CJK string to byte array decoder.
  */
 final class CjkDecoder {
-
   // Collection of utilities. Should not be instantiated.
   CjkDecoder() {}
 
@@ -34,7 +33,7 @@ final class CjkDecoder {
         acc += p << bits;
         bits += 41;
       }
-      byte b = (byte)acc;
+      byte b = (byte) acc;
       if (b != 0) {
         while (zeroCount != 0) {
           result.write(0);

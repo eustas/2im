@@ -1,6 +1,6 @@
-goog.provide("twim.CjkEncoder");
+goog.provide('twim.CjkEncoder');
 
-goog.require("twim.CjkTransform");
+goog.require('twim.CjkTransform');
 
 /**
  * @param{!Array<number>} data bytes

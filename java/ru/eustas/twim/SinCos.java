@@ -12,8 +12,8 @@ public class SinCos {
 
   static {
     for (int i = 0; i < MAX_ANGLE; ++i) {
-      SIN[i] = (int)Math.round(SCALE * Math.sin((Math.PI * i) / MAX_ANGLE));
-      COS[i] = (int)Math.round(SCALE * Math.cos((Math.PI * i) / MAX_ANGLE));
+      SIN[i] = (int) Math.round(SCALE * Math.sin((Math.PI * i) / MAX_ANGLE));
+      COS[i] = (int) Math.round(SCALE * Math.cos((Math.PI * i) / MAX_ANGLE));
     }
   }
 }

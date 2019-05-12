@@ -1,15 +1,14 @@
 package ru.eustas.twim;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.fail;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.fail;
-
 @RunWith(JUnit4.class)
 public class UtfTest {
-
   private void checkRoundtrip(int[] codePoints) {
     byte[] encoded = UtfEncoder.encode(codePoints);
     int[] decoded = UtfDecoder.decode(encoded);

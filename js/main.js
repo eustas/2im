@@ -1,12 +1,13 @@
 goog.require('twim.CjkDecoder');
 
 document.addEventListener('DOMContentLoaded', function() {
-  let content = /** @type{!Node} */ (document.getElementById("content"));
-  let input = /** @type {!HTMLInputElement} */ (document.getElementById('encoded'));
+  let content = /** @type{!Node} */ (document.getElementById('content'));
+  let input =
+      /** @type {!HTMLInputElement} */ (document.getElementById('encoded'));
 
   /** @param{string} text */
   function report(text) {
-    let p = document.createElement("p");
+    let p = document.createElement('p');
     let t = document.createTextNode(text);
     p.appendChild(t);
     content.appendChild(p);
@@ -24,8 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let materialized = input.value;
     let dematerialized = Array.from(materialized).map(chr);
     let decoded = twim.CjkDecoder.decode(dematerialized);
-    report(decoded.join(", "));
+    report(decoded.join(', '));
   }
 
-  input.addEventListener("input", decodeInput);
+  input.addEventListener('input', decodeInput);
 });

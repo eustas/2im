@@ -1,4 +1,4 @@
-goog.provide("twim.RangeEncoder");
+goog.provide('twim.RangeEncoder');
 
 // See Java sources for magic values explanation.
 
@@ -58,13 +58,15 @@ Decoder.prototype.decodeRange = function(totalRange, bottom, top) {
   this.low += bottom * this.range;
   this.range *= top - bottom;
   while (true) {
-    if (Math.floor(this.low / 1099511627776) !== Math.floor((this.low + this.range - 1) / 1099511627776)) {
+    if (Math.floor(this.low / 1099511627776) !==
+        Math.floor((this.low + this.range - 1) / 1099511627776)) {
       if (this.range > 4294967295) {
         break;
       }
       this.range = (281474976710656 - this.low) % 4294967296;
     }
-    var nibble = (this.offset < this.dataLength) ? (this.data[this.offset++] | 0) : 0;
+    var nibble =
+        (this.offset < this.dataLength) ? (this.data[this.offset++] | 0) : 0;
     this.code = ((this.code % 1099511627776) * 256) + nibble;
     this.range = (this.range % 1099511627776) * 256;
     this.low = (this.low % 1099511627776) * 256;
@@ -109,7 +111,8 @@ twim.RangeEncoder.prototype.encode = function() {
     low += bottom * range;
     range *= top - bottom;
     while (true) {
-      if (Math.floor(low / 1099511627776) !== Math.floor((low + range - 1) / 1099511627776)) {
+      if (Math.floor(low / 1099511627776) !==
+          Math.floor((low + range - 1) / 1099511627776)) {
         if (range > 4294967295) {
           break;
         }
@@ -150,7 +153,8 @@ twim.RangeEncoder.prototype.optimize = function(data) {
   let tripletsSize = this.triplets.length;
   let i = 0;
   while (i < tripletsSize) {
-    current.decodeRange(this.triplets[i], this.triplets[i + 1], this.triplets[i + 2]);
+    current.decodeRange(
+        this.triplets[i], this.triplets[i + 1], this.triplets[i + 2]);
     if (current.offset + 6 > data.length) {
       break;
     }
@@ -169,7 +173,8 @@ twim.RangeEncoder.prototype.optimize = function(data) {
       let j = i;
       let ok = true;
       while (ok && (j < tripletsSize)) {
-        ok = current.decodeRange(this.triplets[j], this.triplets[j + 1], this.triplets[j + 2]);
+        ok = current.decodeRange(
+            this.triplets[j], this.triplets[j + 1], this.triplets[j + 2]);
         j += 3;
       }
       if (ok) {

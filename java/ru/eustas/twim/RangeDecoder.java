@@ -45,6 +45,6 @@ final class RangeDecoder {
 
   final int currentCount(int totalRange) {
     range /= totalRange;
-    return (int)((code - low) / range);
+    return (int) ((code - low) / range);
   }
 }
