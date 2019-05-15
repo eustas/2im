@@ -5,6 +5,7 @@ licenses(["notice"])  # MIT
 java_library(
     name = "codec_params",
     srcs = ["CodecParams.java"],
+    deps = [":sin_cos"],
 )
 
 java_library(
@@ -52,6 +53,18 @@ java_test(
 java_library(
     name = "decoder",
     srcs = ["Decoder.java"],
+    deps = [
+        ":codec_params",
+        ":range_decoder",
+        ":region",
+        ":sin_cos",
+    ],
+)
+
+java_binary(
+    name = "DecoderMain",
+    srcs = ["DecoderMain.java"],
+    deps = [":decoder"],
 )
 
 java_library(

@@ -13,18 +13,16 @@ package ru.eustas.twim;
  * TODO(eustas): explore vectorization opportunities:
  *                - transpose Scan in Region
  */
-public class Region {
-  private static class DistanceRange {
+class Region {
+  static class DistanceRange {
     int min;
     int max;
-    int scale;
 
-    private void update(int[] region, int angle) {
+    void update(int[] region, int angle) {
       final int count3 = region[region.length - 1] * 3;
       if (count3 == 0) {
         min = 0;
         max = 0;
-        scale = 0;
         return;
       }
 
@@ -44,12 +42,10 @@ public class Region {
       }
       min = mi;
       max = ma;
-      // TODO(eustas): what if scale < 0?
-      scale = (ma - mi) / 2 - SinCos.SCALE;
     }
   }
 
-  private static void makeLineMask(int[] mask, int width, int angle, int d) {
+  static void makeLineMask(int[] mask, int width, int angle, int d) {
     int height = mask.length / 2;
     int nx = SinCos.SIN[angle];
     int ny = SinCos.COS[angle];
@@ -82,7 +78,7 @@ public class Region {
     }
   }
 
-  private static void split(int[] region, int[] mask, int[] inner, int[] outer) {
+  static void split(int[] region, int[] mask, int[] inner, int[] outer) {
     int innerCount3 = 0;
     int outerCount3 = 0;
     int count3 = region[region.length - 1] * 3;

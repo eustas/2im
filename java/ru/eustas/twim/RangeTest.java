@@ -7,6 +7,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+import java.util.Random;
+
 @RunWith(JUnit4.class)
 public class RangeTest {
   @Test
@@ -283,5 +285,55 @@ public class RangeTest {
     encoder.encodeRange(1, 2, 257);
     byte[] output = encoder.finish();
     assertArrayEquals(new byte[] {42, 43, 44, 45, 45, -39, -43}, output);
+  }
+
+  @Test
+  public void testRandom() {
+    Random rnd = new Random();
+    rnd.setSeed(0x32093A2ECD5773F4L);
+    int n = 1000000;
+    int[] triplets = new int[3 * n];
+    for (int i = 0; i < n; ++i) {
+      int a = rnd.nextInt(256);
+      int b = rnd.nextInt(8) + 1;
+      int c = rnd.nextInt(256);
+      triplets[3 * i] = a;
+      triplets[3 * i + 1] = a + b;
+      triplets[3 * i + 2] = a + b + c;
+    }
+
+    RangeEncoder enc = new RangeEncoder();
+    for (int i = 0; i < n; ++i) {
+      enc.encodeRange(triplets[3 * i], triplets[3 * i + 1],triplets[3 * i + 2]);
+    }
+    byte[] data = enc.finish();
+
+    RangeDecoder dec = new RangeDecoder(data);
+    for (int i = 0; i < n; ++i) {
+      int a = triplets[3 * i];
+      int b = triplets[3 * i + 1];
+      int c = triplets[3 * i + 2];
+      int v = dec.currentCount(c);
+      assertTrue(v >= a);
+      assertTrue(v < b);
+      dec.removeRange(a, b);
+    }
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testCorrupted() {
+    Random rnd = new Random();
+    rnd.setSeed(0x32093A2ECD5773F4L);
+    byte[] data = new byte[32];
+    rnd.nextBytes(data);
+    RangeDecoder dec = new RangeDecoder(data);
+    while (dec.offset < data.length + 7) {
+      int c = rnd.nextInt(256) + 1;
+      int v = dec.currentCount(c);
+      assertTrue(v >= 0);
+      int a = Math.max(0, v - rnd.nextInt(4));
+      int b = Math.min(c, v + rnd.nextInt(4) + 1);
+      dec.removeRange(a, b);
+    }
   }
 }

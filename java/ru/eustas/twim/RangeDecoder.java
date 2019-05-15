@@ -12,7 +12,7 @@ final class RangeDecoder {
   private long range = VALUE_MASK;
   private long code;
   private final byte[] data;
-  private int offset;
+  int offset;  // visible for testing
 
   RangeDecoder(byte[] data) {
     this.data = data;
@@ -24,7 +24,9 @@ final class RangeDecoder {
   }
 
   private int readNibble() {
-    return (offset < data.length) ? (data[offset++] & NIBBLE_MASK) : 0;
+    int result = (offset < data.length) ? (data[offset] & NIBBLE_MASK) : 0;
+    offset++;
+    return result;
   }
 
   final void removeRange(int bottom, int top) {
@@ -45,6 +47,10 @@ final class RangeDecoder {
 
   final int currentCount(int totalRange) {
     range /= totalRange;
-    return (int) ((code - low) / range);
+    int result = (int) ((code - low) / range);
+    if (result < 0 || result > totalRange) {
+      throw new IllegalArgumentException("corrupted input");
+    }
+    return result;
   }
 }
