@@ -12,7 +12,7 @@ final class RangeDecoder {
   private long range = VALUE_MASK;
   private long code;
   private final byte[] data;
-  int offset;  // visible for testing
+  private int offset;
 
   RangeDecoder(byte[] data) {
     this.data = data;
@@ -24,9 +24,7 @@ final class RangeDecoder {
   }
 
   private int readNibble() {
-    int result = (offset < data.length) ? (data[offset] & NIBBLE_MASK) : 0;
-    offset++;
-    return result;
+    return (offset < data.length) ? (data[offset++] & NIBBLE_MASK) : 0;
   }
 
   final void removeRange(int bottom, int top) {

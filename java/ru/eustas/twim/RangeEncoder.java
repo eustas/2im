@@ -1,16 +1,16 @@
 package ru.eustas.twim;
 
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import static ru.eustas.twim.RangeCode.HEAD_NIBBLE_SHIFT;
 import static ru.eustas.twim.RangeCode.HEAD_START;
 import static ru.eustas.twim.RangeCode.NIBBLE_BITS;
 import static ru.eustas.twim.RangeCode.NUM_NIBBLES;
 import static ru.eustas.twim.RangeCode.RANGE_LIMIT_MASK;
 import static ru.eustas.twim.RangeCode.VALUE_MASK;
-
-import java.io.ByteArrayOutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 final class RangeEncoder {
   private final List<Integer> triplets = new ArrayList<>();

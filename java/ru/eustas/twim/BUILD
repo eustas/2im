@@ -68,6 +68,17 @@ java_binary(
 )
 
 java_library(
+    name = "encoder",
+    srcs = ["Encoder.java"],
+    deps = [
+        ":codec_params",
+        ":range_encoder",
+        ":region",
+        ":sin_cos",
+    ],
+)
+
+java_library(
     name = "range_code",
     srcs = ["RangeCode.java"],
 )

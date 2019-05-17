@@ -1,13 +1,14 @@
 package ru.eustas.twim;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertTrue;
-
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 import java.util.Random;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 @RunWith(JUnit4.class)
 public class RangeTest {
@@ -327,7 +328,7 @@ public class RangeTest {
     byte[] data = new byte[32];
     rnd.nextBytes(data);
     RangeDecoder dec = new RangeDecoder(data);
-    while (dec.offset < data.length + 7) {
+    for (int i = 0; i < 1024; ++i) {
       int c = rnd.nextInt(256) + 1;
       int v = dec.currentCount(c);
       assertTrue(v >= 0);
@@ -335,5 +336,6 @@ public class RangeTest {
       int b = Math.min(c, v + rnd.nextInt(4) + 1);
       dec.removeRange(a, b);
     }
+    fail();
   }
 }

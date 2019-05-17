@@ -1,12 +1,14 @@
 package ru.eustas.twim;
 
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 
 import static ru.eustas.twim.CodecParams.NODE_FILL;
 
 public class Decoder {
-
   private static int readNumber(RangeDecoder src, int max) {
+    if (max == 1) return 0;
     int result = src.currentCount(max);
     src.removeRange(result, result + 1);
     return result;
@@ -23,7 +25,7 @@ public class Decoder {
   private static class Fragment {
     private int type = NODE_FILL;
     private int color;
-    private int[] region;
+    private final int[] region;
     private Fragment leftChild;
     private Fragment rightChild;
 
@@ -31,7 +33,7 @@ public class Decoder {
       this.region = region;
     }
 
-    void parse(RangeDecoder src, CodecParams cp, int[] mask) {
+    void parse(RangeDecoder src, CodecParams cp, int[] mask, List<Fragment> children, Region.DistanceRange distanceRange) {
       type = readNumber(src, CodecParams.NODE_TYPE_COUNT);
 
       if (type == NODE_FILL) {
@@ -40,30 +42,16 @@ public class Decoder {
       }
 
       int level = cp.getLevel(region);
-
-      // TODO: remove this
       if (level < 0) {
-        type = NODE_FILL;
-        return;
+        throw new IllegalStateException("corrupted input");
       }
+
       switch (type) {
         case CodecParams.NODE_HALF_PLANE: {
           int angleMax = 1 << cp.angleBits[level];
           int angle = readNumber(src, angleMax) * (SinCos.MAX_ANGLE / angleMax);
-          Region.DistanceRange distanceRange = new Region.DistanceRange();
-          distanceRange.update(region, angle);
-          int min = distanceRange.min;
-          int max = distanceRange.max;
-          int delta = max - min;
-          int lineQuant = cp.lineQuant;
-          int numLines = delta / lineQuant;
-          int distance;
-          if (numLines > 1) {
-            distance = min + (delta - (numLines - 1) * lineQuant) / 2 + lineQuant * readNumber(src, numLines);
-          } else {
-            distance = (max + min) / 2;
-          }
-          Region.makeLineMask(mask, cp.width, angle, distance);
+          distanceRange.update(region, angle, cp.lineQuant);
+          Region.makeLineMask(mask, cp.width, angle, distanceRange.distance(readNumber(src, distanceRange.numLines)));
           break;
         }
 
@@ -79,11 +67,9 @@ public class Decoder {
       int[] outer = new int[lastCount3 + 1];
       Region.split(region, mask, inner, outer);
       leftChild = new Fragment(inner);
+      children.add(leftChild);
       rightChild = new Fragment(outer);
-
-      // TODO: perhaps reorganize to layered parsing.
-      leftChild.parse(src, cp, mask);
-      rightChild.parse(src, cp, mask);
+      children.add(rightChild);
     }
 
     void render(int width, int[] rgb) {
@@ -122,7 +108,17 @@ public class Decoder {
 
     Fragment root = new Fragment(rootRegion);
     int[] mask = new int[height * 2];
-    root.parse(src, cp, mask);
+    List<Fragment> children = new ArrayList<>();
+    children.add(root);
+
+    Region.DistanceRange distanceRange = new Region.DistanceRange();
+    int cursor = 0;
+    while (cursor < children.size()) {
+      int checkpoint = children.size();
+      for (; cursor < checkpoint; ++cursor) {
+        children.get(cursor).parse(src, cp, mask, children, distanceRange);
+      }
+    }
 
     int[] rgb = new int[width * height];
     root.render(width, rgb);

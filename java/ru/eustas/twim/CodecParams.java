@@ -19,8 +19,7 @@ public class CodecParams {
 
   static {
     // TODO(eustas): lazy init.
-    for (int i = 0; i < COLOR_QUANT.length; ++i) {
-      int q = COLOR_QUANT[i];
+    for (int q : COLOR_QUANT) {
       int[] table = new int[q];
       for (int j = 0; j < q; ++j) {
         table[j] = Math.round((255.0f * j) / (q - 1));
@@ -42,7 +41,7 @@ public class CodecParams {
   private final int[] levelScale = new int[MAX_LEVEL];
   final int[] angleBits = new int[MAX_LEVEL];
   final int[] colorQuant = new int[3];
-  int[][] colorDequantTable = new int[3][];
+  final int[][] colorDequantTable = new int[3][];
 
   // Actually, that is image params...
   final int width;

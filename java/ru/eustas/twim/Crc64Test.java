@@ -1,8 +1,8 @@
 package ru.eustas.twim;
 
-import static org.junit.Assert.*;
-
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
 
 public class Crc64Test {
   @Test

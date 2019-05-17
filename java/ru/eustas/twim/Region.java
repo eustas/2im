@@ -17,13 +17,13 @@ class Region {
   static class DistanceRange {
     int min;
     int max;
+    int numLines;
+    int lineQuant;
 
-    void update(int[] region, int angle) {
+    void update(int[] region, int angle, int lineQuant) {
       final int count3 = region[region.length - 1] * 3;
       if (count3 == 0) {
-        min = 0;
-        max = 0;
-        return;
+        throw new IllegalStateException("empty region");
       }
 
       // Note: SinCos.SIN is all positive -> d0 <= d1
@@ -42,6 +42,16 @@ class Region {
       }
       min = mi;
       max = ma;
+      numLines = Math.min((ma - mi) / lineQuant, 1);
+      this.lineQuant = lineQuant;
+    }
+
+    int distance(int line) {
+      if (numLines > 1) {
+        return min + ((max - min) - (numLines - 1) * lineQuant) / 2 + lineQuant * line;
+      } else {
+        return (max + min) / 2;
+      }
     }
   }
 
