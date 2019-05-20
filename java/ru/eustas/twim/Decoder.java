@@ -17,7 +17,8 @@ public class Decoder {
   private static int readColor(RangeDecoder src, CodecParams cp) {
     int argb = 0xFF;  // alpha = 1
     for (int c = 0; c < 3; ++c) {
-      argb = (argb << 8) | cp.colorDequantTable[c][readNumber(src, cp.colorQuant[c])];
+      int q = cp.colorQuant[c];
+      argb = (argb << 8) | CodecParams.dequantizeColor(readNumber(src, q), q);
     }
     return argb;
   }
@@ -33,7 +34,7 @@ public class Decoder {
       this.region = region;
     }
 
-    void parse(RangeDecoder src, CodecParams cp, int[] mask, List<Fragment> children, Region.DistanceRange distanceRange) {
+    void parse(RangeDecoder src, CodecParams cp, List<Fragment> children, Region.DistanceRange distanceRange) {
       type = readNumber(src, CodecParams.NODE_TYPE_COUNT);
 
       if (type == NODE_FILL) {
@@ -46,12 +47,21 @@ public class Decoder {
         throw new IllegalStateException("corrupted input");
       }
 
+      // Cutting with half-planes does not increase the number of scans.
+      // TODO: region will remain unused; split to region and donate it to child?
+      int lastCount3 = region[region.length - 1] * 3;
+      int[] inner = new int[lastCount3 + 1];
+      int[] outer = new int[lastCount3 + 1];
+
       switch (type) {
         case CodecParams.NODE_HALF_PLANE: {
           int angleMax = 1 << cp.angleBits[level];
-          int angle = readNumber(src, angleMax) * (SinCos.MAX_ANGLE / angleMax);
+          int angleMult = (SinCos.MAX_ANGLE / angleMax);
+          int angleCode = readNumber(src, angleMax);
+          int angle = angleCode * angleMult;
           distanceRange.update(region, angle, cp.lineQuant);
-          Region.makeLineMask(mask, cp.width, angle, distanceRange.distance(readNumber(src, distanceRange.numLines)));
+          int line = readNumber(src, distanceRange.numLines);
+          Region.splitLine(region, angle, distanceRange.distance(line), inner, outer);
           break;
         }
 
@@ -60,12 +70,6 @@ public class Decoder {
           throw new IllegalStateException("unreachable");
       }
 
-      // Cutting with half-planes does not increase the number of scans.
-      // TODO: region will remain unused; split to region and donate it to child?
-      int lastCount3 = region[region.length - 1] * 3;
-      int[] inner = new int[lastCount3 + 1];
-      int[] outer = new int[lastCount3 + 1];
-      Region.split(region, mask, inner, outer);
       leftChild = new Fragment(inner);
       children.add(leftChild);
       rightChild = new Fragment(outer);
@@ -74,7 +78,7 @@ public class Decoder {
 
     void render(int width, int[] rgb) {
       if (type == NODE_FILL) {
-        int count3 = region[region.length - 1];
+        int count3 = region[region.length - 1] * 3;
         int clr = color;
         for (int i = 0; i < count3; i += 3) {
           int y = region[i];
@@ -107,7 +111,6 @@ public class Decoder {
     }
 
     Fragment root = new Fragment(rootRegion);
-    int[] mask = new int[height * 2];
     List<Fragment> children = new ArrayList<>();
     children.add(root);
 
@@ -116,7 +119,7 @@ public class Decoder {
     while (cursor < children.size()) {
       int checkpoint = children.size();
       for (; cursor < checkpoint; ++cursor) {
-        children.get(cursor).parse(src, cp, mask, children, distanceRange);
+        children.get(cursor).parse(src, cp, children, distanceRange);
       }
     }
 

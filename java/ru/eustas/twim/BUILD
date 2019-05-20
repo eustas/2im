@@ -67,6 +67,12 @@ java_binary(
     deps = [":decoder"],
 )
 
+java_test(
+    name = "DecoderTest",
+    srcs = ["DecoderTest.java"],
+    deps = [":decoder"],
+)
+
 java_library(
     name = "encoder",
     srcs = ["Encoder.java"],
@@ -76,6 +82,18 @@ java_library(
         ":region",
         ":sin_cos",
     ],
+)
+
+java_binary(
+    name = "EncoderMain",
+    srcs = ["EncoderMain.java"],
+    deps = [":encoder"],
+)
+
+java_test(
+    name = "EncoderTest",
+    srcs = ["EncoderTest.java"],
+    deps = [":encoder"],
 )
 
 java_library(
@@ -111,6 +129,15 @@ java_library(
     srcs = ["Region.java"],
     deps = [
         ":codec_params",
+        ":sin_cos",
+    ],
+)
+
+java_test(
+    name = "RegionTest",
+    srcs = ["RegionTest.java"],
+    deps = [
+        ":region",
         ":sin_cos",
     ],
 )

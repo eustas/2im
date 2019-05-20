@@ -15,17 +15,9 @@ public class CodecParams {
 
   private static final int[] COLOR_QUANT = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
       24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54};
-  private static final int[][] COLOR_DEQUANT_TABLES = new int[55][];
 
-  static {
-    // TODO(eustas): lazy init.
-    for (int q : COLOR_QUANT) {
-      int[] table = new int[q];
-      for (int j = 0; j < q; ++j) {
-        table[j] = Math.round((255.0f * j) / (q - 1));
-      }
-      COLOR_DEQUANT_TABLES[q] = table;
-    }
+  static int dequantizeColor(int v, int q) {
+    return  (255 * v + q - 2) / (q - 1);
   }
 
   private static final int[] SCALE_STEP = {1000, 631, 399, 252, 159, 100};
@@ -41,7 +33,6 @@ public class CodecParams {
   private final int[] levelScale = new int[MAX_LEVEL];
   final int[] angleBits = new int[MAX_LEVEL];
   final int[] colorQuant = new int[3];
-  final int[][] colorDequantTable = new int[3][];
 
   // Actually, that is image params...
   final int width;
@@ -62,7 +53,6 @@ public class CodecParams {
     for (int c = 0; c < 3; ++c) {
       int q = COLOR_QUANT[quants[c]];
       colorQuant[c] = q;
-      colorDequantTable[c] = COLOR_DEQUANT_TABLES[q];
     }
   }
 

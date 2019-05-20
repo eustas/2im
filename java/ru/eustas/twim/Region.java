@@ -7,7 +7,6 @@ package ru.eustas.twim;
  *   <li>Range: v0, v1</li>
  *   <li>Scan: y, x Range</li>
  *   <li>Region: Scan * count, undefined * padding, count</li>
- *   <li>Mask: Range * height </li>
  * </ul></p>
  *
  * TODO(eustas): explore vectorization opportunities:
@@ -34,15 +33,15 @@ class Region {
       for (int i = 0; i < count3; i += 3) {
         int y = region[i];
         int x0 = region[i + 1];
-        int x1 = region[i + 2];
+        int x1 = region[i + 2] - 1;
         int d0 = ny * y + nx * x0;
         int d1 = ny * y + nx * x1;
         mi = Math.min(mi, d0);
         ma = Math.max(ma, d1);
       }
-      min = mi;
-      max = ma;
-      numLines = Math.min((ma - mi) / lineQuant, 1);
+      this.min = mi;
+      this.max = ma;
+      this.numLines = (ma - mi) / lineQuant;
       this.lineQuant = lineQuant;
     }
 
@@ -55,89 +54,56 @@ class Region {
     }
   }
 
-  static void makeLineMask(int[] mask, int width, int angle, int d) {
-    int height = mask.length / 2;
+  // x * nx + y * ny >= d
+  static void splitLine(int[] region, int angle, int d, int[] left, int[] right) {
     int nx = SinCos.SIN[angle];
     int ny = SinCos.COS[angle];
-
-    if (nx == 0) { // nx == 0
-      for (int y = 0; y < height; ++y) {
-        double dd = d - ny * y;
-        if (dd <= 0) {
-          mask[2 * y] = 0;
-          mask[2 * y + 1] = width;
-        } else {
-          mask[2 * y] = -1;
-          mask[2 * y + 1] = -1;
-        }
-      }
-    } else { // nx > 0
-      for (int y = 0; y < height; ++y) {
-        int x = (d - ny * y) / nx;
-        if (x < 0) {
-          mask[2 * y] = 0;
-          mask[2 * y + 1] = width;
-        } else if (x >= width) {
-          mask[2 * y] = -1;
-          mask[2 * y + 1] = -1;
-        } else {
-          mask[2 * y] = x;
-          mask[2 * y + 1] = width;
-        }
-      }
-    }
-  }
-
-  static void split(int[] region, int[] mask, int[] inner, int[] outer) {
-    int innerCount3 = 0;
-    int outerCount3 = 0;
     int count3 = region[region.length - 1] * 3;
-    for (int i = 0; i < count3; i += 3) {
-      int y = region[i];
-      int x0 = region[i + 1];
-      int x1 = region[i + 2];
-      int mx0 = mask[2 * y];
-      int mx1 = mask[2 * y + 1];
-      if ((mx1 <= x0) || (mx0 >= x1)) {
-        // <>[O] | [O]<>
-        outer[outerCount3++] = y;
-        outer[outerCount3++] = x0;
-        outer[outerCount3++] = x1;
-      } else if ((mx0 <= x0) && (mx1 >= x1)) {
-        // <[I]>
-        inner[innerCount3++] = y;
-        inner[innerCount3++] = x0;
-        inner[innerCount3++] = x1;
-      } else if ((mx0 > x0) && (mx1 < x1)) {
-        // [O<I>O]
-        outer[outerCount3++] = y;
-        outer[outerCount3++] = x0;
-        outer[outerCount3++] = mx0;
-        inner[innerCount3++] = y;
-        inner[innerCount3++] = mx0;
-        inner[innerCount3++] = mx1;
-        outer[outerCount3++] = y;
-        outer[outerCount3++] = mx1;
-        outer[outerCount3++] = x1;
-      } else if (mx0 <= x0) {
-        // <[I>O]
-        inner[innerCount3++] = y;
-        inner[innerCount3++] = x0;
-        inner[innerCount3++] = mx1;
-        outer[outerCount3++] = y;
-        outer[outerCount3++] = mx1;
-        outer[outerCount3++] = x1;
-      } else {
-        // [O<I]>
-        outer[outerCount3++] = y;
-        outer[outerCount3++] = x0;
-        outer[outerCount3++] = mx0;
-        inner[innerCount3++] = y;
-        inner[innerCount3++] = mx0;
-        inner[innerCount3++] = x1;
+    int leftCount = 0;
+    int rightCount = 0;
+    if (nx == 0) {
+      // nx = 0 -> ny = SinCos.SCALE -> y * ny ?? d
+      for (int i = 0; i < count3; i += 3) {
+        int y = region[i];
+        int x0 = region[i + 1];
+        int x1 = region[i + 2];
+        if (y * ny >= d) {
+          left[leftCount] = y;
+          left[leftCount + 1] = x0;
+          left[leftCount + 2] = x1;
+          leftCount += 3;
+        } else {
+          right[rightCount] = y;
+          right[rightCount + 1] = x0;
+          right[rightCount + 2] = x1;
+          rightCount += 3;
+        }
+      }
+    } else {
+      // nx > 0 -> x ?? (d - y * ny) / nx
+      d = 2 * d + nx;
+      ny = 2 * ny;
+      nx = 2 * nx;
+      for (int i = 0; i < count3; i += 3) {
+        int y = region[i];
+        int x = (d - y * ny) / nx;
+        int x0 = region[i + 1];
+        int x1 = region[i + 2];
+        if (x < x1) {
+          left[leftCount] = y;
+          left[leftCount + 1] = Math.max(x, x0);
+          left[leftCount + 2] = x1;
+          leftCount += 3;
+        }
+        if (x > x0) {
+          right[rightCount] = y;
+          right[rightCount + 1] = x0;
+          right[rightCount + 2] = Math.min(x, x1);
+          rightCount += 3;
+        }
       }
     }
-    inner[inner.length - 1] = innerCount3 / 3;
-    outer[outer.length - 1] = outerCount3 / 3;
+    left[left.length - 1] = leftCount / 3;
+    right[right.length - 1] = rightCount / 3;
   }
 }
