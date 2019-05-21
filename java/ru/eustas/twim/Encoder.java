@@ -7,6 +7,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public class Encoder {
 
@@ -55,6 +59,12 @@ public class Encoder {
       this.sumRgb = sumRgb;
       this.sumRgb2 = sumRgb2;
       this.sumStride = stride;
+    }
+
+    Cache(Cache other) {
+      this.sumRgb = other.sumRgb;
+      this.sumRgb2 = other.sumRgb2;
+      this.sumStride = other.sumStride;
     }
   }
 
@@ -430,42 +440,68 @@ public class Encoder {
     return dst.finish();
   }
 
-  static byte[] encode(BufferedImage src, int targetSize) {
+  private static class SimulationTask implements Callable<SimulationTask> {
+    int targetSize;
+    int goalFunction;
+    Cache cache;
+    CodecParams cp;
+    double bestSqe = 1e20;
+    int bestColorCode = -1;
+
+    SimulationTask(int targetSize, int goalFunction, Cache cache, CodecParams cp) {
+      this.targetSize = targetSize;
+      this.goalFunction = goalFunction;
+      this.cache = new Cache(cache);
+      this.cp = cp;
+    }
+
+    @Override
+    public SimulationTask call() throws Exception {
+      List<Fragment> partition = buildPartition(targetSize, goalFunction, cp, cache);
+      for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_CODE; ++colorCode) {
+        cp.setColorCode(colorCode);
+        double sqe = simulateEncode(targetSize, partition, cp);
+        if (sqe < bestSqe) {
+          bestSqe = sqe;
+          bestColorCode = colorCode;
+        }
+      }
+      return this;
+    }
+  }
+
+  static byte[] encode(BufferedImage src, int targetSize) throws InterruptedException {
     int width = 64;
     int height = 64;
     if (src.getWidth() != width || src.getHeight() != height) {
       throw new IllegalArgumentException("invalid image size");
     }
     Cache cache = new Cache(src.getRGB(0, 0, width, height, null, 0, width), width);
-    CodecParams cp = new CodecParams(width, height);
-    List<Fragment> partition = null;
-    double bestSqe = 1e20;
-    int bestPartitionCode = -1;
-    int bestColorCode = -1;
-    int bestGoalFunction = -1;
+    List<SimulationTask> tasks = new ArrayList<>();
     for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
-    cp.setPartitionCode(partitionCode);
-    for (int goalFunction = 0; goalFunction < 4; ++goalFunction) {
-      long t0 = System.nanoTime();
-      partition = buildPartition(targetSize, goalFunction, cp, cache);
-      for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_CODE; ++colorCode) {
-        cp.setColorCode(colorCode);
-        double sqe = simulateEncode(targetSize, partition, cp);
-        if (sqe < bestSqe) {
-          System.out.println(">>> g=" + goalFunction + " c=" + colorCode + " p=" + partitionCode +  " | " + sqe);
-          bestSqe = sqe;
-          bestColorCode = colorCode;
-          bestGoalFunction = goalFunction;
-          bestPartitionCode = partitionCode;
-        }
+      for (int goalFunction = 0; goalFunction < 4; ++goalFunction) {
+        CodecParams cp = new CodecParams(width, height);
+        cp.setPartitionCode(partitionCode);
+        tasks.add(new SimulationTask(targetSize, goalFunction, cache, cp));
       }
-      long t1 = System.nanoTime();
-      //System.out.println(((t1 - t0) / 1000 / 1000.0) + "ms g=" + goalFunction + " p=" + partitionCode);
     }
+    int numCores = Runtime.getRuntime().availableProcessors();
+    ExecutorService executor = Executors.newFixedThreadPool(numCores);
+    long t0 = System.nanoTime();
+    executor.invokeAll(tasks);
+    executor.shutdownNow();
+    long t1 = System.nanoTime();
+    System.out.println("DONE " + (((t1 - t0) / 1000000) / 1000.0) + "s");
+    SimulationTask bestResult = tasks.get(0);
+    double bestSqe = 1e20;
+    for (SimulationTask task : tasks) {
+      if (task.bestSqe < bestSqe) {
+        bestResult = task;
+        bestSqe = task.bestSqe;
+      }
     }
-    cp.setColorCode(bestColorCode);
-    cp.setPartitionCode(bestPartitionCode);
-    partition = buildPartition(targetSize, bestGoalFunction, cp, cache);
-    return encode(targetSize, partition, cp);
+    System.out.println(Math.sqrt(bestSqe / (width * height)));
+    bestResult.cp.setColorCode(bestResult.bestColorCode);
+    return encode(targetSize, buildPartition(targetSize, bestResult.goalFunction, bestResult.cp, bestResult.cache), bestResult.cp);
   }
 }
