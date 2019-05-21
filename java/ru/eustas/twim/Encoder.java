@@ -285,14 +285,28 @@ public class Encoder {
           int v = (2 *  (q - 1) * stats.rgb[c] + d) / (2 * d);
           writeNumber(dst, q, v);
         }
-        this.bestCost = bitCost(CodecParams.NODE_TYPE_COUNT * cp.colorQuant[0] * cp.colorQuant[1] * cp.colorQuant[2]);
         return;
       }
       writeNumber(dst, CodecParams.NODE_TYPE_COUNT, CodecParams.NODE_HALF_PLANE);
       int maxAngle = 1 << cp.angleBits[level];
       writeNumber(dst, maxAngle, bestAngleCode);
       writeNumber(dst, bestNumLines, bestLine);
-      System.out.println(level + " " + bestAngleCode + " " + bestLine + "/" + bestNumLines);
+      children.add(leftChild);
+      children.add(rightChild);
+    }
+
+    void simulateEncode(CodecParams cp, boolean isLeaf, List<Fragment> children, double[] sqe) {
+      if (isLeaf) {
+        for (int c = 0; c < 3; ++c) {
+          // sum((vi - v)^2) = sum(vi^2 - 2 * vi * v + v^2) = n * v^2 + sum(vi^2) - 2 * v * sum(vi)
+          int q = cp.colorQuant[c];
+          int d = 255 * stats.pixelCount;
+          int v = (2 *  (q - 1) * stats.rgb[c] + d) / (2 * d);
+          int vq = CodecParams.dequantizeColor(v, q);
+          sqe[c] += stats.pixelCount * vq * vq + stats.rgb2[c] - 2 * vq * stats.rgb[c];
+        }
+        return;
+      }
       children.add(leftChild);
       children.add(rightChild);
     }
@@ -325,7 +339,7 @@ public class Encoder {
    * Partition could be used to try multiple color quantizations to see, which one gives the best result.
    */
   private static List<Fragment> buildPartition(int sizeLimit, int goalFunction, CodecParams cp, Cache cache) {
-    double tax = bitCost(CodecParams.NODE_TYPE_COUNT) + bitCost(2 * 2 * 2);  // Leaf node / just prime colors.
+    double tax = bitCost(CodecParams.NODE_TYPE_COUNT) + 3.0 * bitCost(CodecParams.COLOR_QUANT[0]);
     double budget = sizeLimit * 8 - tax - bitCost(CodecParams.MAX_CODE);  // Minus flat image cost.
 
     int width = cp.width;
@@ -359,7 +373,33 @@ public class Encoder {
     return result;
   }
 
-  static byte[] encode(int sizeLimit, List<Fragment> partition, CodecParams cp) {
+  static double simulateEncode(int sizeLimit, List<Fragment> partition, CodecParams cp) {
+    double tax = bitCost(CodecParams.NODE_TYPE_COUNT * cp.colorQuant[0] * cp.colorQuant[1] * cp.colorQuant[2]);
+    double budget = 8 * sizeLimit - bitCost(CodecParams.MAX_CODE) - tax;
+
+    Set<Fragment> nonLeaf = new HashSet<>();
+    for (Fragment node : partition) {
+      if (node.bestCost < 0.0) break;
+      double cost = node.bestCost + tax;
+      if (budget < cost) break;
+      budget -= cost;
+      nonLeaf.add(node);
+    }
+    List<Fragment> queue = new ArrayList<>(2 * nonLeaf.size() + 1);
+    queue.add(partition.get(0));
+
+    double[] sqe = new double[3];
+
+    int encoded = 0;
+    while (encoded < queue.size()) {
+      Fragment node = queue.get(encoded++);
+      node.simulateEncode(cp, !nonLeaf.contains(node), queue, sqe);
+    }
+
+    return sqe[0] + sqe[1] + sqe[2];
+  }
+
+  private static byte[] encode(int sizeLimit, List<Fragment> partition, CodecParams cp) {
     if (partition.isEmpty()) {
       throw new IllegalStateException("empty tree");
     }
@@ -390,8 +430,7 @@ public class Encoder {
     return dst.finish();
   }
 
-  static byte[] encode(BufferedImage src) {
-    int targetSize = 327;
+  static byte[] encode(BufferedImage src, int targetSize) {
     int width = 64;
     int height = 64;
     if (src.getWidth() != width || src.getHeight() != height) {
@@ -399,10 +438,34 @@ public class Encoder {
     }
     Cache cache = new Cache(src.getRGB(0, 0, width, height, null, 0, width), width);
     CodecParams cp = new CodecParams(width, height);
-    cp.setColorCode(0);
-    cp.setPartitionCode(0);
-    List<Fragment> partition = buildPartition(targetSize, 0, cp, cache);
-    byte[] bytes = encode(targetSize, partition, cp);
-    return bytes;
+    List<Fragment> partition = null;
+    double bestSqe = 1e20;
+    int bestPartitionCode = -1;
+    int bestColorCode = -1;
+    int bestGoalFunction = -1;
+    for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
+    cp.setPartitionCode(partitionCode);
+    for (int goalFunction = 0; goalFunction < 4; ++goalFunction) {
+      long t0 = System.nanoTime();
+      partition = buildPartition(targetSize, goalFunction, cp, cache);
+      for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_CODE; ++colorCode) {
+        cp.setColorCode(colorCode);
+        double sqe = simulateEncode(targetSize, partition, cp);
+        if (sqe < bestSqe) {
+          System.out.println(">>> g=" + goalFunction + " c=" + colorCode + " p=" + partitionCode +  " | " + sqe);
+          bestSqe = sqe;
+          bestColorCode = colorCode;
+          bestGoalFunction = goalFunction;
+          bestPartitionCode = partitionCode;
+        }
+      }
+      long t1 = System.nanoTime();
+      //System.out.println(((t1 - t0) / 1000 / 1000.0) + "ms g=" + goalFunction + " p=" + partitionCode);
+    }
+    }
+    cp.setColorCode(bestColorCode);
+    cp.setPartitionCode(bestPartitionCode);
+    partition = buildPartition(targetSize, bestGoalFunction, cp, cache);
+    return encode(targetSize, partition, cp);
   }
 }

@@ -13,7 +13,7 @@ public class CodecParams {
 
   static final int MAX_CODE = MAX_PARTITION_CODE * MAX_COLOR_CODE;
 
-  private static final int[] COLOR_QUANT = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+  static final int[] COLOR_QUANT = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
       24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54};
 
   static int dequantizeColor(int v, int q) {
