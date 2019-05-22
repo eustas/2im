@@ -18,7 +18,7 @@ let CRC_64_POLY = new Uint32Array([0xD7870F42, 0xC96C5795]);
 twim.Crc64.update = function(crc, next) {
   crc[2] = (crc[0] ^ next) & 0xFF;
   crc[3] = 0;
-  for (let i = 0; i < 8; ++i) {
+  for (let /** @type{number} */ i = 0; i < 8; ++i) {
     crc[4] = (crc[2] >>> 1) | ((crc[3] & 1) << 31);
     crc[5] = crc[3] >>> 1;
     if (crc[2] & 1) {
@@ -53,7 +53,7 @@ twim.Crc64.finish = function(crc) {
   crc[3] = -1;
   crc[0] = crc[0] ^ crc[2];
   crc[1] = crc[1] ^ crc[3];
-  let hi = ('00000000' + crc[1].toString(16)).slice(-8);
-  let lo = ('00000000' + crc[0].toString(16)).slice(-8);
+  let /** @type{string} */ hi = ('00000000' + crc[1].toString(16)).slice(-8);
+  let /** @type{string} */ lo = ('00000000' + crc[0].toString(16)).slice(-8);
   return (hi + lo).toUpperCase();
 };

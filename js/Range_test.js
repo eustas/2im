@@ -4,7 +4,7 @@ goog.require('twim.RangeDecoder');
 goog.require('twim.RangeEncoder');
 
 function testGolden() {
-  let triplets = [
+  let /** @type{!Array<number>} */ triplets = [
     8002,  29338, 61815, 11202, 13541, 15183, 7458,  11303, 38428, 29856, 31071,
     31915, 1589,  32595, 53464, 7672,  8537,  9070,  26967, 46483, 63228, 5223,
     8472,  14582, 23664, 26995, 27935, 37769, 41292, 48104, 1314,  7395,  8494,
@@ -280,7 +280,7 @@ function testGolden() {
     4620,  12746, 15304, 17894, 21951, 55665, 56422, 56855
   ];
 
-  let expected = [
+  let /** @type{!Uint8Array} */ expected = new Uint8Array([
     102, 70,  200, 135, 239, 117, 17,  3,   195, 97,  159, 84,  183, 139, 185,
     97,  24,  90,  5,   2,   132, 60,  129, 176, 86,  130, 222, 4,   8,   88,
     28,  97,  92,  28,  54,  171, 159, 183, 229, 217, 186, 183, 207, 18,  240,
@@ -305,28 +305,28 @@ function testGolden() {
     110, 73,  48,  14,  21,  77,  16,  68,  3,   214, 23,  230, 188, 0,   223,
     176, 12,  64,  235, 62,  22,  82,  159, 239, 61,  105, 178, 10,  7,   35,
     78,  167, 154, 50,  181, 255, 229, 103, 216, 190, 15
-  ];
+  ]);
 
-  let encoder = new twim.RangeEncoder();
-  for (let i = 0; i < triplets.length; i += 3) {
+  let /** @type{!twim.RangeEncoder} */ encoder = new twim.RangeEncoder();
+  for (let /** @type{number} */ i = 0; i < triplets.length; i += 3) {
     encoder.encodeRange(triplets[i], triplets[i + 1], triplets[i + 2]);
   }
-  let data = encoder.finish();
+  let /** @type{!Uint8Array} */ data = encoder.finish();
 
-  assertArrayEquals(expected, data);
+  assertSameElements(expected, data);
 
-  let decoder = new twim.RangeDecoder(data);
+  let /** @type{!twim.RangeDecoder} */ decoder = new twim.RangeDecoder(data);
   for (let i = 0; i < triplets.length; i += 3) {
-    let val = decoder.currentCount(triplets[i + 2]);
+    let /** @type{number} */ val = decoder.currentCount(triplets[i + 2]);
     assertTrue((val >= triplets[i]) && (val < triplets[i + 1]));
     decoder.removeRange(triplets[i], triplets[i + 1]);
   }
 }
 
 function testOptimizer() {
-  let encoder = new twim.RangeEncoder();
-  for (let i = 42; i < 48; ++i) encoder.encodeRange(i, i + 1, 256);
+  let /** @type{!twim.RangeEncoder} */ encoder = new twim.RangeEncoder();
+  for (let /** @type{number} */ i = 42; i < 48; ++i) encoder.encodeRange(i, i + 1, 256);
   encoder.encodeRange(1, 2, 257);
-  let output = encoder.finish();
-  assertArrayEquals([42, 43, 44, 45, 45, 217, 213], output);
+  let /** @type{!Uint8Array} */ output = encoder.finish();
+  assertSameElements(new Uint8Array([42, 43, 44, 45, 45, 217, 213]), output);
 }

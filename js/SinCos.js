@@ -17,7 +17,7 @@ let /** @const @type{number} */ MAX_ANGLE = twim.SinCos.MAX_ANGLE;
 let /** @const @type{!Int32Array} */ SIN = new Int32Array(MAX_ANGLE);
 let /** @const @type{!Int32Array} */ COS = new Int32Array(MAX_ANGLE);
 
-for (let i = 0; i < twim.SinCos.MAX_ANGLE; ++i) {
+for (let /** @type{number} */ i = 0; i < twim.SinCos.MAX_ANGLE; ++i) {
   SIN[i] = Math.round(SCALE * Math.sin((Math.PI * i) / MAX_ANGLE)) | 0;
   COS[i] = Math.round(SCALE * Math.cos((Math.PI * i) / MAX_ANGLE)) | 0;
 }

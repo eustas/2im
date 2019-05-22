@@ -3,7 +3,7 @@ goog.provide('twim.RangeDecoder');
 // See Java sources for magic values explanation.
 
 /**
- * @param{!Array<number>} data bytes
+ * @param{!Uint8Array} data bytes
  * @constructor
  */
 twim.RangeDecoder = function(data) {
@@ -11,17 +11,16 @@ twim.RangeDecoder = function(data) {
   this.low = 0;
   /** @private{number} */
   this.range = 281474976710655;
-  /**
-   * @const
-   * @private{!Array<number>}
-   */
+  /** @const @private{!Uint8Array} */
   this.data = data;
   /** @private{number} */
   this.offset = 0;
   /** @private{number} */
   this.code = 0;
-  for (let i = 0; i < 6; ++i) {
-    this.code = (this.code * 256) + (this.data[this.offset++] | 0);
+  for (let /** @type{number} */ i = 0; i < 6; ++i) {
+    let /** @type{number} */ nextByte =
+        (this.offset < this.data.length) ? this.data[this.offset++] : 0;
+    this.code = (this.code * 256) + nextByte;
   }
 };
 
@@ -41,8 +40,9 @@ twim.RangeDecoder.prototype.removeRange = function(bottom, top) {
       }
       this.range = (281474976710656 - this.low) % 4294967296;
     }
-    this.code =
-        ((this.code % 1099511627776) * 256) + (this.data[this.offset++] | 0);
+    let /** @type{number} */ nextByte =
+        (this.offset < this.data.length) ? this.data[this.offset++] : 0;
+    this.code = ((this.code % 1099511627776) * 256) + nextByte;
     this.range = (this.range % 1099511627776) * 256;
     this.low = (this.low % 1099511627776) * 256;
   }

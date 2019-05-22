@@ -7,8 +7,8 @@ goog.provide('twim.RangeEncoder');
  * @private
  */
 let Decoder = function() {
-  /** @private{!Array<number>} */
-  this.data = [];
+  /** @private{!Uint8Array} */
+  this.data = new Uint8Array([]);
   /** @private{number} */
   this.dataLength = 0;
   /** @private{number} */
@@ -22,7 +22,7 @@ let Decoder = function() {
 };
 
 /**
- * @param{!Array<number>} data
+ * @param{!Uint8Array} data
  * @param{number} dataLength
  * @return {void}
  */
@@ -50,7 +50,7 @@ Decoder.prototype.copy = function(other) {
  */
 Decoder.prototype.decodeRange = function(totalRange, bottom, top) {
   this.range = Math.floor(this.range / totalRange);
-  var count = Math.floor((this.code - this.low) / this.range);
+  let /** @type{number} */ count = Math.floor((this.code - this.low) / this.range);
   if ((count < bottom) || (count >= top)) {
     return false;
   }
@@ -65,7 +65,7 @@ Decoder.prototype.decodeRange = function(totalRange, bottom, top) {
       }
       this.range = (281474976710656 - this.low) % 4294967296;
     }
-    var nibble =
+    let /** @type{number} */ nibble =
         (this.offset < this.dataLength) ? (this.data[this.offset++] | 0) : 0;
     this.code = ((this.code % 1099511627776) * 256) + nibble;
     this.range = (this.range % 1099511627776) * 256;
@@ -96,17 +96,17 @@ twim.RangeEncoder.prototype.encodeRange = function(bottom, top, totalRange) {
 
 /**
  * @private
- * @return{!Array<number>}
+ * @return{!Uint8Array}
  */
 twim.RangeEncoder.prototype.encode = function() {
   let /** @type{!Array<number>} */ out = [];
-  let low = 0;
-  let range = 281474976710655;
-  let tripletsSize = this.triplets.length;
-  for (let i = 0; i < tripletsSize;) {
-    let totalRange = this.triplets[i++];
-    let bottom = this.triplets[i++];
-    let top = this.triplets[i++];
+  let /** @type{number} */ low = 0;
+  let /** @type{number} */ range = 281474976710655;
+  let /** @type{number} */ tripletsSize = this.triplets.length;
+  for (let /** @type{number} */ i = 0; i < tripletsSize;) {
+    let /** @type{number} */ totalRange = this.triplets[i++];
+    let /** @type{number} */ bottom = this.triplets[i++];
+    let /** @type{number} */ top = this.triplets[i++];
     range = Math.floor(range / totalRange);
     low += bottom * range;
     range *= top - bottom;
@@ -123,55 +123,56 @@ twim.RangeEncoder.prototype.encode = function() {
       low = (low % 1099511627776) * 256;
     }
   }
-  for (let i = 0; i < 6; ++i) {
+  for (let /** @type{number} */ i = 0; i < 6; ++i) {
     out.push(Math.floor(low / 1099511627776) & 255);
     low = (low % 1099511627776) * 256;
   }
-  return out;
+  return new Uint8Array(out);
 };
 
 /**
- * @param{!Array<number>} data
+ * @param{!Uint8Array} data
  * @private
- * @return{!Array<number>}
+ * @return{!Uint8Array}
  */
 twim.RangeEncoder.prototype.optimize = function(data) {
+  let /** @type{number} */ dataLength = data.length;
   // KISS
-  if (data.length <= 6) {
+  if (dataLength <= 6) {
     return data;
   }
 
   let /** @type{!Decoder} */ current = new Decoder();
-  current.init(data, data.length);
-  for (let i = 0; i < 6; ++i) {
+  current.init(data, dataLength);
+  for (let /** @type{number} */ i = 0; i < 6; ++i) {
     current.code = (current.code * 256) + (data[current.offset++] | 0);
   }
   current.range = 281474976710655;
 
   let /** @type{!Decoder} */ good = new Decoder();
   good.copy(current);
-  let tripletsSize = this.triplets.length;
-  let i = 0;
+  let /** @type{number} */ tripletsSize = this.triplets.length;
+  let /** @type{number} */ i = 0;
   while (i < tripletsSize) {
     current.decodeRange(
         this.triplets[i], this.triplets[i + 1], this.triplets[i + 2]);
-    if (current.offset + 6 > data.length) {
+    if (current.offset + 6 > dataLength) {
       break;
     }
     good.copy(current);
     i += 3;
   }
 
-  let bestCut = 0;
-  let bestCutDelta = 0;
-  for (let cut = 1; cut <= 6; ++cut) {
-    current.dataLength = data.length - cut;
-    let originalTail = data[current.dataLength - 1];
-    for (let delta = -1; delta <= 1; ++delta) {
+  let /** @type{number} */ bestCut = 0;
+  let /** @type{number} */ bestCutDelta = 0;
+  for (let /** @type{number} */ cut = 1; cut <= 6; ++cut) {
+    current.dataLength = dataLength - cut;
+    let /** @type{number} */ originalTail = data[current.dataLength - 1];
+    for (let /** @type{number} */ delta = -1; delta <= 1; ++delta) {
       current.copy(good);
       data[current.dataLength - 1] = (originalTail + delta) & 0xFF;
-      let j = i;
-      let ok = true;
+      let /** @type{number} */ j = i;
+      let /** @type{boolean} */ ok = true;
       while (ok && (j < tripletsSize)) {
         ok = current.decodeRange(
             this.triplets[j], this.triplets[j + 1], this.triplets[j + 2]);
@@ -184,13 +185,13 @@ twim.RangeEncoder.prototype.optimize = function(data) {
     }
     data[current.dataLength - 1] = originalTail;
   }
-  for (let j = 0; j < bestCut; ++j) data.pop();
-  data[data.length - 1] = (data[data.length - 1] + bestCutDelta) & 0xFF;
-  return data;
+  dataLength -= bestCut;
+  data[dataLength - 1] = (data[dataLength - 1] + bestCutDelta) & 0xFF;
+  return data.subarray(0, dataLength);
 };
 
 /**
- * @return{!Array<number>}
+ * @return{!Uint8Array}
  */
 twim.RangeEncoder.prototype.finish = function() {
   return this.optimize(this.encode());

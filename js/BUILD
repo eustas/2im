@@ -39,6 +39,12 @@ closure_js_library(
 )
 
 closure_js_library(
+    name = "Region",
+    srcs = ["Region.js"],
+    deps = [":SinCos"],
+)
+
+closure_js_library(
     name = "SinCos",
     srcs = ["SinCos.js"],
 )
@@ -73,6 +79,16 @@ closure_js_test(
     deps = [
         ":CjkDecoder",
         ":CjkEncoder",
+        "@io_bazel_rules_closure//closure/library:testing",
+    ],
+)
+
+closure_js_test(
+    name = "RegionTest",
+    srcs = ["Region_test.js"],
+    deps = [
+        ":Region",
+        ":SinCos",
         "@io_bazel_rules_closure//closure/library:testing",
     ],
 )
