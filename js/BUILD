@@ -7,6 +7,12 @@ licenses(["notice"])  # MIT
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_library")
 
 closure_js_library(
+    name = "CodecParams",
+    srcs = ["CodecParams.js"],
+    deps = [":SinCos"],
+)
+
+closure_js_library(
     name = "CjkDecoder",
     srcs = ["CjkDecoder.js"],
     deps = [":CjkTransform"],
@@ -26,6 +32,11 @@ closure_js_library(
 closure_js_library(
     name = "CjkTransform",
     srcs = ["CjkTransform.js"],
+)
+
+closure_js_library(
+    name = "Decoder",
+    srcs = ["Decoder.js"],
 )
 
 closure_js_library(
@@ -60,6 +71,7 @@ load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_binary")
 closure_js_binary(
     name = "app",
     deps = [":main"],
+    language = "ECMASCRIPT_2015",
 )
 
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")

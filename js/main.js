@@ -1,4 +1,4 @@
-goog.require('twim.CjkDecoder');
+import * as CjkDecoder from './CjkDecoder.js';
 
 document.addEventListener('DOMContentLoaded', function() {
   let content = /** @type{!Node} */ (document.getElementById('content'));
@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function decodeInput() {
     let materialized = input.value;
     let dematerialized = Array.from(materialized).map(chr);
-    let decoded = twim.CjkDecoder.decode(dematerialized);
+    let decoded = CjkDecoder.decode(dematerialized);
     report(decoded.join(', '));
   }
 

@@ -1,6 +1,6 @@
 package ru.eustas.twim;
 
-public class Crc64 {
+class Crc64 {
   private static final long CRC_64_POLY = (0xC96C5795L << 32) | 0xD7870F42L;
 
   /**

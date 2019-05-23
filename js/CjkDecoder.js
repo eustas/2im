@@ -1,16 +1,14 @@
-goog.provide('twim.CjkDecoder');
-
-goog.require('twim.CjkTransform');
+import * as CjkTransform from './CjkTransform.js';
 
 /**
  * @param{!Array<number>} data CKJ code-points
  * @return{!Uint8Array} bytes
  */
-twim.CjkDecoder.decode = function(data) {
+export function decode(data) {
   let /** @type{number} */ nibblesLength = data.length * 2;
   let /** @type{!Uint16Array} */ nibbles = new Uint16Array(5 * Math.ceil(nibblesLength / 5) + 5);
   for (let /** @type{number} */ i = 0; i < data.length; ++i) {
-    let /** @type{number} */ ord = twim.CjkTransform.unicodeToOrdinal(data[i] | 0);
+    let /** @type{number} */ ord = CjkTransform.unicodeToOrdinal(data[i] | 0);
     nibbles[2 * i] = ord % 296;
     nibbles[2 * i + 1] = ord / 296;
   }
@@ -37,4 +35,4 @@ twim.CjkDecoder.decode = function(data) {
     resultLength--;
   }
   return result.subarray(0, resultLength);
-};
+}

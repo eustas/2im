@@ -1,7 +1,7 @@
 package ru.eustas.twim;
 
-public class CodecParams {
-  static final int MAX_LEVEL = 7;
+class CodecParams {
+  private static final int MAX_LEVEL = 7;
 
   private static final int MAX_F1 = 4;
   private static final int MAX_F2 = 5;

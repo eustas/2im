@@ -53,12 +53,12 @@ public class RegionTest {
       assertArrayEquals(new int[]{0, 0, 1, 1, 0, 1, 2}, right);
     }
     {
+      // 3/3
       int[] left = new int[4];
       int[] right = new int[10];
       Region.splitLine(region, angle, distanceRange.distance(2), left, right);
       assertArrayEquals(new int[]{3, 0, 1, 1}, left);
       assertArrayEquals(new int[]{0, 0, 1, 1, 0, 1, 2, 0, 1, 3}, right);
-      // 3/3
     }
   }
 }

@@ -10,7 +10,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 
 public class Encoder {
 
@@ -23,7 +22,7 @@ public class Encoder {
     int[] sumRgb2;
     int sumStride;
 
-    Region.DistanceRange distanceRange = new Region.DistanceRange();
+    final Region.DistanceRange distanceRange = new Region.DistanceRange();
 
     Cache(int[] intRgb, int width) {
       int height = intRgb.length / width;
@@ -125,7 +124,6 @@ public class Encoder {
 
       int nx = SinCos.SIN[angle];
       int ny = SinCos.COS[angle];
-      int j = 0;
       if (nx == 0) {
         // nx = 0 -> ny = SinCos.SCALE -> y * ny >= d
         for (int i = 0; i < count3; i += 3) {
@@ -214,7 +212,7 @@ public class Encoder {
     Fragment leftChild;
     Fragment rightChild;
 
-    Stats stats = new Stats();
+    final Stats stats = new Stats();
 
     // Subdivision.
     int level;
@@ -383,7 +381,7 @@ public class Encoder {
     return result;
   }
 
-  static double simulateEncode(int sizeLimit, List<Fragment> partition, CodecParams cp) {
+  private static double simulateEncode(int sizeLimit, List<Fragment> partition, CodecParams cp) {
     double tax = bitCost(CodecParams.NODE_TYPE_COUNT * cp.colorQuant[0] * cp.colorQuant[1] * cp.colorQuant[2]);
     double budget = 8 * sizeLimit - bitCost(CodecParams.MAX_CODE) - tax;
 
@@ -441,10 +439,10 @@ public class Encoder {
   }
 
   private static class SimulationTask implements Callable<SimulationTask> {
-    int targetSize;
-    int goalFunction;
-    Cache cache;
-    CodecParams cp;
+    final int targetSize;
+    final int goalFunction;
+    final Cache cache;
+    final CodecParams cp;
     double bestSqe = 1e20;
     int bestColorCode = -1;
 
@@ -456,7 +454,7 @@ public class Encoder {
     }
 
     @Override
-    public SimulationTask call() throws Exception {
+    public SimulationTask call() {
       List<Fragment> partition = buildPartition(targetSize, goalFunction, cp, cache);
       for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_CODE; ++colorCode) {
         cp.setColorCode(colorCode);

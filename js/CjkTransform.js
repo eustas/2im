@@ -1,5 +1,3 @@
-goog.provide('twim.CjkTransform');
-
 /**
  * @const @type{!Uint32Array}
  * @private
@@ -18,7 +16,7 @@ const CJK_BLOCKS = new Uint32Array([
  * @param{number} chr
  * @returns {number}
  */
-twim.CjkTransform.unicodeToOrdinal = function(chr) {
+export function unicodeToOrdinal(chr) {
   let /** @type{number} */ sum = 0;
   for (let /** @type{number} */ i = 0; i < CJK_BLOCKS.length; i += 2) {
     if (chr >= CJK_BLOCKS[i] && chr <= CJK_BLOCKS[i + 1]) {
@@ -27,13 +25,13 @@ twim.CjkTransform.unicodeToOrdinal = function(chr) {
     sum += CJK_BLOCKS[i + 1] - CJK_BLOCKS[i] + 1;
   }
   return -1;
-};
+}
 
 /**
  * @param{number} ord
  * @returns {number}
  */
-twim.CjkTransform.ordinalToUnicode = function(ord) {
+export function ordinalToUnicode(ord) {
   let /** @type{number} */ sum = ord;
   for (let /** @type{number} */ i = 0; i < CJK_BLOCKS.length; i += 2) {
     let /** @type{number} */ size = CJK_BLOCKS[i + 1] - CJK_BLOCKS[i] + 1;
@@ -43,4 +41,4 @@ twim.CjkTransform.ordinalToUnicode = function(ord) {
     sum -= size;
   }
   return -1;
-};
+}

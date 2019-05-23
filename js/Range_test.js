@@ -1,7 +1,7 @@
-goog.require('goog.testing.asserts');
-goog.require('goog.testing.jsunit');
-goog.require('twim.RangeDecoder');
-goog.require('twim.RangeEncoder');
+import {assertSameElements, assertTrue} from 'goog:goog.testing.asserts';
+import 'goog:goog.testing.jsunit';
+import {RangeDecoder} from "./RangeDecoder.js";
+import {RangeEncoder} from "./RangeEncoder.js";
 
 function testGolden() {
   let /** @type{!Array<number>} */ triplets = [
@@ -307,7 +307,7 @@ function testGolden() {
     78,  167, 154, 50,  181, 255, 229, 103, 216, 190, 15
   ]);
 
-  let /** @type{!twim.RangeEncoder} */ encoder = new twim.RangeEncoder();
+  let /** @type{!RangeEncoder} */ encoder = new RangeEncoder();
   for (let /** @type{number} */ i = 0; i < triplets.length; i += 3) {
     encoder.encodeRange(triplets[i], triplets[i + 1], triplets[i + 2]);
   }
@@ -315,7 +315,7 @@ function testGolden() {
 
   assertSameElements(expected, data);
 
-  let /** @type{!twim.RangeDecoder} */ decoder = new twim.RangeDecoder(data);
+  let /** @type{!RangeDecoder} */ decoder = new RangeDecoder(data);
   for (let i = 0; i < triplets.length; i += 3) {
     let /** @type{number} */ val = decoder.currentCount(triplets[i + 2]);
     assertTrue((val >= triplets[i]) && (val < triplets[i + 1]));
@@ -324,7 +324,7 @@ function testGolden() {
 }
 
 function testOptimizer() {
-  let /** @type{!twim.RangeEncoder} */ encoder = new twim.RangeEncoder();
+  let /** @type{!RangeEncoder} */ encoder = new RangeEncoder();
   for (let /** @type{number} */ i = 42; i < 48; ++i) encoder.encodeRange(i, i + 1, 256);
   encoder.encodeRange(1, 2, 257);
   let /** @type{!Uint8Array} */ output = encoder.finish();
