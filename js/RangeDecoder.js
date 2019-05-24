@@ -6,15 +6,15 @@ export class RangeDecoder {
    */
   constructor(data) {
     /** @private{number} */
-    this.low = 0;
+    this._low = 0;
     /** @private{number} */
-    this.range = 281474976710655;
+    this._range = 281474976710655;
     /** @const @private{!Uint8Array} */
-    this.data = data;
+    this._data = data;
     /** @private{number} */
-    this.offset = 0;
+    this._offset = 0;
     /** @private{number} */
-    this.code = 0;
+    this._code = 0;
     this.init();
   }
 
@@ -25,8 +25,8 @@ export class RangeDecoder {
     // TODO(eustas): move to "init"
     for (let /** @type{number} */ i = 0; i < 6; ++i) {
       let /** @type{number} */ nextByte =
-          (this.offset < this.data.length) ? this.data[this.offset++] : 0;
-      this.code = (this.code * 256) + nextByte;
+          (this._offset < this._data.length) ? this._data[this._offset++] : 0;
+      this._code = (this._code * 256) + nextByte;
     }
   }
 
@@ -36,21 +36,21 @@ export class RangeDecoder {
    * @return {void}
    */
   removeRange(bottom, top) {
-    this.low += bottom * this.range;
-    this.range *= top - bottom;
+    this._low += bottom * this._range;
+    this._range *= top - bottom;
     while (true) {
-      if (Math.floor(this.low / 1099511627776) !==
-          Math.floor((this.low + this.range - 1) / 1099511627776)) {
-        if (this.range > 4294967295) {
+      if (Math.floor(this._low / 1099511627776) !==
+          Math.floor((this._low + this._range - 1) / 1099511627776)) {
+        if (this._range > 4294967295) {
           break;
         }
-        this.range = (281474976710656 - this.low) % 4294967296;
+        this._range = (281474976710656 - this._low) % 4294967296;
       }
       let /** @type{number} */ nextByte =
-          (this.offset < this.data.length) ? this.data[this.offset++] : 0;
-      this.code = ((this.code % 1099511627776) * 256) + nextByte;
-      this.range = (this.range % 1099511627776) * 256;
-      this.low = (this.low % 1099511627776) * 256;
+          (this._offset < this._data.length) ? this._data[this._offset++] : 0;
+      this._code = ((this._code % 1099511627776) * 256) + nextByte;
+      this._range = (this._range % 1099511627776) * 256;
+      this._low = (this._low % 1099511627776) * 256;
     }
   }
 
@@ -59,7 +59,7 @@ export class RangeDecoder {
    * @return{number}
    */
   currentCount(totalRange) {
-    this.range = Math.floor(this.range / totalRange);
-    return Math.floor((this.code - this.low) / this.range);
+    this._range = Math.floor(this._range / totalRange);
+    return Math.floor((this._code - this._low) / this._range);
   }
 }

@@ -3,9 +3,9 @@ import * as SinCos from './SinCos.js';
 export class DistanceRange {
   constructor() {
     /** @type{number} */
-    this.min = 0;
+    this._min = 0;
     /** @type{number} */
-    this.max = 0;
+    this._max = 0;
     /** @type{number} */
     this.numLines = 0;
     /** @type{number} */
@@ -38,8 +38,8 @@ export class DistanceRange {
       mi = mi < d0 ? mi : d0;
       ma = ma > d1 ? ma : d1;
     }
-    this.min = mi;
-    this.max = ma;
+    this._min = mi;
+    this._max = ma;
     this.numLines = ((ma - mi) / lineQuant) | 0;
     this.lineQuant = lineQuant;
   }
@@ -50,9 +50,9 @@ export class DistanceRange {
    */
   distance(line) {
     if (this.numLines > 1) {
-      return this.min + (((this.max - this.min) - (this.numLines - 1) * this.lineQuant) / 2 | 0) + this.lineQuant * line;
+      return this._min + (((this._max - this._min) - (this.numLines - 1) * this.lineQuant) / 2 | 0) + this.lineQuant * line;
     } else {
-      return ((this.max + this.min) / 2) | 0;
+      return ((this._max + this._min) / 2) | 0;
     }
   }
 }

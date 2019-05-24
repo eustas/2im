@@ -127,6 +127,6 @@ public class Decoder {
     root.render(width, rgb);
     BufferedImage output = new BufferedImage(cp.width, cp.height, BufferedImage.TYPE_INT_ARGB);
     output.setRGB(0, 0, width, height, rgb, 0, width);
-    return  output;
+    return output;
   }
 }

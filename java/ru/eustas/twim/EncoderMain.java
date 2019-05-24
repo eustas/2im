@@ -11,7 +11,7 @@ public class EncoderMain {
   public static void main(String... args) throws IOException, InterruptedException {
     for (String arg : args) {
       BufferedImage image = ImageIO.read(new File(arg));
-      byte[] data = Encoder.encode(image, 3270);
+      byte[] data = Encoder.encode(image, 327);
       Files.write(FileSystems.getDefault().getPath(arg + ".2im"), data);
     }
   }

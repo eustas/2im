@@ -17,7 +17,7 @@ class CodecParams {
       24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54};
 
   static int dequantizeColor(int v, int q) {
-    return  (255 * v + q - 2) / (q - 1);
+    return (255 * v + q - 2) / (q - 1);
   }
 
   private static final int[] SCALE_STEP = {1000, 631, 399, 252, 159, 100};

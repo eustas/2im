@@ -1,3 +1,4 @@
+import {newInt32Array} from './Mini.js';
 import * as SinCos from './SinCos.js';
 
 const /** @type{number} */ MAX_LEVEL = 7;
@@ -10,12 +11,12 @@ const /** @type{number} */ MAX_F4 = 5;
 const /** @type{number} */ MAX_PARTITION_CODE = MAX_F1 * MAX_F2 * MAX_F3 * MAX_F4;
 const /** @type{number} */ MAX_COLOR_CODE = 30;
 
-const /** @type{!Int32Array} */ COLOR_QUANT = new Int32Array([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+const /** @type{!Int32Array} */ COLOR_QUANT = newInt32Array([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
     24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54]);
 
-const /** @type{!Int32Array} */ SCALE_STEP = new Int32Array([1000, 631, 399, 252, 159, 100]);
+const /** @type{!Int32Array} */ SCALE_STEP = newInt32Array([1000, 631, 399, 252, 159, 100]);
 const /** @type{number} */ SCALE_STEP_FACTOR = 40;
-const /** @type{!Int32Array} */ BASE_SCALE = new Int32Array([4, 9, 16, 25, 36]);
+const /** @type{!Int32Array} */ BASE_SCALE = newInt32Array([4, 9, 16, 25, 36]);
 const /** @type{number} */ BASE_SCALE_FACTOR = 36;
 
 export class CodecParams {
@@ -25,17 +26,17 @@ export class CodecParams {
    */
   constructor(width, height) {
     /** @const @type{number} */
-    this.width = width;
+    this._width = width;
     /** @const @type{number} */
-    this.height = height;
+    this._height = height;
     /** @const @type{number} */
     this.lineQuant = SinCos.SCALE;
     /** @const @type{!Int32Array} */
-    this.levelScale = new Int32Array(MAX_LEVEL);
+    this.levelScale = newInt32Array(MAX_LEVEL);
     /** @const @type{!Int32Array} */
-    this.angleBits = new Int32Array(MAX_LEVEL);
+    this.angleBits = newInt32Array(MAX_LEVEL);
     /** @const @type{!Int32Array} */
-    this.colorQuant = new Int32Array(3);
+    this.colorQuant = newInt32Array(3);
   }
 
   /**
@@ -55,7 +56,7 @@ export class CodecParams {
     partitionCode = (partitionCode / MAX_F3) | 0;
     let /** @type{number} */ f4 = partitionCode % MAX_F4;
 
-    let /** @type{number} */ scale = (this.width * this.width + this.height * this.height) * BASE_SCALE[f2];
+    let /** @type{number} */ scale = (this._width * this._width + this._height * this._height) * BASE_SCALE[f2];
     for (let /** @type{number} */ i = 0; i < MAX_LEVEL; ++i) {
       this.levelScale[i] = scale / BASE_SCALE_FACTOR;
       scale = ((scale * SCALE_STEP_FACTOR) / SCALE_STEP[f3]) | 0;
@@ -81,9 +82,9 @@ export class CodecParams {
       return -1;
     }
 
-    let /** @type{number} */ min_y = height + 1;
+    let /** @type{number} */ min_y = this._height + 1;
     let /** @type{number} */ max_y = -1;
-    let /** @type{number} */ min_x = width + 1;
+    let /** @type{number} */ min_x = this._width + 1;
     let /** @type{number} */ max_x = -1;
     for (let /** @type{number} */ i = 0; i < count3; i += 3) {
       let /** @type{number} */ y = region[i];
@@ -106,6 +107,15 @@ export class CodecParams {
     return MAX_LEVEL - 1;
   }
 }
+
+/**
+ * @param{number} v
+ * @param{number} q
+ * @return{number}
+ */
+CodecParams.dequantizeColor = function(v, q) {
+  return ((255 * v + q - 2) / (q - 1)) | 0;
+};
 
 /** @const @type{number} */
 CodecParams.MAX_CODE = MAX_PARTITION_CODE * MAX_COLOR_CODE;
