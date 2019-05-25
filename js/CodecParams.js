@@ -1,4 +1,4 @@
-import {newInt32Array} from './Mini.js';
+import {last, newInt32Array} from './Mini.js';
 import * as SinCos from './SinCos.js';
 
 const /** @type{number} */ MAX_LEVEL = 7;
@@ -64,7 +64,7 @@ export class CodecParams {
 
     let /** @type{number} */ bits = 9 - f1;
     for (let /** @type{number} */ i = 0; i < MAX_LEVEL; ++i) {
-      this.angleBits[i] = Math.max(bits - i - ((i * f4) / 2) | 0, 0);
+      this.angleBits[i] = Math.max(bits - i - (((i * f4) / 2) | 0), 0);
     }
 
     for (let /** @type{number} */ c = 0; c < 3; ++c) {
@@ -77,7 +77,7 @@ export class CodecParams {
    * @return{number}
    */
   getLevel(region) {
-    const /** @type{number} */ count3 = region[region.length - 1] * 3;
+    const /** @type{number} */ count3 = region[last(region)] * 3;
     if (count3 === 0) {
       return -1;
     }
@@ -113,9 +113,7 @@ export class CodecParams {
  * @param{number} q
  * @return{number}
  */
-CodecParams.dequantizeColor = function(v, q) {
-  return ((255 * v + q - 2) / (q - 1)) | 0;
-};
+export let dequantizeColor = (v, q) => ((255 * v + q - 2) / (q - 1)) | 0;
 
 /** @const @type{number} */
 CodecParams.MAX_CODE = MAX_PARTITION_CODE * MAX_COLOR_CODE;

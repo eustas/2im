@@ -1,4 +1,12 @@
+import {b8, b32, b40, b48, mathFloor} from "./Mini.js";
+
 // See Java sources for magic values explanation.
+
+/**
+ * @param{!RangeDecoder} self
+ * @return {number}
+ */
+let nextByte = (self) => self._data[self._offset++] | 0;
 
 export class RangeDecoder {
   /**
@@ -8,25 +16,16 @@ export class RangeDecoder {
     /** @private{number} */
     this._low = 0;
     /** @private{number} */
-    this._range = 281474976710655;
+    this._range = b48 - 1;
     /** @const @private{!Uint8Array} */
     this._data = data;
     /** @private{number} */
     this._offset = 0;
     /** @private{number} */
     this._code = 0;
-    this.init();
-  }
-
-  /**
-   * @return {void}
-   */
-  init() {
-    // TODO(eustas): move to "init"
+    let /** @type{!RangeDecoder} */ self = this;
     for (let /** @type{number} */ i = 0; i < 6; ++i) {
-      let /** @type{number} */ nextByte =
-          (this._offset < this._data.length) ? this._data[this._offset++] : 0;
-      this._code = (this._code * 256) + nextByte;
+      self._code = (self._code * b8) + nextByte(self);
     }
   }
 
@@ -39,18 +38,16 @@ export class RangeDecoder {
     this._low += bottom * this._range;
     this._range *= top - bottom;
     while (true) {
-      if (Math.floor(this._low / 1099511627776) !==
-          Math.floor((this._low + this._range - 1) / 1099511627776)) {
-        if (this._range > 4294967295) {
+      if (mathFloor(this._low / b40) !==
+          mathFloor((this._low + this._range - 1) / b40)) {
+        if (this._range >= b32) {
           break;
         }
-        this._range = (281474976710656 - this._low) % 4294967296;
+        this._range = (b48 - this._low) % b32;
       }
-      let /** @type{number} */ nextByte =
-          (this._offset < this._data.length) ? this._data[this._offset++] : 0;
-      this._code = ((this._code % 1099511627776) * 256) + nextByte;
-      this._range = (this._range % 1099511627776) * 256;
-      this._low = (this._low % 1099511627776) * 256;
+      this._code = ((this._code % b40) * b8) + nextByte(this);
+      this._range = (this._range % b40) * b8;
+      this._low = (this._low % b40) * b8;
     }
   }
 
@@ -59,7 +56,9 @@ export class RangeDecoder {
    * @return{number}
    */
   currentCount(totalRange) {
-    this._range = Math.floor(this._range / totalRange);
-    return Math.floor((this._code - this._low) / this._range);
+    this._range = mathFloor(this._range / totalRange);
+    let result = mathFloor((this._code - this._low) / this._range);
+    if (result < 0 || result > totalRange) throw 3;
+    return result;
   }
 }

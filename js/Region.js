@@ -1,3 +1,4 @@
+import {b32, last} from './Mini.js';
 import * as SinCos from './SinCos.js';
 
 export class DistanceRange {
@@ -19,16 +20,16 @@ export class DistanceRange {
    * @return {void}
    */
   update(region, angle, lineQuant) {
-    let /** @type{number} */ count3 = region[region.length - 1] * 3;
+    let /** @type{number} */ count3 = region[last(region)] * 3;
     if (count3 === 0) {
-      throw "empty region";
+      throw 4;
     }
 
     // Note: SinCos.SIN is all positive -> d0 <= d1
     let /** @type{number} */ nx = SinCos.SIN[angle];
     let /** @type{number} */ ny = SinCos.COS[angle];
-    let /** @type{number} */ mi = 2147483647;
-    let /** @type{number} */ ma = -2147483648;
+    let /** @type{number} */ mi = b32;
+    let /** @type{number} */ ma = -b32;
     for (let /** @type{number} */ i = 0; i < count3; i += 3) {
       let /** @type{number} */ y = region[i];
       let /** @type{number} */ x0 = region[i + 1];
@@ -69,7 +70,7 @@ export function splitLine(region, angle, d, left, right) {
   // x * nx + y * ny >= d
   let /** @type{number} */ nx = SinCos.SIN[angle];
   let /** @type{number} */ ny = SinCos.COS[angle];
-  let /** @type{number} */ count3 = region[region.length - 1] * 3;
+  let /** @type{number} */ count3 = region[last(region)] * 3;
   let /** @type{number} */ leftCount = 0;
   let /** @type{number} */ rightCount = 0;
   if (nx === 0) {
@@ -102,18 +103,18 @@ export function splitLine(region, angle, d, left, right) {
       let /** @type{number} */ x1 = region[i + 2];
       if (x < x1) {
         left[leftCount] = y;
-        left[leftCount + 1] = Math.max(x, x0);
+        left[leftCount + 1] = x > x0 ? x : x0;
         left[leftCount + 2] = x1;
         leftCount += 3;
       }
       if (x > x0) {
         right[rightCount] = y;
         right[rightCount + 1] = x0;
-        right[rightCount + 2] = Math.min(x, x1);
+        right[rightCount + 2] = x < x1 ? x : x1;
         rightCount += 3;
       }
     }
   }
-  left[left.length - 1] = leftCount / 3;
-  right[right.length - 1] = rightCount / 3;
+  left[last(left)] = leftCount / 3;
+  right[last(right)] = rightCount / 3;
 }

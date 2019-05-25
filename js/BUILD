@@ -61,6 +61,8 @@ closure_js_library(
 closure_js_library(
     name = "RangeDecoder",
     srcs = ["RangeDecoder.js"],
+    suppress = ["moduleLoad"],
+    deps = [":Mini"],
 )
 
 closure_js_library(
@@ -72,22 +74,34 @@ closure_js_library(
     name = "Region",
     srcs = ["Region.js"],
     suppress = ["moduleLoad"],
-    deps = [":SinCos"],
+    deps = [
+        ":Mini",
+        ":SinCos",
+    ],
 )
 
 closure_js_library(
     name = "SinCos",
     srcs = ["SinCos.js"],
+    suppress = ["moduleLoad"],
+    deps = [":Mini"],
 )
 
 closure_js_library(
     name = "main",
     srcs = ["main.js"],
+    suppress = ["moduleLoad", "reportUnknownTypes"],
+    #deps = [
+    #    ":CjkDecoder",
+    #    ":Decoder",
+    #],
+)
+
+closure_js_library(
+    name = "twim-lib",
+    srcs = ["twim-lib.js"],
     suppress = ["moduleLoad"],
-    deps = [
-        ":CjkDecoder",
-        ":Decoder",
-    ],
+    deps = [":Decoder"],
 )
 
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_binary")
@@ -97,6 +111,14 @@ closure_js_binary(
     entry_points = ["js/main.js"],
     deps = [":main"],
     language = "ECMASCRIPT_2015",
+)
+
+closure_js_binary(
+    name = "twim",
+    entry_points = ["js/twim-lib.js"],
+    deps = [":twim-lib"],
+    #language = "ECMASCRIPT_2015",
+    output_wrapper = "(function(scope){%output%})(window);",
 )
 
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")
