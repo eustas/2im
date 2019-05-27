@@ -9,7 +9,7 @@ function testSin() {
     console.log(SinCos.SIN[i]);
     crc = Crc64.update(crc, SinCos.SIN[i] & 0xFF);
   }
-  assertEquals('F22E8BD6F4993380', Crc64.finish(crc));
+  assertEquals('9486473C3841E28F', Crc64.finish(crc));
 }
 
 function testCos() {
@@ -17,5 +17,5 @@ function testCos() {
   for (let /** @type{number} */ i = 0; i < SinCos.MAX_ANGLE; ++i) {
     crc = Crc64.update(crc, SinCos.COS[i] & 0xFF);
   }
-  assertEquals('D18BB3517EE71BBB', Crc64.finish(crc));
+  assertEquals('A32700985A177AE9', Crc64.finish(crc));
 }

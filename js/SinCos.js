@@ -1,6 +1,6 @@
 import {newInt32Array, pow2} from "./Mini.js";
 
-const /** @type{number} */ SCALE_BITS = 20;
+const /** @type{number} */ SCALE_BITS = 18;
 export const /** @type{number} */ SCALE = pow2(SCALE_BITS);
 const /** @type{number} */ MAX_ANGLE_BITS = 9;
 export const /** @type{number} */ MAX_ANGLE = pow2(MAX_ANGLE_BITS);

@@ -11,11 +11,11 @@ import static org.junit.Assert.assertTrue;
 
 public class EncoderTest {
 
-  /*@Test
-  public void testEncoder() throws IOException {
-    String arg = "cat.png";
+  @Test
+  public void testEncoder() throws IOException, InterruptedException {
+    /*String arg = "/Users/eustas/clients/2im/mona.png";
     BufferedImage image = ImageIO.read(new File(arg));
-    byte[] data = Encoder.encode(image);
-    assertTrue(data.length > 20);
-  }*/
+    byte[] data = Encoder.encode(image, 876, 256, 256);
+    assertTrue(data.length > 20);*/
+  }
 }

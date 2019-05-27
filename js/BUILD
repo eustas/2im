@@ -75,6 +75,7 @@ closure_js_library(
     srcs = ["Region.js"],
     suppress = ["moduleLoad"],
     deps = [
+        ":CodecParams",
         ":Mini",
         ":SinCos",
     ],
@@ -152,6 +153,7 @@ closure_js_test(
     entry_points = ["js/Region_test.js"],
     suppress = ["moduleLoad"],
     deps = [
+        ":CodecParams",
         ":Region",
         ":SinCos",
         "@io_bazel_rules_closure//closure/library:testing",

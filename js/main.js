@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
   //}
 
 
-  let /** @type{string} */cat64 = "BRguTwFqYZaK5r6b/lVSxWz9Q2A7JrOdsLRy57eMiGuJGsvQDUjGyRcehwtHXxRCug1e2UpKaOK/OJQXNieo/MTWHSnOOaQ3nqlxoJjKSOIAvSBVvz8j0b0IuQXfYu1plJm9mzsIsxKwt1gqUWO5w4efUmUJaRe6aKD4HBye8v25f99viUoHaDGIxxA=";
+  let /** @type{string} */cat64 = "Rt91ED2NxlzZWYEoQGh83lUqjoPvvmpKPvQpeGBfJSo=";
   let cat = new Uint8Array(Array.from(atob(cat64)).map(chr));
   let catIm = /** @type{!ImageData} */ (window['decode2im'](cat, 64, 64));
   ctx.putImageData(catIm, 0, 0);

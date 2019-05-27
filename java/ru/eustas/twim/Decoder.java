@@ -59,7 +59,7 @@ public class Decoder {
           int angleMult = (SinCos.MAX_ANGLE / angleMax);
           int angleCode = readNumber(src, angleMax);
           int angle = angleCode * angleMult;
-          distanceRange.update(region, angle, cp.lineQuant);
+          distanceRange.update(region, angle, cp);
           int line = readNumber(src, distanceRange.numLines);
           Region.splitLine(region, angle, distanceRange.distance(line), inner, outer);
           break;
@@ -95,10 +95,8 @@ public class Decoder {
     }
   }
 
-  static BufferedImage decode(byte[] encoded) {
+  static BufferedImage decode(byte[] encoded, int width, int height) {
     RangeDecoder src = new RangeDecoder(encoded);
-    int width = 64;
-    int height = 64;
     CodecParams cp = new CodecParams(width, height);
     cp.setCode(readNumber(src, CodecParams.MAX_CODE));
 

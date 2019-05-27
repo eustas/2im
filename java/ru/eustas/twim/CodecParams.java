@@ -9,12 +9,11 @@ class CodecParams {
   private static final int MAX_F4 = 5;
 
   static final int MAX_PARTITION_CODE = MAX_F1 * MAX_F2 * MAX_F3 * MAX_F4;
-  static final int MAX_COLOR_CODE = 30;
+  static final int MAX_COLOR_CODE = 13;
 
   static final int MAX_CODE = MAX_PARTITION_CODE * MAX_COLOR_CODE;
 
-  static final int[] COLOR_QUANT = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-      24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54};
+  static final int[] COLOR_QUANT = {5, 7, 9, 11, 13, 15, 17, 21, 25, 29, 33, 65, 129};
 
   static int dequantizeColor(int v, int q) {
     return (255 * v + q - 2) / (q - 1);
@@ -38,6 +37,7 @@ class CodecParams {
   final int width;
   final int height;
   final int lineQuant = SinCos.SCALE;
+  final int lineLimit = 25;
 
   private int partitionCode;
   private int colorCode;
@@ -76,6 +76,18 @@ class CodecParams {
     for (int i = 0; i < MAX_LEVEL; ++i) {
       angleBits[i] = Math.max(bits - i - (i * f4) / 2, 0);
     }
+  }
+
+  public String toString() {
+    int code = partitionCode;
+    int f1 = code % MAX_F1;
+    code = code / MAX_F1;
+    int f2 = code % MAX_F2;
+    code = code / MAX_F2;
+    int f3 = code % MAX_F3;
+    code = code / MAX_F3;
+    int f4 = code % MAX_F4;
+    return "p: " + f1 + "" + f2 + "" + f3 + "" + f4 + ", clr: " + colorCode;
   }
 
   int getCode() {

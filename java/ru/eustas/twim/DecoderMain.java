@@ -10,7 +10,7 @@ public class DecoderMain {
   public static void main(String... args) throws IOException {
     for (String arg : args) {
       byte[] data = Files.readAllBytes(FileSystems.getDefault().getPath(arg));
-      ImageIO.write(Decoder.decode(data), "png", new File(arg + ".png"));
+      ImageIO.write(Decoder.decode(data, 64, 64), "png", new File(arg + ".png"));
     }
   }
 }

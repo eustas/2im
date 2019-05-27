@@ -1,7 +1,7 @@
 package ru.eustas.twim;
 
 class SinCos {
-  private static final int SCALE_BITS = 20;
+  private static final int SCALE_BITS = 18;
   static final int SCALE = 1 << SCALE_BITS;
 
   private static final int MAX_ANGLE_BITS = 9;

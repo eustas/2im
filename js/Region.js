@@ -1,5 +1,6 @@
 import {b32, last} from './Mini.js';
 import * as SinCos from './SinCos.js';
+import {CodecParams} from './CodecParams.js';
 
 export class DistanceRange {
   constructor() {
@@ -16,10 +17,10 @@ export class DistanceRange {
   /**
    * @param{!Int32Array} region
    * @param{number} angle
-   * @param{number} lineQuant
+   * @param{!CodecParams} cp
    * @return {void}
    */
-  update(region, angle, lineQuant) {
+  update(region, angle, cp) {
     let /** @type{number} */ count3 = region[last(region)] * 3;
     if (count3 === 0) {
       throw 4;
@@ -41,7 +42,15 @@ export class DistanceRange {
     }
     this._min = mi;
     this._max = ma;
-    this.numLines = ((ma - mi) / lineQuant) | 0;
+    let /** @type{number} */ lineQuant = cp.lineQuant;
+    while (true) {
+      this.numLines = (ma - mi) / lineQuant | 0;
+      if (this.numLines > cp.lineLimit) {
+        lineQuant = lineQuant + (lineQuant / 16 | 0);
+      } else {
+        break;
+      }
+    }
     this.lineQuant = lineQuant;
   }
 

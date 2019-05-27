@@ -207,7 +207,7 @@ public class Encoder {
     }
   }
 
-  private static class Fragment {
+  static class Fragment {
     final int[] region;
     Fragment leftChild;
     Fragment rightChild;
@@ -234,7 +234,6 @@ public class Encoder {
 
       int[] region = this.region;
       Stats stats = this.stats;
-      int lineQuant = cp.lineQuant;
       int level = cp.getLevel(region);
       int angleMax = 1 << cp.angleBits[level];
       int angleMult = (SinCos.MAX_ANGLE / angleMax);
@@ -245,7 +244,7 @@ public class Encoder {
       // Find subdivision
       for (int angleCode = 0; angleCode < angleMax; ++angleCode) {
         int angle = angleCode * angleMult;
-        distanceRange.update(region, angle, lineQuant);
+        distanceRange.update(region, angle, cp);
         int numLines = distanceRange.numLines;
         for (int line = 0; line < numLines; ++line) {
           int d = distanceRange.distance(line);
@@ -268,7 +267,7 @@ public class Encoder {
       if (bestScore < 0.0) {
         this.bestCost = -1.0;
       } else {
-        distanceRange.update(region, bestAngleCode * angleMult, lineQuant);
+        distanceRange.update(region, bestAngleCode * angleMult, cp);
         int[] leftRegion = new int[region[region.length - 1] * 3 + 1];
         int[] rightRegion = new int[region[region.length - 1] * 3 + 1];
         Region.splitLine(region, bestAngleCode * angleMult, distanceRange.distance(bestLine), leftRegion, rightRegion);
@@ -346,7 +345,7 @@ public class Encoder {
    * Minimal color data cost is used.
    * Partition could be used to try multiple color quantizations to see, which one gives the best result.
    */
-  private static List<Fragment> buildPartition(int sizeLimit, int goalFunction, CodecParams cp, Cache cache) {
+  static List<Fragment> buildPartition(int sizeLimit, int goalFunction, CodecParams cp, Cache cache) {
     double tax = bitCost(CodecParams.NODE_TYPE_COUNT) + 3.0 * bitCost(CodecParams.COLOR_QUANT[0]);
     double budget = sizeLimit * 8 - tax - bitCost(CodecParams.MAX_CODE);  // Minus flat image cost.
 
@@ -381,10 +380,9 @@ public class Encoder {
     return result;
   }
 
-  private static double simulateEncode(int sizeLimit, List<Fragment> partition, CodecParams cp) {
+  private static Set<Fragment> subpartition(int targetSize, List<Fragment> partition, CodecParams cp) {
     double tax = bitCost(CodecParams.NODE_TYPE_COUNT * cp.colorQuant[0] * cp.colorQuant[1] * cp.colorQuant[2]);
-    double budget = 8 * sizeLimit - bitCost(CodecParams.MAX_CODE) - tax;
-
+    double budget = 8 * targetSize - bitCost(CodecParams.MAX_CODE) - tax;
     Set<Fragment> nonLeaf = new HashSet<>();
     for (Fragment node : partition) {
       if (node.bestCost < 0.0) break;
@@ -393,6 +391,11 @@ public class Encoder {
       budget -= cost;
       nonLeaf.add(node);
     }
+    return nonLeaf;
+  }
+
+  private static double simulateEncode(int targetSize, List<Fragment> partition, CodecParams cp) {
+    Set<Fragment> nonLeaf = subpartition(targetSize, partition, cp);
     List<Fragment> queue = new ArrayList<>(2 * nonLeaf.size() + 1);
     queue.add(partition.get(0));
 
@@ -407,27 +410,13 @@ public class Encoder {
     return sqe[0] + sqe[1] + sqe[2];
   }
 
-  private static byte[] encode(int sizeLimit, List<Fragment> partition, CodecParams cp) {
-    if (partition.isEmpty()) {
-      throw new IllegalStateException("empty tree");
-    }
-
-    double tax = bitCost(CodecParams.NODE_TYPE_COUNT * cp.colorQuant[0] * cp.colorQuant[1] * cp.colorQuant[2]);
-    double budget = 8 * sizeLimit - bitCost(CodecParams.MAX_CODE) - tax;
+  static byte[] encode(int targetSize, List<Fragment> partition, CodecParams cp) {
+    Set<Fragment> nonLeaf = subpartition(targetSize, partition, cp);
+    List<Fragment> queue = new ArrayList<>(2 * nonLeaf.size() + 1);
+    queue.add(partition.get(0));
 
     RangeEncoder dst = new RangeEncoder();
     writeNumber(dst, CodecParams.MAX_CODE, cp.getCode());
-
-    Set<Fragment> nonLeaf = new HashSet<>();
-    for (Fragment node : partition) {
-      if (node.bestCost < 0.0) break;
-      double cost = node.bestCost + tax;
-      if (budget < cost) break;
-      budget -= cost;
-      nonLeaf.add(node);
-    }
-    List<Fragment> queue = new ArrayList<>(2 * nonLeaf.size() + 1);
-    queue.add(partition.get(0));
 
     int encoded = 0;
     while (encoded < queue.size()) {
@@ -464,20 +453,19 @@ public class Encoder {
           bestColorCode = colorCode;
         }
       }
+      System.out.println(
+          "Done cp: [" + cp + "], g: " + goalFunction + ", error: " + Math.sqrt(bestSqe / (cp.width * cp.height)));
       return this;
     }
   }
 
   static byte[] encode(BufferedImage src, int targetSize) throws InterruptedException {
-    int width = 64;
-    int height = 64;
-    if (src.getWidth() != width || src.getHeight() != height) {
-      throw new IllegalArgumentException("invalid image size");
-    }
+    int width = src.getWidth();
+    int height = src.getHeight();
     Cache cache = new Cache(src.getRGB(0, 0, width, height, null, 0, width), width);
     List<SimulationTask> tasks = new ArrayList<>();
     for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
-      for (int goalFunction = 0; goalFunction < 4; ++goalFunction) {
+      for (int goalFunction = 3; goalFunction < 4; ++goalFunction) {
         CodecParams cp = new CodecParams(width, height);
         cp.setPartitionCode(partitionCode);
         tasks.add(new SimulationTask(targetSize, goalFunction, cache, cp));
@@ -488,8 +476,6 @@ public class Encoder {
     long t0 = System.nanoTime();
     executor.invokeAll(tasks);
     executor.shutdownNow();
-    long t1 = System.nanoTime();
-    System.out.println("DONE " + (((t1 - t0) / 1000000) / 1000.0) + "s");
     SimulationTask bestResult = tasks.get(0);
     double bestSqe = 1e20;
     for (SimulationTask task : tasks) {
@@ -498,8 +484,13 @@ public class Encoder {
         bestSqe = task.bestSqe;
       }
     }
-    System.out.println(Math.sqrt(bestSqe / (width * height)));
     bestResult.cp.setColorCode(bestResult.bestColorCode);
-    return encode(targetSize, buildPartition(targetSize, bestResult.goalFunction, bestResult.cp, bestResult.cache), bestResult.cp);
+    List<Fragment> partition = buildPartition(targetSize, bestResult.goalFunction, bestResult.cp, bestResult.cache);
+    byte[] data = encode(targetSize, partition, bestResult.cp);
+    long t1 = System.nanoTime();
+    System.out.println("time: " + (((t1 - t0) / 1000000) / 1000.0) + "s, size: " + data.length +
+        ", cp: [" + bestResult.cp + "], g: " + bestResult.goalFunction +
+        ", error: " + Math.sqrt(bestSqe / (width * height)));
+    return data;
   }
 }

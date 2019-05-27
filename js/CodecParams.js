@@ -9,10 +9,9 @@ const /** @type{number} */ MAX_F3 = 5;
 const /** @type{number} */ MAX_F4 = 5;
 
 const /** @type{number} */ MAX_PARTITION_CODE = MAX_F1 * MAX_F2 * MAX_F3 * MAX_F4;
-const /** @type{number} */ MAX_COLOR_CODE = 30;
+const /** @type{number} */ MAX_COLOR_CODE = 13;
 
-const /** @type{!Int32Array} */ COLOR_QUANT = newInt32Array([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-    24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54]);
+const /** @type{!Int32Array} */ COLOR_QUANT = newInt32Array([5, 7, 9, 11, 13, 15, 17, 21, 25, 29, 33, 65, 129]);
 
 const /** @type{!Int32Array} */ SCALE_STEP = newInt32Array([1000, 631, 399, 252, 159, 100]);
 const /** @type{number} */ SCALE_STEP_FACTOR = 40;
@@ -31,6 +30,8 @@ export class CodecParams {
     this._height = height;
     /** @const @type{number} */
     this.lineQuant = SinCos.SCALE;
+    /** @const @type{number} */
+    this.lineLimit = 25;
     /** @const @type{!Int32Array} */
     this.levelScale = newInt32Array(MAX_LEVEL);
     /** @const @type{!Int32Array} */

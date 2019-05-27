@@ -96,6 +96,16 @@ java_test(
     deps = [":encoder"],
 )
 
+java_binary(
+    name = "MovieMain",
+    srcs = ["MovieMain.java"],
+    deps = [
+        ":codec_params",
+        ":decoder",
+        ":encoder",
+    ],
+)
+
 java_library(
     name = "range_code",
     srcs = ["RangeCode.java"],

@@ -19,7 +19,7 @@ class Region {
     int numLines;
     int lineQuant;
 
-    void update(int[] region, int angle, int lineQuant) {
+    void update(int[] region, int angle, CodecParams cp) {
       final int count3 = region[region.length - 1] * 3;
       if (count3 == 0) {
         throw new IllegalStateException("empty region");
@@ -41,7 +41,16 @@ class Region {
       }
       this.min = mi;
       this.max = ma;
-      this.numLines = (ma - mi) / lineQuant;
+
+      int lineQuant = cp.lineQuant;
+      while (true) {
+        this.numLines = (ma - mi) / lineQuant;
+        if (this.numLines > cp.lineLimit) {
+          lineQuant = lineQuant + lineQuant / 16;
+        } else {
+          break;
+        }
+      }
       this.lineQuant = lineQuant;
     }
 

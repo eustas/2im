@@ -11,11 +11,11 @@ import java.nio.file.Files;
 
 public class DecoderTest {
 
-  /*@Test
+  @Test
   public void testEncoder() throws IOException {
-    String arg = "cat.png.2im";
+    /*String arg = "cat.png.2im";
     byte[] data = Files.readAllBytes(FileSystems.getDefault().getPath(arg));
     BufferedImage decoded = Decoder.decode(data);
-    ImageIO.write(decoded, "png", new File(arg + ".png"));
-  }*/
+    ImageIO.write(decoded, "png", new File(arg + ".png"));*/
+  }
 }

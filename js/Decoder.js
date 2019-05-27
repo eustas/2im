@@ -84,7 +84,7 @@ class Fragment {
     let /** @type{number} */ angleMult = (SinCos.MAX_ANGLE / angleMax);
     let /** @type{number} */ angleCode = readNumber(src, angleMax);
     let /** @type{number} */ angle = angleCode * angleMult;
-    distanceRange.update(this._region, angle, cp.lineQuant);
+    distanceRange.update(this._region, angle, cp);
     let /** @type{number} */ line = readNumber(src, distanceRange.numLines);
     Region.splitLine(this._region, angle, distanceRange.distance(line), inner, outer);
 
