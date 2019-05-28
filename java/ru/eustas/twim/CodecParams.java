@@ -9,11 +9,13 @@ class CodecParams {
   private static final int MAX_F4 = 5;
 
   static final int MAX_PARTITION_CODE = MAX_F1 * MAX_F2 * MAX_F3 * MAX_F4;
-  static final int MAX_COLOR_CODE = 13;
+  static final int MAX_COLOR_CODE = 17;
 
   static final int MAX_CODE = MAX_PARTITION_CODE * MAX_COLOR_CODE;
 
-  static final int[] COLOR_QUANT = {5, 7, 9, 11, 13, 15, 17, 21, 25, 29, 33, 65, 129};
+  static int makeColorQuant(int code) {
+    return 1 + ((4 + (code & 3)) << (code >> 2));
+  }
 
   static int dequantizeColor(int v, int q) {
     return (255 * v + q - 2) / (q - 1);
@@ -21,7 +23,6 @@ class CodecParams {
 
   private static final int[] SCALE_STEP = {1000, 631, 399, 252, 159, 100};
   private static final int SCALE_STEP_FACTOR = 40;
-  private static final int[] BASE_SCALE = {4, 9, 16, 25, 36};
   private static final int BASE_SCALE_FACTOR = 36;
 
   // Not the best place, but OK for prototype.
@@ -51,7 +52,7 @@ class CodecParams {
     colorCode = code;
     int[] quants = {code, code, code};
     for (int c = 0; c < 3; ++c) {
-      int q = COLOR_QUANT[quants[c]];
+      int q = makeColorQuant(quants[c]);
       colorQuant[c] = q;
     }
   }
@@ -60,13 +61,13 @@ class CodecParams {
     partitionCode = code;
     int f1 = code % MAX_F1;
     code = code / MAX_F1;
-    int f2 = code % MAX_F2;
+    int f2 = 2 + code % MAX_F2;
     code = code / MAX_F2;
     int f3 = code % MAX_F3;
     code = code / MAX_F3;
     int f4 = code % MAX_F4;
 
-    int scale = (width * width + height * height) * BASE_SCALE[f2];
+    int scale = (width * width + height * height) * f2 * f2;
     for (int i = 0; i < MAX_LEVEL; ++i) {
       levelScale[i] = scale / BASE_SCALE_FACTOR;
       scale = (scale * SCALE_STEP_FACTOR) / SCALE_STEP[f3];

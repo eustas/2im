@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
   //}
 
 
-  let /** @type{string} */cat64 = "Rt91ED2NxlzZWYEoQGh83lUqjoPvvmpKPvQpeGBfJSo=";
+  let /** @type{string} */cat64 = "VFCGshDtPcnDAnZLeIP05Mnci4+ka/4YnEI7D+CDptw=";
   let cat = new Uint8Array(Array.from(atob(cat64)).map(chr));
   let catIm = /** @type{!ImageData} */ (window['decode2im'](cat, 64, 64));
   ctx.putImageData(catIm, 0, 0);

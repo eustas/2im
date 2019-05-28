@@ -346,7 +346,7 @@ public class Encoder {
    * Partition could be used to try multiple color quantizations to see, which one gives the best result.
    */
   static List<Fragment> buildPartition(int sizeLimit, int goalFunction, CodecParams cp, Cache cache) {
-    double tax = bitCost(CodecParams.NODE_TYPE_COUNT) + 3.0 * bitCost(CodecParams.COLOR_QUANT[0]);
+    double tax = bitCost(CodecParams.NODE_TYPE_COUNT) + 3.0 * bitCost(CodecParams.makeColorQuant(0));
     double budget = sizeLimit * 8 - tax - bitCost(CodecParams.MAX_CODE);  // Minus flat image cost.
 
     int width = cp.width;

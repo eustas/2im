@@ -118,7 +118,7 @@ closure_js_binary(
     name = "twim",
     entry_points = ["js/twim-lib.js"],
     deps = [":twim-lib"],
-    #language = "ECMASCRIPT_2015",
+    language = "ECMASCRIPT_2015",
     output_wrapper = "(function(scope){%output%})(window);",
 )
 
