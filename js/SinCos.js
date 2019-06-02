@@ -1,9 +1,8 @@
-import {math, mathRound, newInt32Array, pow2} from "./Mini.js";
+import {b8, b16, math, mathRound, newInt32Array} from "./Mini.js";
 
-const /** @type{number} */ SCALE_BITS = 18;
-export let /** @noinline @type{number} */ SCALE = pow2(SCALE_BITS);
-const /** @type{number} */ MAX_ANGLE_BITS = 9;
-export let /** @noinline @type{number} */ MAX_ANGLE = pow2(MAX_ANGLE_BITS);
+export let /** @noinline @type{number} */ SCALE = b16 * 4;
+export const /** @type{number} */ MAX_ANGLE_BITS = 9;
+export let /** @noinline @type{number} */ MAX_ANGLE = b8 * 2;
 
 export let /** @const @type{!Int32Array} */ SIN = newInt32Array(MAX_ANGLE);
 export let /** @const @type{!Int32Array} */ COS = newInt32Array(MAX_ANGLE);

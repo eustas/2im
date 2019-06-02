@@ -23,16 +23,11 @@ export let last = (a) =>  a.length - 1;
 
 export let /** @const */ math = Math;
 
-/**
- * @param{number} n
- * @return {number}
- */
-export let pow2 = n => 2 ** n;
-
-export let /** @const @noinline @type{number} */ b8 = pow2(8);
-export let /** @const @type{number} */ b32 = b8 ** 4;
-export let /** @const @type{number} */ b40 = b8 ** 5;
-export let /** @const @type{number} */ b48 = b8 ** 6;
+export let /** @const @noinline @type{number} */ b8 = 256;
+export let /** @const @noinline @type{number} */ b16 = b8 * b8;
+export let /** @const @type{number} */ b32 = b16 * b16;
+export let /** @const @type{number} */ b40 = b32 * b8;
+export let /** @const @type{number} */ b48 = b40 * b8;
 
 export let /** @type{function(number):number} */ mathFloor = math.floor;
 export let /** @type{function(number):number} */ mathRound = math.round;

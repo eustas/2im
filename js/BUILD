@@ -104,16 +104,6 @@ closure_js_library(
 )
 
 closure_js_library(
-    name = "main",
-    srcs = ["main.js"],
-    suppress = ["moduleLoad", "reportUnknownTypes"],
-    #deps = [
-    #    ":CjkDecoder",
-    #    ":Decoder",
-    #],
-)
-
-closure_js_library(
     name = "twim-lib",
     srcs = ["twim-lib.js"],
     suppress = ["moduleLoad"],
@@ -121,13 +111,6 @@ closure_js_library(
 )
 
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_binary")
-
-closure_js_binary(
-    name = "app",
-    entry_points = ["js/main.js"],
-    deps = [":main"],
-    #language = "ECMASCRIPT_2015",
-)
 
 closure_js_binary(
     name = "twim",

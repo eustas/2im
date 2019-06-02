@@ -17,7 +17,6 @@ let /** @type{number} */ MAX_COLOR_CODE = 17;
  */
 let makeColorQuant = (code) => 1 + ((4 + (code & 3)) << (code >> 2));
 
-let /** @type{!Int32Array} */ SCALE_STEP = newInt32Array([1000, 631, 399, 252, 159, 100]);
 let /** @type{number} */ SCALE_STEP_FACTOR = 40;
 let /** @type{number} */ BASE_SCALE_FACTOR = 36;
 
@@ -58,29 +57,26 @@ export let getLineQuant = () => SinCos.SCALE;
  * @return{void}
  */
 export let setCode = (code) => {
-  let /** @type{number} */ partitionCode = code % MAX_PARTITION_CODE;
-  code = (code / MAX_PARTITION_CODE) | 0;
-  let /** @type{number} */ colorCode = code % MAX_COLOR_CODE;
-
-  let /** @type{number} */ f1 = partitionCode % MAX_F1;
-  partitionCode = (partitionCode / MAX_F1) | 0;
-  let /** @type{number} */ f2 = 2 + partitionCode % MAX_F2;
-  partitionCode = (partitionCode / MAX_F2) | 0;
-  let /** @type{number} */ f3 = partitionCode % MAX_F3;
-  partitionCode = (partitionCode / MAX_F3) | 0;
-  let /** @type{number} */ f4 = partitionCode % MAX_F4;
+  let /** @type{number} */ f1 = code % MAX_F1;
+  code = (code / MAX_F1) | 0;
+  let /** @type{number} */ f2 = 2 + code % MAX_F2;
+  code = (code / MAX_F2) | 0;
+  let /** @type{number} */ f3 = 10 ** (3 - (code % MAX_F3) / 5) | 0;
+  code = (code / MAX_F3) | 0;
+  let /** @type{number} */ f4 = code % MAX_F4;
+  code = (code / MAX_F4) | 0;
 
   let /** @type{number} */ scale = (_width * _width + _height * _height) * f2 * f2;
   for (let /** @type{number} */ i = 0; i < MAX_LEVEL; ++i) {
     _levelScale[i] = scale / BASE_SCALE_FACTOR;
-    scale = ((scale * SCALE_STEP_FACTOR) / SCALE_STEP[f3]) | 0;
+    scale = ((scale * SCALE_STEP_FACTOR) / f3) | 0;
   }
 
-  let /** @type{number} */ bits = 9 - f1;
+  let /** @type{number} */ bits = SinCos.MAX_ANGLE_BITS - f1;
   for (let /** @type{number} */ i = 0; i < MAX_LEVEL; ++i) {
     angleBits[i] = math.max(bits - i - (((i * f4) / 2) | 0), 0);
   }
-  _colorQuant = makeColorQuant(colorCode);
+  _colorQuant = makeColorQuant(code);
 };
 
 /**

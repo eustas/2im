@@ -8,7 +8,7 @@ import static ru.eustas.twim.CodecParams.NODE_FILL;
 
 public class Decoder {
   private static int readNumber(RangeDecoder src, int max) {
-    if (max == 1) return 0;
+    if (max < 2) return 0;
     int result = src.currentCount(max);
     src.removeRange(result, result + 1);
     return result;

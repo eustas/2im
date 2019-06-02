@@ -10,7 +10,7 @@ import * as SinCos from './SinCos.js';
  * @return{number}
  */
 let readNumber = (max) => {
-  if (max === 1) return 0;
+  if (max < 2) return 0;
   let /** @type{number} */ result = RangeDecoder.currentCount(max);
   RangeDecoder.removeRange(result, result + 1);
   return result;
@@ -43,7 +43,7 @@ let parseColor = () => [
 let parse = (region, children, width, rgba) => {
   let /** @type{number} */ type = readNumber(CodecParams.NODE_TYPE_COUNT);
 
-  if (type === CodecParams.NODE_FILL) {
+  if (type == CodecParams.NODE_FILL) {
     let /** @type{!Array<number>} */ color = parseColor();
     forEachScan(region, (y, x0, x1) => {
       for (let /** @type{number} */ x = x0; x < x1; ++x) {
@@ -55,9 +55,9 @@ let parse = (region, children, width, rgba) => {
 
   let /** @type{number} */ level = CodecParams.getLevel(region);
 
-  let /** @type{number} */ lastCount3 = region[last(region)] * 3;
-  let /** @type{!Int32Array} */ inner = newInt32Array(lastCount3 + 1);
-  let /** @type{!Int32Array} */ outer = newInt32Array(lastCount3 + 1);
+  let /** @type{number} */ lastCount3_1 = region[last(region)] * 3 + 1;
+  let /** @type{!Int32Array} */ inner = newInt32Array(lastCount3_1);
+  let /** @type{!Int32Array} */ outer = newInt32Array(lastCount3_1);
 
   // type === CodecParams.NODE_HALF_PLANE
   let /** @type{number} */ angleMax = 1 << CodecParams.angleBits[level];
@@ -68,8 +68,7 @@ let parse = (region, children, width, rgba) => {
   let /** @type{number} */ line = readNumber(DistanceRange.getNumLines());
   Region.splitLine(region, angle, DistanceRange.distance(line), inner, outer);
 
-  children.push(inner);
-  children.push(outer);
+  children.push(inner, outer);
 };
 
 /**

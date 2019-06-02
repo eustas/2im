@@ -15,16 +15,7 @@ export let splitLine = (region, angle, d, left, right) => {
   let /** @type{number} */ ny = SinCos.COS[angle];
   let /** @type{number} */ leftCount = 0;
   let /** @type{number} */ rightCount = 0;
-  if (nx === 0) {
-    // nx = 0 -> ny = SinCos.SCALE -> y * ny ?? d
-    forEachScan(region, (y, x0, x1) => {
-      if (y * ny >= d) {
-        int32ArraySet(left, [y, x0, x1], 3 * leftCount++);
-      } else {
-        int32ArraySet(right, [y, x0, x1], 3 * rightCount++);
-      }
-    });
-  } else {
+  if (nx) {
     // nx > 0 -> x ?? (d - y * ny) / nx
     d = 2 * d + nx;
     ny = 2 * ny;
@@ -36,6 +27,15 @@ export let splitLine = (region, angle, d, left, right) => {
       }
       if (x > x0) {
         int32ArraySet(right, [y, x0, x < x1 ? x : x1], 3 * rightCount++);
+      }
+    });
+  } else {
+    // nx = 0 -> ny = SinCos.SCALE -> y * ny ?? d
+    forEachScan(region, (y, x0, x1) => {
+      if (y * ny >= d) {
+        int32ArraySet(left, [y, x0, x1], 3 * leftCount++);
+      } else {
+        int32ArraySet(right, [y, x0, x1], 3 * rightCount++);
       }
     });
   }

@@ -21,7 +21,6 @@ class CodecParams {
     return (255 * v + q - 2) / (q - 1);
   }
 
-  private static final int[] SCALE_STEP = {1000, 631, 399, 252, 159, 100};
   private static final int SCALE_STEP_FACTOR = 40;
   private static final int BASE_SCALE_FACTOR = 36;
 
@@ -62,17 +61,17 @@ class CodecParams {
     code = code / MAX_F1;
     int f2 = 2 + code % MAX_F2;
     code = code / MAX_F2;
-    int f3 = code % MAX_F3;
+    int f3 = (int)Math.pow(10, 3 - (code % MAX_F3) / 5.0);
     code = code / MAX_F3;
     int f4 = code % MAX_F4;
 
     int scale = (width * width + height * height) * f2 * f2;
     for (int i = 0; i < MAX_LEVEL; ++i) {
       levelScale[i] = scale / BASE_SCALE_FACTOR;
-      scale = (scale * SCALE_STEP_FACTOR) / SCALE_STEP[f3];
+      scale = (scale * SCALE_STEP_FACTOR) / f3;
     }
 
-    int bits = 9 - f1;
+    int bits = SinCos.MAX_ANGLE_BITS - f1;
     for (int i = 0; i < MAX_LEVEL; ++i) {
       angleBits[i] = Math.max(bits - i - (i * f4) / 2, 0);
     }
