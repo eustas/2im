@@ -1,6 +1,6 @@
 import {assertSameElements, assertTrue} from 'goog:goog.testing.asserts';
 import 'goog:goog.testing.jsunit';
-import {currentCount, RangeDecoder, removeRange} from "./RangeDecoder.js";
+import * as RangeDecoder from "./RangeDecoder.js";
 import {RangeEncoder} from "./RangeEncoder.js";
 
 function testGolden() {
@@ -315,11 +315,11 @@ function testGolden() {
 
   assertSameElements(expected, data);
 
-  let /** @type{!RangeDecoder} */ decoder = new RangeDecoder(data);
+  RangeDecoder.init(data);
   for (let i = 0; i < triplets.length; i += 3) {
-    let /** @type{number} */ val = currentCount(decoder, triplets[i + 2]);
+    let /** @type{number} */ val = RangeDecoder.currentCount(triplets[i + 2]);
     assertTrue((val >= triplets[i]) && (val < triplets[i + 1]));
-    removeRange(decoder, triplets[i], triplets[i + 1]);
+    RangeDecoder.removeRange(triplets[i], triplets[i + 1]);
   }
 }
 

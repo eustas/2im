@@ -17,7 +17,7 @@ public class Decoder {
   private static int readColor(RangeDecoder src, CodecParams cp) {
     int argb = 0xFF;  // alpha = 1
     for (int c = 0; c < 3; ++c) {
-      int q = cp.colorQuant[c];
+      int q = cp.colorQuant;
       argb = (argb << 8) | CodecParams.dequantizeColor(readNumber(src, q), q);
     }
     return argb;
@@ -34,7 +34,7 @@ public class Decoder {
       this.region = region;
     }
 
-    void parse(RangeDecoder src, CodecParams cp, List<Fragment> children, Region.DistanceRange distanceRange) {
+    void parse(RangeDecoder src, CodecParams cp, List<Fragment> children, DistanceRange distanceRange) {
       type = readNumber(src, CodecParams.NODE_TYPE_COUNT);
 
       if (type == NODE_FILL) {
@@ -112,7 +112,7 @@ public class Decoder {
     List<Fragment> children = new ArrayList<>();
     children.add(root);
 
-    Region.DistanceRange distanceRange = new Region.DistanceRange();
+    DistanceRange distanceRange = new DistanceRange();
     int cursor = 0;
     while (cursor < children.size()) {
       int checkpoint = children.size();

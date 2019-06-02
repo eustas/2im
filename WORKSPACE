@@ -12,8 +12,8 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 git_repository(
     name = "io_bazel_rules_closure",
-    commit = "87b9b7cefe57f9dea04c5e8518862af17cdfba2e",
-    shallow_since = "1558039479 -0700",
+    commit = "6794c2755113e967394eec53ed4ceb6c7eb4d065",
+    shallow_since = "1559345009 -0700",
     remote = "https://github.com/bazelbuild/rules_closure.git",
 )
 

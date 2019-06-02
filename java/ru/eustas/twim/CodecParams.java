@@ -32,12 +32,11 @@ class CodecParams {
 
   private final int[] levelScale = new int[MAX_LEVEL];
   final int[] angleBits = new int[MAX_LEVEL];
-  final int[] colorQuant = new int[3];
+  int colorQuant;
 
   // Actually, that is image params...
   final int width;
   final int height;
-  final int lineQuant = SinCos.SCALE;
   final int lineLimit = 25;
 
   private int partitionCode;
@@ -48,13 +47,13 @@ class CodecParams {
     this.height = height;
   }
 
+  int getLineQuant() {
+    return SinCos.SCALE;
+  }
+
   void setColorCode(int code) {
     colorCode = code;
-    int[] quants = {code, code, code};
-    for (int c = 0; c < 3; ++c) {
-      int q = makeColorQuant(quants[c]);
-      colorQuant[c] = q;
-    }
+    colorQuant = makeColorQuant(code);
   }
 
   void setPartitionCode(int code) {

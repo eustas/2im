@@ -43,12 +43,27 @@ closure_js_library(
 closure_js_library(
     name = "Decoder",
     srcs = ["Decoder.js"],
-    suppress = ["moduleLoad"],
+    suppress = [
+        "extraRequire",  # closure compiler gone mad
+        "moduleLoad",
+    ],
     deps = [
         ":CodecParams",
+        ":DistanceRange",
         ":RangeDecoder",
         ":Mini",
         ":Region",
+        ":SinCos",
+    ],
+)
+
+closure_js_library(
+    name = "DistanceRange",
+    srcs = ["DistanceRange.js"],
+    suppress = ["moduleLoad"],
+    deps = [
+        ":CodecParams",
+        ":Mini",
         ":SinCos",
     ],
 )
@@ -111,15 +126,15 @@ closure_js_binary(
     name = "app",
     entry_points = ["js/main.js"],
     deps = [":main"],
-    language = "ECMASCRIPT_2015",
+    #language = "ECMASCRIPT_2015",
 )
 
 closure_js_binary(
     name = "twim",
     entry_points = ["js/twim-lib.js"],
     deps = [":twim-lib"],
-    language = "ECMASCRIPT_2015",
-    output_wrapper = "(function(scope){%output%})(window);",
+    language = "ECMASCRIPT_NEXT",
+    output_wrapper = "((zis)=>{%output%})(window);",
 )
 
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")
@@ -154,6 +169,7 @@ closure_js_test(
     suppress = ["moduleLoad"],
     deps = [
         ":CodecParams",
+        ":DistanceRange",
         ":Region",
         ":SinCos",
         "@io_bazel_rules_closure//closure/library:testing",

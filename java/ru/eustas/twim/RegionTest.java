@@ -10,8 +10,9 @@ public class RegionTest {
   public void testHorizontalSplit() {
     int[] region = {0, 0, 4, 1};
     int angle = SinCos.MAX_ANGLE / 2;
-    Region.DistanceRange distanceRange = new Region.DistanceRange();
-    distanceRange.update(region, angle, SinCos.SCALE);
+    CodecParams cp = new CodecParams(4, 4);
+    DistanceRange distanceRange = new DistanceRange();
+    distanceRange.update(region, angle, cp);
     assertEquals(3, distanceRange.numLines);
     int[] left = new int[4];
     int[] right = new int[4];
@@ -33,8 +34,9 @@ public class RegionTest {
   public void testVerticalSplit() {
     int[] region = {0, 0, 1, 1, 0, 1, 2, 0, 1, 3, 0, 1, 4};
     int angle = 0;
-    Region.DistanceRange distanceRange = new Region.DistanceRange();
-    distanceRange.update(region, angle, SinCos.SCALE);
+    CodecParams cp = new CodecParams(4, 4);
+    DistanceRange distanceRange = new DistanceRange();
+    distanceRange.update(region, angle, cp);
     assertEquals(3, distanceRange.numLines);
     {
       // 1/3

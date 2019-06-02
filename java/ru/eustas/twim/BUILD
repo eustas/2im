@@ -136,7 +136,10 @@ java_test(
 
 java_library(
     name = "region",
-    srcs = ["Region.java"],
+    srcs = [
+        "DistanceRange.java",
+        "Region.java",
+    ],
     deps = [
         ":codec_params",
         ":sin_cos",
@@ -147,6 +150,7 @@ java_test(
     name = "RegionTest",
     srcs = ["RegionTest.java"],
     deps = [
+        ":codec_params",
         ":region",
         ":sin_cos",
     ],

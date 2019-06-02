@@ -21,24 +21,21 @@ export let int32ArraySet = (dst, src, offset) => dst.set(src, offset);
  */
 export let last = (a) =>  a.length - 1;
 
+export let /** @const */ math = Math;
+
 /**
- * @noinline
  * @param{number} n
  * @return {number}
  */
-export let pow2 = n => Math.pow(2, n);
+export let pow2 = n => 2 ** n;
 
-export let /** @const @type{number} */ b8 = pow2(8);
-export let /** @const @type{number} */ b32 = pow2(32);
-export let /** @const @type{number} */ b40 = pow2(40);
-export let /** @const @type{number} */ b48 = pow2(48);
+export let /** @const @noinline @type{number} */ b8 = pow2(8);
+export let /** @const @type{number} */ b32 = b8 ** 4;
+export let /** @const @type{number} */ b40 = b8 ** 5;
+export let /** @const @type{number} */ b48 = b8 ** 6;
 
-/**
- * @noinline
- * @param{number} x
- * @return {number}
- */
-export let mathFloor = (x) => Math.floor(x);
+export let /** @type{function(number):number} */ mathFloor = math.floor;
+export let /** @type{function(number):number} */ mathRound = math.round;
 
 /**
  * @param{!Int32Array} region
@@ -50,3 +47,10 @@ export let forEachScan = (region, callback) => {
     callback(region[i], region[i + 1], region[i + 2]);
   }
 };
+
+/**
+ * @noinline
+ * @param{boolean} b
+ * @return {void}
+ */
+export let assertFalse = b => {if (b) throw 4;};

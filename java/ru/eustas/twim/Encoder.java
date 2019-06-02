@@ -22,7 +22,7 @@ public class Encoder {
     int[] sumRgb2;
     int sumStride;
 
-    final Region.DistanceRange distanceRange = new Region.DistanceRange();
+    final DistanceRange distanceRange = new DistanceRange();
 
     Cache(int[] intRgb, int width) {
       int height = intRgb.length / width;
@@ -227,7 +227,7 @@ public class Encoder {
     }
 
     void findBestSubdivision(Cache cache, int goalFunction, CodecParams cp) {
-      Region.DistanceRange distanceRange = cache.distanceRange;
+      DistanceRange distanceRange = cache.distanceRange;
       // TODO(eustas): move to cache?
       Stats left = new Stats();
       Stats right = new Stats();
@@ -287,7 +287,7 @@ public class Encoder {
       if (isLeaf) {
         writeNumber(dst, CodecParams.NODE_TYPE_COUNT, CodecParams.NODE_FILL);
         for (int c = 0; c < 3; ++c) {
-          int q = cp.colorQuant[c];
+          int q = cp.colorQuant;
           int d = 255 * stats.pixelCount;
           int v = (2 *  (q - 1) * stats.rgb[c] + d) / (2 * d);
           writeNumber(dst, q, v);
@@ -306,7 +306,7 @@ public class Encoder {
       if (isLeaf) {
         for (int c = 0; c < 3; ++c) {
           // sum((vi - v)^2) = sum(vi^2 - 2 * vi * v + v^2) = n * v^2 + sum(vi^2) - 2 * v * sum(vi)
-          int q = cp.colorQuant[c];
+          int q = cp.colorQuant;
           int d = 255 * stats.pixelCount;
           int v = (2 *  (q - 1) * stats.rgb[c] + d) / (2 * d);
           int vq = CodecParams.dequantizeColor(v, q);
@@ -381,7 +381,7 @@ public class Encoder {
   }
 
   private static Set<Fragment> subpartition(int targetSize, List<Fragment> partition, CodecParams cp) {
-    double tax = bitCost(CodecParams.NODE_TYPE_COUNT * cp.colorQuant[0] * cp.colorQuant[1] * cp.colorQuant[2]);
+    double tax = bitCost(CodecParams.NODE_TYPE_COUNT * cp.colorQuant * cp.colorQuant * cp.colorQuant);
     double budget = 8 * targetSize - bitCost(CodecParams.MAX_CODE) - tax;
     Set<Fragment> nonLeaf = new HashSet<>();
     for (Fragment node : partition) {
