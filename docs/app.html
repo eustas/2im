@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,900">
+<style>
+  body {font-family: "Lato", sans-serif}
+</style>
+</head>
+<body>
+<div class="w3-top">
+  <div class="w3-bar w3-black w3-card">
+    <a href="#twim" class="w3-bar-item w3-button w3-padding-large">2im</a>
+    <a href="#demo" class="w3-bar-item w3-button w3-padding-large">Demo</a>
+  </div>
+</div>
+
+<div class="w3-content w3-padding-32 w3-center" style="max-width:800px">
+  <div class="w3-panel" id="twim">
+    <h2 class="w3-wide">2im</h2>
+    <p class="w3-opacity"><i>Everything should be made as simple as possible, but no simpler.</i></p>
+    <p class="w3-justify"><b>2im</b> (or <b>twim</b>) is a new image compression format.</p>
+    <p class="w3-justify">
+      JPEG, GIF and PNG are the most popular image formats in the web.
+      PNG is used mainly used for lossless encoding, GIF is used for animated images,
+      JPEG is perfect for lossy photos encoding...
+    </p>
+    <p class="w3-justify">
+      <b>But</b> modern responsive web has one more use-case: embeddable image previews.
+      2im has been designed exactly for that: encoding 64 x 64 image preview into <b>2</b>00 bytes...
+      Or 192 x 192 picture into <b>tw</b>itter message...
+    </p>
+    <p class="w3-justify">
+      Unlike most other codecs, the main parameter for codec is not some abstract quality,
+      but output size (in bytes). Encoder will try to find the best representation that fits the bit budget.
+    </p>
+    <p class="w3-justify">
+      Moreover, simple image format allows fast and small JS decoder (just 1928 bytes).
+    </p>
+  </div>
+
+  <form class="w3-container w3-card-4 w3-light-grey w3-padding-large" id="demo">
+    <h2 class="w3-wide">Demo</h2>
+    <input class="w3-input w3-border w3-round" type="text" id="encoded" placeholder="Insert base64-encoded 2im image here">
+    <p>Decoded image</p>
+    <canvas class="w3-card-4" id="canvas" width="64" height="64"></canvas>
+  </form>
+</div>
+
+<script type="text/javascript" src="twim.js"></script>
+<script type="text/javascript">
+  document.addEventListener('DOMContentLoaded', () => {
+    let input = document.getElementById('encoded');
+    input.addEventListener('input', () => {
+      let ctx = document.getElementById('canvas').getContext('2d');
+      let encoded = new Uint8Array(Array.from(atob(input.value)).map(s => s.codePointAt(0)));
+      ctx.putImageData(window.decode2im(encoded, 64, 64), 0, 0);
+    });
+  });
+</script>
+</body>
+</html>
