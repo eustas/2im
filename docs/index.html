@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,900">
+<style>
+  body {font-family: "Lato", sans-serif}
+</style>
+</head>
+<body>
+<div class="w3-top">
+  <div class="w3-bar w3-black w3-card">
+    <a href="#twim" class="w3-bar-item w3-button w3-padding-large">2im</a>
+    <a href="#demo" class="w3-bar-item w3-button w3-padding-large">Demo</a>
+  </div>
+</div>
+
+<div class="w3-content w3-padding-32 w3-center" style="max-width:800px">
+  <div class="w3-panel" id="twim">
+    <h2 class="w3-wide">2im</h2>
+    <p class="w3-opacity"><i>Everything should be made as simple as possible, but no simpler.</i></p>
+    <p class="w3-justify"><b>2im</b> (or <b>twim</b>) is a new image compression format.</p>
+    <p class="w3-justify">
+      JPEG, GIF and PNG are the most popular image formats in the web.
+      PNG is used mainly used for lossless encoding, GIF is used for animated images,
+      JPEG is perfect for lossy photos encoding...
+    </p>
+    <p class="w3-justify">
+      <b>But</b> modern responsive web has one more use-case: embeddable image previews.
+      2im has been designed exactly for that: encoding 64 x 64 image preview into <b>2</b>00 bytes...
+      Or 192 x 192 picture into <b>tw</b>itter message...
+    </p>
+    <p class="w3-justify">
+      Unlike most other codecs, the main parameter for codec is not some abstract quality,
+      but output size (in bytes). Encoder will try to find the best representation that fits the bit budget.
+    </p>
+    <img src="cat.gif">
+    <p class="w3-justify">
+      Moreover, simple image format allows fast and small JS decoder (just 1928 bytes).
+    </p>
+  </div>
+
+  <div class="w3-panel w3-light-grey w3-padding" id="demo">
+    <h2 class="w3-wide">Demo</h2>
+    <p class="w3-opacity"><i>一畫勝千言</i></p>
+    <input class="w3-input w3-border w3-round" type="text" id="encoded" placeholder="Insert base64-encoded 2im image here">
+    <div class="w3-xlarge">⇩</div>
+    <canvas class="w3-card-4 w3-white w3-margin-bottom" style="background-image: url(ava.svg)" id="canvas" width="64" height="64"></canvas>
+    <p class="w3-justify">The Swiss flag – a plus for the country (40 bytes):</p>
+    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
+           value="Ouzjj0HAamp/cdjZdwh1I5HaepzRbnQ5ZlKTSzIGpKFgHH0it4Zw2A=="/>
+    <p class="w3-justify">No effort to learn (the community rules) and improve over time (128 bytes):</p>
+    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
+           value="DIx6l198puxZwB+miMt/GvqBHu0aGlTzwghH1rD1ZwsMmftPCMSk60jkwxJZ2dlsKBbunTW63FKEFgGVFMG1jaFyrfFX+aw/l8GofMDTbI0kMAuiAUPDZeKueiK91Uv1GStDw/v/rdHEXABSZKa8rTndjae9qv+nqERB7Wd8GBA="/>
+    <p class="w3-justify">That cat's something I can't explain (254 bytes):</p>
+    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
+           value="mPPt8dvjGWN2ct/ts11R0KQCz4/y01BQPmuZoRvodM6iIu1WDYpBmodLkg65WRibRDFseTFxfcnHFamN7SwO/WItk+wWW1+uBGqg3wXQxyQsSmqI0ukd6h/7lgRGKKGVsKYuzOnInSlYJU25yUpYy08DLY5nKrWcpmjLeJO+pI5zDvPXrQmFx6ekANUNYzj5mUudvvyDt9RdM1yddsTJB1g+iS2DElvP5BwI7PmhpHEDI9sLYifcgQ9jaq4IDjZFmBqiwo5ialSS4m6jUL7vOA+n2kK65k0wbVlTTTNMLMUthsDdPtmNZoGUTshYrQYb6CV4Ygmaf44wbx0Heuc="/>
+    <p class="w3-justify">In time, all great masterpieces turn into shameless creatures who laugh at their creators (398 bytes):</p>
+    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
+           value="ms368drHGA+6Jc75MtG56cyL1DqdlBCmgJK0vIAHsgL4ZQoO8jryZ98rI0wseCTE1VqPc37C9RFxuONz+N/9ojKmq9+EwHOd+lVHrylHQ5XFYrDTeJVl1Dn81y2eh8Bdlv/x8mNWZOuOziBTuVpm/LNlk4mSDhusWqFDkFxXz1kvRT8BolGvZBvx+M4VG/iGLWdly0C2GurfYQ2cRVymM+iRF51fhXAmEuJTCsBR/hvBcF+N9OzjQ60eXUT/spyWf2aCIdhrBTx34vPERM7r+lyxrQWULCvkI8wZYU040ZH02k8yM3F8SBIRgNg+6Ew6lubLYu/sqgS2nyOydWT9unEUvfSZNs7TkG2EfnQqA+DHy7NYuYK4vLtQPraKxdowIqUpEfdo8We1yuEY2uPHplWlxGQV8j8rMGAV/dDVw8oP/bHoLADZmIAvOV5uGoxc55JBEatKHa1O1bJLD8jiNz2ATyZIjirVojlOoV3tuBKBF7QES05624hMx8GaPUmGwYSSlyd0OK7+KgcUtLw="/>
+    <p class="w3-justify">For millions of years, mankind lived just like the animals. Then something happened which unleashed the power of our imagination. We learned to talk and we learned to listen. Speech has allowed the communication of ideas, enabling human beings to work together to build the impossible. (640 bytes):</p>
+    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
+           value="gvfBCsHk8K7kXno3ctRLtbK48TmIB0wDqvJIdJx5+BdO3NJZk1KwZmODZwSw8+lCI77lV0RmrbxvwYnvCNcMn4red51431r7X8D+5Mzlb2IpRXN2cM5VaDDKslE9Juu87Q94IEg5yCswFDPa70HlS69hZpwkVCXjqchwvTzGKpc1wyP08hLMnTMzi83kN6KOfuyVBcBvlRa/mhR5Gq90/zT9UVimRu/rBmTN776GTtlMkuqS8bpGd9x+j2iPkBU4UybB0lMhoowiqJHweDkQJoT2urNdHtAhUPv9h2/YDuaG1zv8WBtLB9mpLNGT9aeJWnZ7iVqEP5hv2C+SbdiNbG4spFfOCbRK5l+pWgXL47IqFM2GQM4jUlaiNpLMUxrdlZlcDwrZ/0tbjDfrtPvnG5da9SyEy8V6J+VpjEFe22/rE8IrAejfIjLlJ1WcM8MK6Gh+NQ3amwnChUQRYnmEB11aLdhpFue+k6NQ55wgOP9gY2ExgWmmKA67dMU1pDPHMkm6x9/QjyWd3jlnr+ZVXw/UNmSU9GKQVgZOgrS2vYK0Tw2aHyE/7NnyLjmUeCkA/Wv8af9WdIysY7IRYLb2fcz1WYHtQO47gpS7BIKP5NPIHLtFu8KT78cZXlFOIsvvqqyWh5xjjlqJSxCkNHmAxllOLeikpYiOgbsJAZ1djrXq/OR0TP+zJ8726Nmya3yfDoWQk0KBEBCktpyFeeOCxr6tca0nalYd+Q08MdeW2Q5L6LMNy/0mSYq0S9ZdpQls5WKuf2SqzTXWyLJwkym/7MTkp815y+TYPyaa62cM5IKMKkdHsRRui/Q9Uy4/NWwqP4wXlWzotJG23N4gQ1cj5Q=="/>
+  </div>
+</div>
+
+<script type="text/javascript" src="twim.js"></script>
+<script type="text/javascript">
+  document.addEventListener('DOMContentLoaded', () => {
+    let input = document.getElementById('encoded');
+    input.addEventListener('input', () => {
+      let ctx = document.getElementById('canvas').getContext('2d');
+      ctx.clearRect(0, 0, 64, 64);
+      let encoded = new Uint8Array(Array.from(atob(input.value)).map(s => s.codePointAt(0)));
+      ctx.putImageData(window.decode2im(encoded, 64, 64), 0, 0);
+    });
+  });
+</script>
+</body>
+</html>
