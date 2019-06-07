@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,900">
 <style>
   body {font-family: "Lato", sans-serif}
+  .drawboard {background-image: url(data:image/svg+xml;charset=utf-8,%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%20standalone%3D%22no%22%3F%3E%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2264%22%20height%3D%2264%22%20viewBox%3D%220%200%2064%2064%22%20version%3D%221.1%22%3E%3Cg%20style%3D%22fill%3Anone%3Bstroke%3A%23000%3Bstroke-width%3A2%3Bstroke-linecap%3Around%3Bstroke-linejoin%3Around%3Bstroke-miterlimit%3A4%3Bstroke-dasharray%3A600%22%3E%3Cpath%20style%3D%22stroke-dashoffset%3A600%3Bstroke-width%3A2.5%22%20d%3D%22m20%2C23.5c2%2C-4%204%2C-7%205.5%2C-8%202%2C0%204%2C1%206%2C4%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A620%3Bstroke-width%3A2.5%22%20d%3D%22m31.5%2C22.5c3%2C-6%205%2C-6%206%2C-6%201%2C0%203%2C3%207%2C10%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A660%3Bstroke-width%3A3.5%22%20d%3D%22m26.5%2C26.5v0.5%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A670%3Bstroke-width%3A3.5%22%20d%3D%22m36.5%2C26.5v0.5%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A680%22%20d%3D%22m29.5%2C34.5h5L32%2C38.5%2029.5%2C34.5%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A710%22%20d%3D%22M26.5%2C36.5C20%2C35%2011%2C34%203%2C32%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A735%22%20d%3D%22M26%2C39.5C19%2C39%2013%2C39%206%2C40%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A760%22%20d%3D%22M26%2C42C19%2C42%2014%2C44%208%2C46%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A785%22%20d%3D%22m38%2C37c8%2C-1%2015%2C-2%2024%2C-2%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A810%22%20d%3D%22m39%2C39.5c8%2C0%2014%2C0%2019%2C2%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A835%22%20d%3D%22m38%2C42c8%2C1%2014%2C3%2021%2C6%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A870%22%20d%3D%22m28%2C46c3%2C2%205%2C3%208%2C0%22%2F%3E%3Cpath%20style%3D%22stroke-dashoffset%3A920%3Bstroke-width%3A10%3Bstroke%3A%23fff%22%20d%3D%22M17%2C18%2053%2C21%206%2C31%2059%2C37%207%2C42%2058%2C47%22%2F%3E%3Canimate%20attributeType%3D%22CSS%22%20attributeName%3D%22stroke-dasharray%22%20from%3D%22600%22%20to%3D%221200%22%20dur%3D%2215s%22%20repeatCount%3D%22indefinite%22%2F%3E%3C%2Fg%3E%3Cg%20style%3D%22fill%3Anone%3Bstroke%3A%23ccc%3Bstroke-width%3A15%3Bstroke-linecap%3Around%3Bstroke-linejoin%3Around%3Bstroke-dasharray%3A1%20600%201%20599%3Bstroke-dashoffset%3A920%22%3E%3Cpath%20d%3D%22M17%2C18%2053%2C21%206%2C31%2059%2C37%207%2C42%2058%2C47%22%2F%3E%3Canimate%20attributeType%3D%22CSS%22%20attributeName%3D%22stroke-dashoffset%22%20from%3D%22920%22%20to%3D%22320%22%20dur%3D%2215s%22%20repeatCount%3D%22indefinite%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E)}
 </style>
 </head>
 <body>
@@ -18,7 +19,7 @@
 </div>
 
 <div class="w3-content w3-padding-32 w3-center" style="max-width:800px">
-  <div class="w3-panel" id="twim">
+  <div class="w3-panel w3-light-grey" id="twim">
     <h2 class="w3-wide">2im</h2>
     <p class="w3-opacity"><i>Everything should be made as simple as possible, but no simpler.</i></p>
     <p class="w3-justify"><b>2im</b> (or <b>twim</b>) is a new image compression format.</p>
@@ -36,47 +37,50 @@
       Unlike most other codecs, the main parameter for codec is not some abstract quality,
       but output size (in bytes). Encoder will try to find the best representation that fits the bit budget.
     </p>
-    <img src="cat.gif">
+    <img class="w3-card-4" src="cat.gif">
     <p class="w3-justify">
       Moreover, simple image format allows fast and small JS decoder (just 1928 bytes).
     </p>
   </div>
 
-  <div class="w3-panel w3-light-grey w3-padding" id="demo">
+  <div class="w3-panel w3-padding" id="demo">
     <h2 class="w3-wide">Demo</h2>
     <p class="w3-opacity"><i>一畫勝千言</i></p>
     <input class="w3-input w3-border w3-round" type="text" id="encoded" placeholder="Insert base64-encoded 2im image here">
     <div class="w3-xlarge">⇩</div>
-    <canvas class="w3-card-4 w3-white w3-margin-bottom" style="background-image: url(ava.svg)" id="canvas" width="64" height="64"></canvas>
-    <p class="w3-justify">The Swiss flag – a plus for the country (40 bytes):</p>
-    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
-           value="Ouzjj0HAamp/cdjZdwh1I5HaepzRbnQ5ZlKTSzIGpKFgHH0it4Zw2A=="/>
-    <p class="w3-justify">No effort to learn (the community rules) and improve over time (128 bytes):</p>
-    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
-           value="DIx6l198puxZwB+miMt/GvqBHu0aGlTzwghH1rD1ZwsMmftPCMSk60jkwxJZ2dlsKBbunTW63FKEFgGVFMG1jaFyrfFX+aw/l8GofMDTbI0kMAuiAUPDZeKueiK91Uv1GStDw/v/rdHEXABSZKa8rTndjae9qv+nqERB7Wd8GBA="/>
-    <p class="w3-justify">That cat's something I can't explain (254 bytes):</p>
-    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
-           value="mPPt8dvjGWN2ct/ts11R0KQCz4/y01BQPmuZoRvodM6iIu1WDYpBmodLkg65WRibRDFseTFxfcnHFamN7SwO/WItk+wWW1+uBGqg3wXQxyQsSmqI0ukd6h/7lgRGKKGVsKYuzOnInSlYJU25yUpYy08DLY5nKrWcpmjLeJO+pI5zDvPXrQmFx6ekANUNYzj5mUudvvyDt9RdM1yddsTJB1g+iS2DElvP5BwI7PmhpHEDI9sLYifcgQ9jaq4IDjZFmBqiwo5ialSS4m6jUL7vOA+n2kK65k0wbVlTTTNMLMUthsDdPtmNZoGUTshYrQYb6CV4Ygmaf44wbx0Heuc="/>
-    <p class="w3-justify">In time, all great masterpieces turn into shameless creatures who laugh at their creators (398 bytes):</p>
-    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
-           value="ms368drHGA+6Jc75MtG56cyL1DqdlBCmgJK0vIAHsgL4ZQoO8jryZ98rI0wseCTE1VqPc37C9RFxuONz+N/9ojKmq9+EwHOd+lVHrylHQ5XFYrDTeJVl1Dn81y2eh8Bdlv/x8mNWZOuOziBTuVpm/LNlk4mSDhusWqFDkFxXz1kvRT8BolGvZBvx+M4VG/iGLWdly0C2GurfYQ2cRVymM+iRF51fhXAmEuJTCsBR/hvBcF+N9OzjQ60eXUT/spyWf2aCIdhrBTx34vPERM7r+lyxrQWULCvkI8wZYU040ZH02k8yM3F8SBIRgNg+6Ew6lubLYu/sqgS2nyOydWT9unEUvfSZNs7TkG2EfnQqA+DHy7NYuYK4vLtQPraKxdowIqUpEfdo8We1yuEY2uPHplWlxGQV8j8rMGAV/dDVw8oP/bHoLADZmIAvOV5uGoxc55JBEatKHa1O1bJLD8jiNz2ATyZIjirVojlOoV3tuBKBF7QES05624hMx8GaPUmGwYSSlyd0OK7+KgcUtLw="/>
-    <p class="w3-justify">For millions of years, mankind lived just like the animals. Then something happened which unleashed the power of our imagination.</p>
-    <input class="w3-input w3-border w3-round w3-codespan w3-white" disabled type="text"
-           value="gvfBCsHk8K7kXno3ctRLtbK48TmIB0wDqvJIdJx5+BdO3NJZk1KwZmODZwSw8+lCI77lV0RmrbxvwYnvCNcMn4red51431r7X8D+5Mzlb2IpRXN2cM5VaDDKslE9Juu87Q94IEg5yCswFDPa70HlS69hZpwkVCXjqchwvTzGKpc1wyP08hLMnTMzi83kN6KOfuyVBcBvlRa/mhR5Gq90/zT9UVimRu/rBmTN776GTtlMkuqS8bpGd9x+j2iPkBU4UybB0lMhoowiqJHweDkQJoT2urNdHtAhUPv9h2/YDuaG1zv8WBtLB9mpLNGT9aeJWnZ7iVqEP5hv2C+SbdiNbG4spFfOCbRK5l+pWgXL47IqFM2GQM4jUlaiNpLMUxrdlZlcDwrZ/0tbjDfrtPvnG5da9SyEy8V6J+VpjEFe22/rE8IrAejfIjLlJ1WcM8MK6Gh+NQ3amwnChUQRYnmEB11aLdhpFue+k6NQ55wgOP9gY2ExgWmmKA67dMU1pDPHMkm6x9/QjyWd3jlnr+ZVXw/UNmSU9GKQVgZOgrS2vYK0Tw2aHyE/7NnyLjmUeCkA/Wv8af9WdIysY7IRYLb2fcz1WYHtQO47gpS7BIKP5NPIHLtFu8KT78cZXlFOIsvvqqyWh5xjjlqJSxCkNHmAxllOLeikpYiOgbsJAZ1djrXq/OR0TP+zJ8726Nmya3yfDoWQk0KBEBCktpyFeeOCxr6tca0nalYd+Q08MdeW2Q5L6LMNy/0mSYq0S9ZdpQls5WKuf2SqzTXWyLJwkym/7MTkp815y+TYPyaa62cM5IKMKkdHsRRui/Q9Uy4/NWwqP4wXlWzotJG23N4gQ1cj5Q=="/>
+    <canvas class="w3-card-4 w3-white w3-margin-bottom drawboard" id="canvas" width="64" height="64"></canvas>
+    <div id="demo-placeholder" class="w3-hide"/>
   </div>
 </div>
 
 <script type="text/javascript" src="twim.js"></script>
 <script type="text/javascript">
-  document.addEventListener('DOMContentLoaded', () => {
-    let input = document.getElementById('encoded');
-    input.addEventListener('input', () => {
-      let ctx = document.getElementById('canvas').getContext('2d');
-      ctx.clearRect(0, 0, 64, 64);
-      let encoded = new Uint8Array(Array.from(atob(input.value)).map(s => s.codePointAt(0)));
-      ctx.putImageData(window.decode2im(encoded, 64, 64), 0, 0);
-    });
-  });
+let input = document.getElementById('encoded');
+function onInput() {
+  let ctx = document.getElementById('canvas').getContext('2d');
+  ctx.clearRect(0, 0, 64, 64);
+  let encoded = new Uint8Array(Array.from(atob(input.value)).map(s => s.codePointAt(0)));
+  ctx.putImageData(window.decode2im(encoded, 64, 64), 0, 0);
+}
+function onCopyClick(id) {
+  let src = document.getElementById(id);
+  src.removeAttribute('disabled');
+  src.select();
+  document.execCommand("copy");
+  src.setAttribute('disabled', 1);
+  input.value = src.value;
+  onInput();
+}
+document.addEventListener('DOMContentLoaded', () => {
+input.addEventListener('input', onInput);
+document.getElementById('demo-placeholder').outerHTML = [
+  ['The Swiss flag – a plus for the country (40 bytes):', 'Ouzjj0HAamp/cdjZdwh1I5HaepzRbnQ5ZlKTSzIGpKFgHH0it4Zw2A=='],
+  ['No effort to learn and improve over time (128 bytes):', 'DIx6l198puxZwB+miMt/GvqBHu0aGlTzwghH1rD1ZwsMmftPCMSk60jkwxJZ2dlsKBbunTW63FKEFgGVFMG1jaFyrfFX+aw/l8GofMDTbI0kMAuiAUPDZeKueiK91Uv1GStDw/v/rdHEXABSZKa8rTndjae9qv+nqERB7Wd8GBA='],
+  ['That cat\'s something I can\'t explain (254 bytes):', 'mPPt8dvjGWN2ct/ts11R0KQCz4/y01BQPmuZoRvodM6iIu1WDYpBmodLkg65WRibRDFseTFxfcnHFamN7SwO/WItk+wWW1+uBGqg3wXQxyQsSmqI0ukd6h/7lgRGKKGVsKYuzOnInSlYJU25yUpYy08DLY5nKrWcpmjLeJO+pI5zDvPXrQmFx6ekANUNYzj5mUudvvyDt9RdM1yddsTJB1g+iS2DElvP5BwI7PmhpHEDI9sLYifcgQ9jaq4IDjZFmBqiwo5ialSS4m6jUL7vOA+n2kK65k0wbVlTTTNMLMUthsDdPtmNZoGUTshYrQYb6CV4Ygmaf44wbx0Heuc='],
+  ['In time, all great masterpieces turn into shameless creatures who laugh at their creators (398 bytes):', 'ms368drHGA+6Jc75MtG56cyL1DqdlBCmgJK0vIAHsgL4ZQoO8jryZ98rI0wseCTE1VqPc37C9RFxuONz+N/9ojKmq9+EwHOd+lVHrylHQ5XFYrDTeJVl1Dn81y2eh8Bdlv/x8mNWZOuOziBTuVpm/LNlk4mSDhusWqFDkFxXz1kvRT8BolGvZBvx+M4VG/iGLWdly0C2GurfYQ2cRVymM+iRF51fhXAmEuJTCsBR/hvBcF+N9OzjQ60eXUT/spyWf2aCIdhrBTx34vPERM7r+lyxrQWULCvkI8wZYU040ZH02k8yM3F8SBIRgNg+6Ew6lubLYu/sqgS2nyOydWT9unEUvfSZNs7TkG2EfnQqA+DHy7NYuYK4vLtQPraKxdowIqUpEfdo8We1yuEY2uPHplWlxGQV8j8rMGAV/dDVw8oP/bHoLADZmIAvOV5uGoxc55JBEatKHa1O1bJLD8jiNz2ATyZIjirVojlOoV3tuBKBF7QES05624hMx8GaPUmGwYSSlyd0OK7+KgcUtLw='],
+  ['For millions of years, mankind lived just like the animals. Then something happened which unleashed the power of our imagination...', 'gvfBCsHk8K7kXno3ctRLtbK48TmIB0wDqvJIdJx5+BdO3NJZk1KwZmODZwSw8+lCI77lV0RmrbxvwYnvCNcMn4red51431r7X8D+5Mzlb2IpRXN2cM5VaDDKslE9Juu87Q94IEg5yCswFDPa70HlS69hZpwkVCXjqchwvTzGKpc1wyP08hLMnTMzi83kN6KOfuyVBcBvlRa/mhR5Gq90/zT9UVimRu/rBmTN776GTtlMkuqS8bpGd9x+j2iPkBU4UybB0lMhoowiqJHweDkQJoT2urNdHtAhUPv9h2/YDuaG1zv8WBtLB9mpLNGT9aeJWnZ7iVqEP5hv2C+SbdiNbG4spFfOCbRK5l+pWgXL47IqFM2GQM4jUlaiNpLMUxrdlZlcDwrZ/0tbjDfrtPvnG5da9SyEy8V6J+VpjEFe22/rE8IrAejfIjLlJ1WcM8MK6Gh+NQ3amwnChUQRYnmEB11aLdhpFue+k6NQ55wgOP9gY2ExgWmmKA67dMU1pDPHMkm6x9/QjyWd3jlnr+ZVXw/UNmSU9GKQVgZOgrS2vYK0Tw2aHyE/7NnyLjmUeCkA/Wv8af9WdIysY7IRYLb2fcz1WYHtQO47gpS7BIKP5NPIHLtFu8KT78cZXlFOIsvvqqyWh5xjjlqJSxCkNHmAxllOLeikpYiOgbsJAZ1djrXq/OR0TP+zJ8726Nmya3yfDoWQk0KBEBCktpyFeeOCxr6tca0nalYd+Q08MdeW2Q5L6LMNy/0mSYq0S9ZdpQls5WKuf2SqzTXWyLJwkym/7MTkp815y+TYPyaa62cM5IKMKkdHsRRui/Q9Uy4/NWwqP4wXlWzotJG23N4gQ1cj5Q==']
+].map((v, i) => '<p class="w3-justify">' + v[0] + '</p><div class="w3-row w3-border w3-round"><button class="w3-button w3-col w3-right w3-border-bottom w3-border-left w3-light-gray" style="width: 33px;height: 39px; padding: 8px" onclick="onCopyClick(\'demo' + i + '\')"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="18" viewBox="0 0 16 18" version="1.1" style="vertical-align: middle"><path style="fill:none;stroke:#000" d="M2.5,7V2.5h9v12h-9V11M4,0.5h9.5V13"/><path d="M0,8H5V6L8,9 5,12V10H0Z"/></svg></button><div class="w3-rest"><input class="w3-input" disabled type="text" id="demo' + i + '" value="' + v[1] + '"/></div></div>').join('');
+});
 </script>
 </body>
 </html>
