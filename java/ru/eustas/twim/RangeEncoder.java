@@ -15,6 +15,27 @@ import static ru.eustas.twim.RangeCode.VALUE_MASK;
 final class RangeEncoder {
   private final List<Integer> triplets = new ArrayList<>();
 
+  static void writeNumber(RangeEncoder dst, int max, int value) {
+    if (max == 1) return;
+    dst.encodeRange(value, value + 1, max);
+  }
+
+  static void writeSize(RangeEncoder dst, int value) {
+    value -= 8;
+    int chunks = 2;
+    while (value > (1 << (chunks * 3))) {
+      value -= (1 << (chunks * 3));
+      chunks++;
+    }
+    for (int i = 0; i < chunks; ++i) {
+      if (i > 1) {
+        writeNumber(dst, 2, 1);
+      }
+      writeNumber(dst, 8,  (value >> (3 * (chunks - i - 1))) & 7);
+    }
+    writeNumber(dst, 2, 0);
+  }
+
   final void encodeRange(int bottom, int top, int totalRange) {
     triplets.add(totalRange);
     triplets.add(bottom);

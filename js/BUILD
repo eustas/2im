@@ -12,6 +12,7 @@ closure_js_library(
     suppress = ["moduleLoad"],
     deps = [
         ":Mini",
+        ":RangeDecoder",
         ":SinCos",
     ],
 )

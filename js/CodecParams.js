@@ -1,4 +1,5 @@
 import {assertFalse, forEachScan, math, newInt32Array} from './Mini.js';
+import {readNumber, readSize} from "./RangeDecoder.js";
 import * as SinCos from './SinCos.js';
 
 let /** @type{number} */ MAX_LEVEL = 7;
@@ -7,13 +8,14 @@ let /** @type{number} */ MAX_F1 = 4;
 let /** @type{number} */ MAX_F2 = 5;
 let /** @type{number} */ MAX_F3 = 5;
 let /** @type{number} */ MAX_F4 = 5;
+let /** @type{number} */ MAX_LINE_LIMIT = 63;
 
 let /** @type{number} */ MAX_PARTITION_CODE = MAX_F1 * MAX_F2 * MAX_F3 * MAX_F4;
 let /** @type{number} */ MAX_COLOR_CODE = 17;
 
 /**
  * @param{number} code
- * @return {number}
+ * @return{number}
  */
 let makeColorQuant = (code) => 1 + ((4 + (code & 3)) << (code >> 2));
 
@@ -27,11 +29,28 @@ let _height;
 /** @type{number} */
 let _colorQuant;
 /** @type{number} */
-export let lineLimit = 25;
+let lineLimit;
 /** @const @type{!Int32Array} */
 let _levelScale = newInt32Array(MAX_LEVEL);
 /** @const @type{!Int32Array} */
 export let angleBits = newInt32Array(MAX_LEVEL);
+
+/** @return{number} */
+export let getWidth = () => _width;
+/** @return{number} */
+export let getHeight = () => _height;
+/** @return{number} */
+export let getLineLimit = () => lineLimit;
+
+/**
+ * @param{number} w
+ * @param{number} h
+ * @return{void}
+ */
+export let initForTest = (w, h) => {
+  _width = w;
+  _height = h;
+};
 
 /**
  * @return{number}
@@ -39,32 +58,20 @@ export let angleBits = newInt32Array(MAX_LEVEL);
 export let getColorQuant = () => _colorQuant;
 
 /**
- * @param{number} width
- * @param{number} height
- */
-export let init = (width, height) => {
-  _width = width;
-  _height = height;
-};
-
-/**
- * @return {number}
+ * @return{number}
  */
 export let getLineQuant = () => SinCos.SCALE;
 
-/**
- * @param{number} code
- * @return{void}
- */
-export let setCode = (code) => {
-  let /** @type{number} */ f1 = code % MAX_F1;
-  code = (code / MAX_F1) | 0;
-  let /** @type{number} */ f2 = 2 + code % MAX_F2;
-  code = (code / MAX_F2) | 0;
-  let /** @type{number} */ f3 = 10 ** (3 - (code % MAX_F3) / 5) | 0;
-  code = (code / MAX_F3) | 0;
-  let /** @type{number} */ f4 = code % MAX_F4;
-  code = (code / MAX_F4) | 0;
+/** @return{void} */
+export let read = () => {
+  _width = readSize();
+  _height = readSize();
+
+  let /** @type{number} */ f1 = readNumber(MAX_F1);
+  let /** @type{number} */ f2 = 2 + readNumber(MAX_F2);
+  let /** @type{number} */ f3 = 10 ** (3 - readNumber(MAX_F3) / 5) | 0;
+  let /** @type{number} */ f4 = readNumber(MAX_F4);
+  lineLimit = readNumber(MAX_LINE_LIMIT) + 1;
 
   let /** @type{number} */ scale = (_width * _width + _height * _height) * f2 * f2;
   for (let /** @type{number} */ i = 0; i < MAX_LEVEL; ++i) {
@@ -76,7 +83,7 @@ export let setCode = (code) => {
   for (let /** @type{number} */ i = 0; i < MAX_LEVEL; ++i) {
     angleBits[i] = math.max(bits - i - (((i * f4) / 2) | 0), 0);
   }
-  _colorQuant = makeColorQuant(code);
+  _colorQuant = makeColorQuant(readNumber(MAX_COLOR_CODE));
 };
 
 /**

@@ -66,4 +66,46 @@ class Region {
     left[left.length - 1] = leftCount / 3;
     right[right.length - 1] = rightCount / 3;
   }
+
+  //
+  static void splitStripe(int[] region, int angle, int di, int ds, int[] stripe) {
+    int nx = SinCos.SIN[angle];
+    int ny = SinCos.COS[angle];
+    int count3 = region[region.length - 1] * 3;
+    int stripeCount = 0;
+    if (nx == 0) {
+      // nx = 0 -> ny = SinCos.SCALE -> y * ny ?? d
+      for (int i = 0; i < count3; i += 3) {
+        int y = region[i];
+        int x0 = region[i + 1];
+        int x1 = region[i + 2];
+        int dd = y * ny;
+        if (dd >= ds || dd < di) {
+          continue;
+        }
+        stripe[stripeCount] = y;
+        stripe[stripeCount + 1] = x0;
+        stripe[stripeCount + 2] = x1;
+        stripeCount += 3;
+      }
+    } else {
+      // nx > 0 -> x ?? (d - y * ny) / nx
+      di = 2 * di + nx;
+      ds = 2 * ds + nx;
+      ny = 2 * ny;
+      nx = 2 * nx;
+      for (int i = 0; i < count3; i += 3) {
+        int y = region[i];
+        int x0 = Math.max(region[i + 1], (di - y * ny) / nx);
+        int x1 = Math.min(region[i + 2], (ds - y * ny) / nx);
+        if (x0 < x1) {
+          stripe[stripeCount] = y;
+          stripe[stripeCount + 1] = x0;
+          stripe[stripeCount + 2] = x1;
+          stripeCount += 3;
+        }
+      }
+    }
+    stripe[stripe.length - 1] = stripeCount / 3;
+  }
 }

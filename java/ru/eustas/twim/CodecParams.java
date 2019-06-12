@@ -1,5 +1,12 @@
 package ru.eustas.twim;
 
+import java.util.Arrays;
+
+import static ru.eustas.twim.RangeDecoder.readNumber;
+import static ru.eustas.twim.RangeDecoder.readSize;
+import static ru.eustas.twim.RangeEncoder.writeNumber;
+import static ru.eustas.twim.RangeEncoder.writeSize;
+
 class CodecParams {
   private static final int MAX_LEVEL = 7;
 
@@ -7,11 +14,11 @@ class CodecParams {
   private static final int MAX_F2 = 5;
   private static final int MAX_F3 = 5;
   private static final int MAX_F4 = 5;
+  static final int MAX_LINE_LIMIT = 63;
 
   static final int MAX_PARTITION_CODE = MAX_F1 * MAX_F2 * MAX_F3 * MAX_F4;
   static final int MAX_COLOR_CODE = 17;
-
-  static final int MAX_CODE = MAX_PARTITION_CODE * MAX_COLOR_CODE;
+  static final int TAX = MAX_PARTITION_CODE * MAX_LINE_LIMIT * MAX_COLOR_CODE;
 
   static int makeColorQuant(int code) {
     return 1 + ((4 + (code & 3)) << (code >> 2));
@@ -36,9 +43,9 @@ class CodecParams {
   // Actually, that is image params...
   final int width;
   final int height;
-  final int lineLimit = 25;
+  int lineLimit = 63;
 
-  private int partitionCode;
+  private int[] params;
   private int colorCode;
 
   CodecParams(int width, int height) {
@@ -55,16 +62,28 @@ class CodecParams {
     colorQuant = makeColorQuant(code);
   }
 
-  void setPartitionCode(int code) {
-    partitionCode = code;
-    int f1 = code % MAX_F1;
+  private int[] splitCode(int code) {
+    int[] result = new int[4];
+    result[0] = code % MAX_F1;
     code = code / MAX_F1;
-    int f2 = 2 + code % MAX_F2;
+    result[1] = code % MAX_F2;
     code = code / MAX_F2;
-    int f3 = (int)Math.pow(10, 3 - (code % MAX_F3) / 5.0);
+    result[2] = code % MAX_F3;
     code = code / MAX_F3;
-    int f4 = code % MAX_F4;
+    result[3] = code % MAX_F4;
+    return result;
+  }
 
+  void setPartitionCode(int code) {
+    setPartitionParams(splitCode(code));
+  }
+
+  private void setPartitionParams(int[] params) {
+    this.params = Arrays.copyOf(params, 4);
+    int f1 = params[0];
+    int f2 = params[1] + 2;
+    int f3 = (int) Math.pow(10, 3 - params[2] / 5.0);
+    int f4 = params[3];
     int scale = (width * width + height * height) * f2 * f2;
     for (int i = 0; i < MAX_LEVEL; ++i) {
       levelScale[i] = scale / BASE_SCALE_FACTOR;
@@ -78,25 +97,30 @@ class CodecParams {
   }
 
   public String toString() {
-    int code = partitionCode;
-    int f1 = code % MAX_F1;
-    code = code / MAX_F1;
-    int f2 = code % MAX_F2;
-    code = code / MAX_F2;
-    int f3 = code % MAX_F3;
-    code = code / MAX_F3;
-    int f4 = code % MAX_F4;
-    return "p: " + f1 + "" + f2 + "" + f3 + "" + f4 + ", clr: " + colorCode;
+    return "p: " + params[0] + "" + params[1] + "" + params[2] + "" + params[3]
+        + ", l: " + lineLimit + ", c: " + colorCode;
   }
 
-  int getCode() {
-    return partitionCode + colorCode * MAX_PARTITION_CODE;
+  static CodecParams read(RangeDecoder src) {
+    int width = readSize(src);
+    int height = readSize(src);
+    CodecParams cp = new CodecParams(width, height);
+    int[] params = {readNumber(src, MAX_F1), readNumber(src, MAX_F2), readNumber(src, MAX_F3), readNumber(src, MAX_F4)};
+    cp.setPartitionParams(params);
+    cp.lineLimit = readNumber(src, MAX_LINE_LIMIT) + 1;
+    cp.setColorCode(readNumber(src, MAX_COLOR_CODE));
+    return cp;
   }
 
-  void setCode(int code) {
-    setPartitionCode(code % MAX_PARTITION_CODE);
-    code /= MAX_PARTITION_CODE;
-    setColorCode(code % MAX_COLOR_CODE);
+  void write(RangeEncoder dst) {
+    writeSize(dst, width);
+    writeSize(dst, height);
+    writeNumber(dst, MAX_F1, params[0]);
+    writeNumber(dst, MAX_F2, params[1]);
+    writeNumber(dst, MAX_F3, params[2]);
+    writeNumber(dst, MAX_F4, params[3]);
+    writeNumber(dst, MAX_LINE_LIMIT, lineLimit - 1);
+    writeNumber(dst, MAX_COLOR_CODE, colorCode);
   }
 
   int getLevel(int[] region) {

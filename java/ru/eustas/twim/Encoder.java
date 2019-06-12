@@ -11,6 +11,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static ru.eustas.twim.RangeEncoder.writeNumber;
+
 public class Encoder {
 
   private static final double[] LUM = {0.299, 0.587, 0.114};
@@ -23,12 +25,22 @@ public class Encoder {
     int sumStride;
 
     final DistanceRange distanceRange = new DistanceRange();
+    final Stats left = new Stats();
+    final Stats right = new Stats();
+    final Stats stripe = new Stats();
+
+    final int[] tmpStripe;
+    final int[] tmpLeft;
+    final int[] tmpRight;
 
     Cache(int[] intRgb, int width) {
       int height = intRgb.length / width;
       if (width * height != intRgb.length) {
         throw new IllegalArgumentException("width * height != length");
       }
+      tmpLeft = new int[3 * height + 1];
+      tmpRight = new int[3 * height + 1];
+      tmpStripe = new int[3 * height + 1];
 
       int stride = (width + 1) * 3;
       int[] sum = new int[3];
@@ -64,6 +76,9 @@ public class Encoder {
       this.sumRgb = other.sumRgb;
       this.sumRgb2 = other.sumRgb2;
       this.sumStride = other.sumStride;
+      tmpLeft = new int[other.tmpLeft.length];
+      tmpRight = new int[other.tmpRight.length];
+      tmpStripe = new int[other.tmpStripe.length];
     }
   }
 
@@ -228,9 +243,12 @@ public class Encoder {
 
     void findBestSubdivision(Cache cache, int goalFunction, CodecParams cp) {
       DistanceRange distanceRange = cache.distanceRange;
-      // TODO(eustas): move to cache?
-      Stats left = new Stats();
-      Stats right = new Stats();
+      Stats left = cache.left;
+      Stats right = cache.right;
+      Stats stripe = cache.stripe;
+      int[] tmpLeft = cache.tmpLeft;
+      int[] tmpStripe = cache.tmpStripe;
+      int[] tmpRight = cache.tmpRight;
 
       int[] region = this.region;
       Stats stats = this.stats;
@@ -249,10 +267,35 @@ public class Encoder {
         for (int line = 0; line < numLines; ++line) {
           int d = distanceRange.distance(line);
           double fullScore = 0.0;
-          // TODO: stripe delta = 1, when possible
+/*
+          Region.splitStripe(region, angle, d - SinCos.SCALE, d + SinCos.SCALE, tmpStripe);
+          stripe.update(cache, tmpStripe);
+          left.updateGe(cache, tmpStripe, angle, d);
+          right.update(stripe, left);
+          fullScore += score(goalFunction, stripe, left, right);
+
+          Region.splitStripe(region, angle, d - 3 * SinCos.SCALE, d + 3 * SinCos.SCALE, tmpStripe);
+          stripe.update(cache, tmpStripe);
+          left.updateGe(cache, tmpStripe, angle, d);
+          right.update(stripe, left);
+          fullScore += score(goalFunction, stripe, left, right);
+
+          Region.splitStripe(region, angle, d - 5 * SinCos.SCALE, d + 5 * SinCos.SCALE, tmpStripe);
+          stripe.update(cache, tmpStripe);
+          left.updateGe(cache, tmpStripe, angle, d);
+          right.update(stripe, left);
+          fullScore += score(goalFunction, stripe, left, right);
+
+          Region.splitStripe(region, angle, d - 7 * SinCos.SCALE, d + 7 * SinCos.SCALE, tmpStripe);
+          stripe.update(cache, tmpStripe);
+          left.updateGe(cache, tmpStripe, angle, d);
+          right.update(stripe, left);
+          fullScore += score(goalFunction, stripe, left, right);
+*/
           left.updateGe(cache, region, angle, d);
           right.update(stats, left);
-          fullScore += score(goalFunction, stats, left, right);
+          fullScore += 4.0 * score(goalFunction, stats, left, right);
+
           if (fullScore > bestScore) {
             bestAngleCode = angleCode;
             bestLine = line;
@@ -323,9 +366,15 @@ public class Encoder {
     return Math.log(range) / Math.log(2.0);
   }
 
-  private static void writeNumber(RangeEncoder dst, int max, int value) {
-    if (max == 1) return;
-    dst.encodeRange(value, value + 1, max);
+  private static int sizeCost(int value) {
+    if (value < 8) throw new IllegalArgumentException("size < 8");
+    value -= 8;
+    int bits = 6;
+    while (value > (1 << bits)) {
+      value -= (1 << bits);
+      bits += 3;
+    }
+    return bits + (bits / 3) - 1;
   }
 
   private static class FragmentComparator implements Comparator<Fragment> {
@@ -347,7 +396,7 @@ public class Encoder {
    */
   static List<Fragment> buildPartition(int sizeLimit, int goalFunction, CodecParams cp, Cache cache) {
     double tax = bitCost(CodecParams.NODE_TYPE_COUNT) + 3.0 * bitCost(CodecParams.makeColorQuant(0));
-    double budget = sizeLimit * 8 - tax - bitCost(CodecParams.MAX_CODE);  // Minus flat image cost.
+    double budget = sizeLimit * 8 - tax - bitCost(CodecParams.TAX);  // Minus flat image cost.
 
     int width = cp.width;
     int height = cp.height;
@@ -382,7 +431,9 @@ public class Encoder {
 
   private static Set<Fragment> subpartition(int targetSize, List<Fragment> partition, CodecParams cp) {
     double tax = bitCost(CodecParams.NODE_TYPE_COUNT * cp.colorQuant * cp.colorQuant * cp.colorQuant);
-    double budget = 8 * targetSize - bitCost(CodecParams.MAX_CODE) - tax;
+    double budget = 8 * targetSize - bitCost(CodecParams.TAX) - tax;
+    budget -= sizeCost(cp.width);
+    budget -= sizeCost(cp.height);
     Set<Fragment> nonLeaf = new HashSet<>();
     for (Fragment node : partition) {
       if (node.bestCost < 0.0) break;
@@ -416,7 +467,7 @@ public class Encoder {
     queue.add(partition.get(0));
 
     RangeEncoder dst = new RangeEncoder();
-    writeNumber(dst, CodecParams.MAX_CODE, cp.getCode());
+    cp.write(dst);
 
     int encoded = 0;
     while (encoded < queue.size()) {
@@ -453,22 +504,27 @@ public class Encoder {
           bestColorCode = colorCode;
         }
       }
-      System.out.println(
-          "Done cp: [" + cp + "], g: " + goalFunction + ", error: " + Math.sqrt(bestSqe / (cp.width * cp.height)));
+      cp.setColorCode(bestColorCode);
+      //System.out.println(
+      //    "Done cp: [" + cp + "], g: " + goalFunction + ", error: " + Math.sqrt(bestSqe / (cp.width * cp.height)));
       return this;
     }
   }
 
-  static byte[] encode(BufferedImage src, int targetSize) throws InterruptedException {
+  static byte[] encode(BufferedImage src, int targetSize, int goalMask) throws InterruptedException {
     int width = src.getWidth();
     int height = src.getHeight();
     Cache cache = new Cache(src.getRGB(0, 0, width, height, null, 0, width), width);
     List<SimulationTask> tasks = new ArrayList<>();
-    for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
-      for (int goalFunction = 3; goalFunction < 4; ++goalFunction) {
-        CodecParams cp = new CodecParams(width, height);
-        cp.setPartitionCode(partitionCode);
-        tasks.add(new SimulationTask(targetSize, goalFunction, cache, cp));
+    for (int lineLimit = 0; lineLimit < CodecParams.MAX_LINE_LIMIT; ++lineLimit) {
+      for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
+        for (int goalFunction = 0; goalFunction < 4; ++goalFunction) {
+          if (((1 << goalFunction) & goalMask) == 0) continue;
+          CodecParams cp = new CodecParams(width, height);
+          cp.setPartitionCode(partitionCode);
+          cp.lineLimit = lineLimit + 1;
+          tasks.add(new SimulationTask(targetSize, goalFunction, cache, cp));
+        }
       }
     }
     int numCores = Runtime.getRuntime().availableProcessors();

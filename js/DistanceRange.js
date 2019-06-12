@@ -1,4 +1,4 @@
-import * as CodecParams from './CodecParams.js';
+import {getLineLimit, getLineQuant} from "./CodecParams.js";
 import {assertFalse, b32, forEachScan} from './Mini.js';
 import * as SinCos from './SinCos.js';
 
@@ -32,10 +32,10 @@ export let update = (region, angle) => {
   assertFalse(ma < mi);
   _min = mi;
   _max = ma;
-  _lineQuant = CodecParams.getLineQuant();
+  _lineQuant = getLineQuant();
   while (true) {
     numLines = (ma - mi) / _lineQuant | 0;
-    if (numLines > CodecParams.lineLimit) {
+    if (numLines > getLineLimit()) {
       _lineQuant = _lineQuant + (_lineQuant / 16 | 0);
     } else {
       break;

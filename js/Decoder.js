@@ -1,20 +1,11 @@
 import * as CodecParams from "./CodecParams.js";
+import {getWidth, getHeight} from "./CodecParams.js";
 import * as RangeDecoder from "./RangeDecoder.js";
-import {assertFalse, b8, forEachScan, int32ArraySet, last, newInt32Array} from './Mini.js';
+import {readNumber} from "./RangeDecoder.js";
+import {b8, forEachScan, int32ArraySet, last, newInt32Array} from './Mini.js';
 import * as DistanceRange from "./DistanceRange.js";
 import * as Region from "./Region.js";
 import * as SinCos from './SinCos.js';
-
-/**
- * @param{number} max
- * @return{number}
- */
-let readNumber = (max) => {
-  if (max < 2) return 0;
-  let /** @type{number} */ result = RangeDecoder.currentCount(max);
-  RangeDecoder.removeRange(result, result + 1);
-  return result;
-};
 
 /**
  * @noinline
@@ -74,30 +65,27 @@ let parse = (region, children, width, rgba) => {
 /**
  * @noinline
  * @param{!Uint8Array} encoded
- * @param{number} width
- * @param{number} height
  * @return{!ImageData}
  */
-export let decode = (encoded, width, height) => {
+export let decode = (encoded) => {
   RangeDecoder.init(encoded);
-  CodecParams.init(width, height);
-  CodecParams.setCode(readNumber(CodecParams.MAX_CODE));
+  CodecParams.read();
 
-  let /** @type{!Int32Array} */ rootRegion = newInt32Array(height * 3 + 1);
-  rootRegion[last(rootRegion)] = height;
-  for (let /** @type{number} */ y = 0; y < height; ++y) {
-    int32ArraySet(rootRegion, [y, 0, width], y * 3);
+  let /** @type{!Int32Array} */ rootRegion = newInt32Array(getHeight() * 3 + 1);
+  rootRegion[last(rootRegion)] = getHeight();
+  for (let /** @type{number} */ y = 0; y < getHeight(); ++y) {
+    int32ArraySet(rootRegion, [y, 0, getWidth()], y * 3);
   }
 
-  let /** @type{!Uint8ClampedArray} */ rgba = new Uint8ClampedArray(4 * width * height);
+  let /** @type{!Uint8ClampedArray} */ rgba = new Uint8ClampedArray(4 * getWidth() * getHeight());
   let /** @type{!Array<!Int32Array>} */ children = [rootRegion];
   let /** @type{number} */ cursor = 0;
   while (cursor <= last(children)) {
     let /** @type{number} */ checkpoint = last(children);
     for (; cursor <= checkpoint; ++cursor) {
-      parse(children[cursor], children, width, rgba);
+      parse(children[cursor], children, getWidth(), rgba);
     }
   }
 
-  return new ImageData(rgba, width, height);
+  return new ImageData(rgba, getWidth(), getHeight());
 };

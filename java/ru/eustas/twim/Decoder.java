@@ -5,14 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static ru.eustas.twim.CodecParams.NODE_FILL;
+import static ru.eustas.twim.RangeDecoder.readNumber;
 
 public class Decoder {
-  private static int readNumber(RangeDecoder src, int max) {
-    if (max < 2) return 0;
-    int result = src.currentCount(max);
-    src.removeRange(result, result + 1);
-    return result;
-  }
 
   private static int readColor(RangeDecoder src, CodecParams cp) {
     int argb = 0xFF;  // alpha = 1
@@ -95,10 +90,11 @@ public class Decoder {
     }
   }
 
-  static BufferedImage decode(byte[] encoded, int width, int height) {
+  static BufferedImage decode(byte[] encoded) {
     RangeDecoder src = new RangeDecoder(encoded);
-    CodecParams cp = new CodecParams(width, height);
-    cp.setCode(readNumber(src, CodecParams.MAX_CODE));
+    CodecParams cp = CodecParams.read(src);
+    int width = cp.width;
+    int height = cp.height;
 
     int[] rootRegion = new int[height * 3 + 1];
     rootRegion[rootRegion.length - 1] = height;

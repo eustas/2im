@@ -23,6 +23,24 @@ final class RangeDecoder {
     this.code = code;
   }
 
+  static int readNumber(RangeDecoder src, int max) {
+    if (max < 2) return 0;
+    int result = src.currentCount(max);
+    src.removeRange(result, result + 1);
+    return result;
+  }
+
+  static int readSize(RangeDecoder src) {
+    int plus = -1;
+    int bits = 0;
+    while ((plus <= 0) || (readNumber(src, 2) == 1)) {
+      plus = (plus + 1) << 3;
+      int extra = readNumber(src, 8);
+      bits = (bits << 3) + extra;
+    }
+    return bits + plus;
+  }
+
   private int readNibble() {
     return (offset < data.length) ? (data[offset++] & NIBBLE_MASK) : 0;
   }

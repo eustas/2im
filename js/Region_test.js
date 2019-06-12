@@ -6,7 +6,7 @@ import * as DistanceRange from "./DistanceRange.js";
 import * as SinCos from './SinCos.js';
 
 function testHorizontalSplit() {
-  CodecParams.init(4, 4);
+  CodecParams.initForTest(4, 4);
   let /** @type{!Int32Array} */ region = new Int32Array([0, 0, 4, 1]);
   let /** @type{number} */ angle = (SinCos.MAX_ANGLE / 2) | 0;
   DistanceRange.update(region, angle);
@@ -28,7 +28,7 @@ function testHorizontalSplit() {
 }
 
 function testVerticalSplit() {
-  CodecParams.init(4, 4);
+  CodecParams.initForTest(4, 4);
   let /** @type{!Int32Array} */ region = new Int32Array([0, 0, 1, 1, 0, 1, 2, 0, 1, 3, 0, 1, 4]);
   let /** @type{number} */ angle = 0;
   DistanceRange.update(region, angle);

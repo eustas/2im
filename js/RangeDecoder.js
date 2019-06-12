@@ -65,3 +65,25 @@ export let currentCount = (totalRange) => {
   assertFalse(result < 0 || result >= totalRange);
   return result;
 };
+
+/**
+ * @param{number} max
+ * @return{number}
+ */
+export let readNumber = (max) => {
+  if (max < 2) return 0;
+  let /** @type{number} */ result = currentCount(max);
+  removeRange(result, result + 1);
+  return result;
+};
+
+/**
+ * @return {number}
+ */
+export let readSize = () => {
+  let /** @type{number} */ bits = -1;
+  while ((bits < 8) || (readNumber(2) > 0)) {
+    bits = 8 * bits + readNumber(8) + 8;
+  }
+  return bits;
+};
