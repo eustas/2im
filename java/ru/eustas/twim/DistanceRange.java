@@ -7,8 +7,9 @@ class DistanceRange {
   int lineQuant;
 
   void update(int[] region, int angle, CodecParams cp) {
-    final int count3 = region[region.length - 1] * 3;
-    if (count3 == 0) {
+    final int step = region.length / 3;
+    final int count = region[region.length - 1];
+    if (count == 0) {
       throw new IllegalStateException("empty region");
     }
 
@@ -17,10 +18,10 @@ class DistanceRange {
     int ny = SinCos.COS[angle];
     int mi = Integer.MAX_VALUE;
     int ma = Integer.MIN_VALUE;
-    for (int i = 0; i < count3; i += 3) {
+    for (int i = 0; i < count; i++) {
       int y = region[i];
-      int x0 = region[i + 1];
-      int x1 = region[i + 2] - 1;
+      int x0 = region[step + i];
+      int x1 = region[2 * step + i] - 1;
       int d0 = ny * y + nx * x0;
       int d1 = ny * y + nx * x1;
       mi = Math.min(mi, d0);

@@ -24,7 +24,7 @@ public class MovieMain {
       String suffix = String.format(".%03d", targetSize);
       byte[] data = Encoder.encode(targetSize, partition, cp);
       Files.write(FileSystems.getDefault().getPath(arg + suffix + ".2im"), data);
-      ImageIO.write(Decoder.decode(data, width, height), "png", new File(arg + suffix + ".png"));
+      ImageIO.write(Decoder.decode(data), "png", new File(arg + suffix + ".png"));
     }
   }
 }

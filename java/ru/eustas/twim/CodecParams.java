@@ -124,8 +124,9 @@ class CodecParams {
   }
 
   int getLevel(int[] region) {
-    final int count3 = region[region.length - 1] * 3;
-    if (count3 == 0) {
+    final int step = region.length / 3;
+    final int count = region[region.length - 1];
+    if (count == 0) {
       return -1;
     }
 
@@ -134,10 +135,10 @@ class CodecParams {
     int max_y = -1;
     int min_x = width + 1;
     int max_x = -1;
-    for (int i = 0; i < count3; i += 3) {
+    for (int i = 0; i < count; i++) {
       int y = region[i];
-      int x0 = region[i + 1];
-      int x1 = region[i + 2];
+      int x0 = region[step + i];
+      int x1 = region[2 * step + i];
       min_y = Math.min(min_y, y);
       max_y = Math.max(max_y, y);
       min_x = Math.min(min_x, x0);

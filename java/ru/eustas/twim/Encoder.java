@@ -15,70 +15,154 @@ import static ru.eustas.twim.RangeEncoder.writeNumber;
 
 public class Encoder {
 
-  private static final double[] LUM = {0.299, 0.587, 0.114};
+  private static final float[] LUM = {0.299f, 0.587f, 0.114f};
+  private static final float[] LUM2 = {LUM[0] * LUM[0], LUM[1] * LUM[1], LUM[2] * LUM[2]};
+
+  static class StatsCache {
+    int count;
+    final float[] y;
+    final float[] x0;
+    final float[] x1;
+    final float[] x;
+
+    int[] plus = new int[7];
+    int[] minus = new int[7];
+
+    static void sum(Cache cache, float[] regionX, int[] dst) {
+      StatsCache statsCache = cache.statsCache;
+      int count = statsCache.count;
+      float[] regionY = statsCache.y;
+      int sumStride = cache.sumStride;
+      int[] sumR = cache.sumR;
+      int[] sumG = cache.sumG;
+      int[] sumB = cache.sumB;
+      int[] sumR2 = cache.sumR2;
+      int[] sumG2 = cache.sumG2;
+      int[] sumB2 = cache.sumB2;
+      int pixelCount = 0, r = 0, g = 0, b = 0, r2 = 0, g2 = 0, b2 = 0;
+
+      for (int i = 0; i < count; i++) {
+        int y = (int) regionY[i];
+        int x = (int) regionX[i];
+        int offset = y * sumStride + x;
+        pixelCount += x;
+        r += sumR[offset];
+        g += sumG[offset];
+        b += sumB[offset];
+        r2 += sumR2[offset];
+        g2 += sumG2[offset];
+        b2 += sumB2[offset];
+      }
+
+      dst[0] = pixelCount;
+      dst[1] = r;
+      dst[2] = g;
+      dst[3] = b;
+      dst[4] = r2;
+      dst[5] = g2;
+      dst[6] = b2;
+    }
+
+    StatsCache(int height) {
+      int step = Region.vectorFriendlySize(height);
+      this.y = new float[step];
+      this.x0 = new float[step];
+      this.x1 = new float[step];
+      this.x = new float[step];
+    }
+
+    StatsCache(StatsCache other) {
+      int step = other.x.length;
+      this.y = new float[step];
+      this.x0 = new float[step];
+      this.x1 = new float[step];
+      this.x = new float[step];
+    }
+
+    void prepare(Cache cache, int[] region) {
+      int count = region[region.length - 1];
+      int step = region.length / 3;
+      for (int i = 0; i < count; ++i) {
+        y[i] = region[i];
+        x0[i] = region[step + i];
+        x1[i] = region[2 * step + i];
+      }
+      this.count = count;
+      sum(cache, x1, plus);
+    }
+  }
 
   static class Cache {
-    /* Cumulative sum of previous row values. [R, G, B] triplets. Extra column with total sum. */
-    int[] sumRgb;
-    /* Cumulative sum of squares of previous row values. [R, G, B] triplets. Extra column with total sum. */
-    int[] sumRgb2;
-    int sumStride;
+    /* Cumulative sum of previous row values. Extra column with total sum. */
+    final int[] sumR;
+    final int[] sumG;
+    final int[] sumB;
+    /* Cumulative sum of squares of previous row values. Extra column with total sum. */
+    final int[] sumR2;
+    final int[] sumG2;
+    final int[] sumB2;
+    final int sumStride;
 
     final DistanceRange distanceRange = new DistanceRange();
-    final Stats left = new Stats();
-    final Stats right = new Stats();
-    final Stats stripe = new Stats();
 
-    final int[] tmpStripe;
-    final int[] tmpLeft;
-    final int[] tmpRight;
+    final StatsCache statsCache;
+
+    final Stats[] stats = new Stats[CodecParams.MAX_LINE_LIMIT + 6];
+    {
+      for (int i = 0; i < stats.length; ++i) {
+        stats[i] = new Stats();
+      }
+    }
 
     Cache(int[] intRgb, int width) {
       int height = intRgb.length / width;
       if (width * height != intRgb.length) {
         throw new IllegalArgumentException("width * height != length");
       }
-      tmpLeft = new int[3 * height + 1];
-      tmpRight = new int[3 * height + 1];
-      tmpStripe = new int[3 * height + 1];
 
-      int stride = (width + 1) * 3;
-      int[] sum = new int[3];
-      int[] sum2 = new int[3];
-      int[] sumRgb = new int[stride * height];
-      int[] sumRgb2 = new int[stride * height];
+      int stride = width + 1;
+      int[] sumR = new int[stride * height];
+      int[] sumG = new int[stride * height];
+      int[] sumB = new int[stride * height];
+      int[] sumR2 = new int[stride * height];
+      int[] sumG2 = new int[stride * height];
+      int[] sumB2 = new int[stride * height];
       for (int y = 0; y < height; ++y) {
-        for (int c = 0; c < 3; ++c) {
-          sum[c] = 0;
-          sum2[c] = 0;
-        }
         int srcRowOffset = y * width;
         int dstRowOffset = y * stride;
         for (int x = 0; x < width; ++x) {
-          int dstOffset = dstRowOffset + 3 * x + 3;  // extra +1 for sum delay
+          int dstOffset = dstRowOffset + x;
           int rgbValue = intRgb[srcRowOffset + x];
-          for (int c = 2; c >= 0; --c) {
-            int value = rgbValue & 0xFF;
-            rgbValue >>>= 8;
-            sum[c] += value;
-            sum2[c] += value * value;
-            sumRgb[dstOffset + c] = sum[c];
-            sumRgb2[dstOffset + c] = sum2[c];
-          }
+          int r = (rgbValue >> 16) & 0xFF;
+          int g = (rgbValue >> 8) & 0xFF;
+          int b = rgbValue & 0xFF;
+          sumR[dstOffset + 1] = sumR[dstOffset] + r;
+          sumR2[dstOffset + 1] = sumR2[dstOffset] + r * r;
+          sumG[dstOffset + 1] = sumG[dstOffset] + g;
+          sumG2[dstOffset + 1] = sumG2[dstOffset] + g * g;
+          sumB[dstOffset + 1] = sumB[dstOffset] + b;
+          sumB2[dstOffset + 1] = sumB2[dstOffset] + b * b;
         }
       }
-      this.sumRgb = sumRgb;
-      this.sumRgb2 = sumRgb2;
+      this.sumR = sumR;
+      this.sumG = sumG;
+      this.sumB = sumB;
+      this.sumR2 = sumR2;
+      this.sumG2 = sumG2;
+      this.sumB2 = sumB2;
       this.sumStride = stride;
+      this.statsCache = new StatsCache(height);
     }
 
     Cache(Cache other) {
-      this.sumRgb = other.sumRgb;
-      this.sumRgb2 = other.sumRgb2;
+      this.sumR = other.sumR;
+      this.sumG = other.sumG;
+      this.sumB = other.sumB;
+      this.sumR2 = other.sumR2;
+      this.sumG2 = other.sumG2;
+      this.sumB2 = other.sumB2;
       this.sumStride = other.sumStride;
-      tmpLeft = new int[other.tmpLeft.length];
-      tmpRight = new int[other.tmpRight.length];
-      tmpStripe = new int[other.tmpStripe.length];
+      this.statsCache = new StatsCache(other.statsCache);
     }
   }
 
@@ -88,106 +172,103 @@ public class Encoder {
     int pixelCount;
 
     // Calculate stats from own region.
-    void update(Cache cache, int[] region) {
-      int pixelCount = 0;
-      int[] rgb = this.rgb;
-      int[] rgb2 = this.rgb2;
-      int[] sumRgb = cache.sumRgb;
-      int[] sumRgb2 = cache.sumRgb2;
-      int sumStride = cache.sumStride;
-      int count3 = region[region.length - 1] * 3;
-      for (int c = 0; c < 3; ++c) {
-        rgb[c] = 0;
-        rgb2[c] = 0;
-      }
-      for (int i = 0; i < count3; i += 3) {
-        int y = region[i];
-        int x0 = region[i + 1];
-        int x1 = region[i + 2];
-        int ox0 = y * sumStride + 3 * x0;
-        int ox1 = y * sumStride + 3 * x1;
-        pixelCount += x1 - x0;
-        for (int c = 0; c < 3; ++c) {
-          rgb[c] += sumRgb[ox1 + c] - sumRgb[ox0 + c];
-          rgb2[c] += sumRgb2[ox1 + c] - sumRgb2[ox0 + c];
-        }
-      }
-      this.pixelCount = pixelCount;
+    void update(Cache cache) {
+      delta(cache, cache.statsCache.x0);
     }
 
     void update(Stats parent, Stats sibling) {
-      pixelCount = parent.pixelCount - sibling.pixelCount;
+      copy(parent);
+      sub(sibling);
+    }
+
+    void copy(Stats other) {
+      pixelCount = other.pixelCount;
       for (int c = 0; c < 3; ++c) {
-        rgb[c] = parent.rgb[c] - sibling.rgb[c];
-        rgb2[c] = parent.rgb2[c] - sibling.rgb2[c];
+        rgb[c] = other.rgb[c];
+        rgb2[c] = other.rgb2[c];
       }
     }
 
-    // x * nx + y * ny >= d
-    void updateGe(Cache cache, int[] region, int angle, int d) {
-      int pixelCount = 0;
-      int[] rgb = this.rgb;
-      int[] rgb2 = this.rgb2;
-      int[] sumRgb = cache.sumRgb;
-      int[] sumRgb2 = cache.sumRgb2;
-      int sumStride = cache.sumStride;
-      int count3 = region[region.length - 1] * 3;
+    void sub(Stats other) {
+      pixelCount -= other.pixelCount;
       for (int c = 0; c < 3; ++c) {
-        rgb[c] = 0;
-        rgb2[c] = 0;
+        rgb[c] -= other.rgb[c];
+        rgb2[c] -= other.rgb2[c];
       }
+    }
 
+    // y * ny >= d
+    static void updateGeHorizontal(Cache cache, int d) {
+      int ny = SinCos.COS[0];
+      float dny = d / (float) ny;
+      StatsCache statsCache = cache.statsCache;
+      int count = statsCache.count;
+      float[] regionY = statsCache.y;
+      float[] regionX0 = statsCache.x0;
+      float[] regionX1 = statsCache.x1;
+      float[] regionX = statsCache.x;
+
+      for (int i = 0; i < count; i++) {
+        float y = regionY[i];
+        float x0 = regionX0[i];
+        float x1 = regionX1[i];
+        regionX[i] = ((y - dny) < 0) ? x1 : x0;
+      }
+    }
+
+    // x >= (d - y * ny) / nx
+    static void updateGeGeneric(Cache cache, int angle, int d) {
       int nx = SinCos.SIN[angle];
       int ny = SinCos.COS[angle];
-      if (nx == 0) {
-        // nx = 0 -> ny = SinCos.SCALE -> y * ny >= d
-        for (int i = 0; i < count3; i += 3) {
-          int y = region[i];
-          if (y * ny >= d) {
-            int x0 = region[i + 1];
-            int x1 = region[i + 2];
-            pixelCount += x1 - x0;
-            int ox0 = y * sumStride + 3 * x0;
-            int ox1 = y * sumStride + 3 * x1;
-            for (int c = 0; c < 3; ++c) {
-              rgb[c] += sumRgb[ox1 + c] - sumRgb[ox0 + c];
-              rgb2[c] += sumRgb2[ox1 + c] - sumRgb2[ox0 + c];
-            }
-          }
-        }
-      } else {
-        // nx > 0 -> x >= (d - y * ny) / nx
-        d = 2 * d + nx;
-        nx = 2 * nx;
-        ny = 2 * ny;
-        for (int i = 0; i < count3; i += 3) {
-          int y = region[i];
-          int x = (d - y * ny) / nx;
-          int x0 = region[i + 1];
-          int x1 = region[i + 2];
-          if (x < x1) {
-            x0 = Math.max(x, x0);
-            pixelCount += x1 - x0;
-            int ox0 = y * sumStride + 3 * x0;
-            int ox1 = y * sumStride + 3 * x1;
-            for (int c = 0; c < 3; ++c) {
-              rgb[c] += sumRgb[ox1 + c] - sumRgb[ox0 + c];
-              rgb2[c] += sumRgb2[ox1 + c] - sumRgb2[ox0 + c];
-            }
-          }
-        }
+      float dnx = (2 * d + nx) / (float) (2 * nx);
+      float mnynx = -(2 * ny) / (float) (2 * nx);
+      StatsCache statsCache = cache.statsCache;
+      int count = statsCache.count;
+      float[] regionY = statsCache.y;
+      float[] regionX0 = statsCache.x0;
+      float[] regionX1 = statsCache.x1;
+      float[] regionX = statsCache.x;
+
+      for (int i = 0; i < count; i++) {
+        float y = regionY[i];
+        float xf = Math.fma(y, mnynx, dnx);
+        float x0 = regionX0[i];
+        float x1 = regionX1[i];
+        float m = ((xf - x0) > 0) ? xf : x0;
+        regionX[i] = ((x1 - xf) > 0) ? m : x1;
       }
-      this.pixelCount = pixelCount;
+    }
+
+    void delta(Cache cache, float[] regionX) {
+      StatsCache statsCache = cache.statsCache;
+      int[] minus = statsCache.minus;
+      StatsCache.sum(cache, regionX, minus);
+
+      int[] plus = statsCache.plus;
+      this.pixelCount = plus[0] - minus[0];
+      this.rgb[0] = plus[1] - minus[1];
+      this.rgb[1] = plus[2] - minus[2];
+      this.rgb[2] = plus[3] - minus[3];
+      this.rgb2[0] = plus[4] - minus[4];
+      this.rgb2[1] = plus[5] - minus[5];
+      this.rgb2[2] = plus[6] - minus[6];
+    }
+
+    void updateGe(Cache cache, int angle, int d) {
+      if (angle == 0) {
+        updateGeHorizontal(cache, d);
+      } else {
+        updateGeGeneric(cache, angle, d);
+      }
+      delta(cache, cache.statsCache.x);
     }
   }
 
-  private static double score(int goalFunction, Stats parent, Stats left, Stats right) {
+  private static double score(int goalFunction, Stats parent, Stats left, Stats right, double[] leftScore, double[] rightScore) {
     if (left.pixelCount == 0 || right.pixelCount == 0) {
       return 0;
     }
 
-    double[] leftScore = new double[3];
-    double[] rightScore = new double[3];
     for (int c = 0; c < 3; ++c) {
       double parentAverage = (parent.rgb[c] + 0.0) / parent.pixelCount;
       double leftAverage = (left.rgb[c] + 0.0) / left.pixelCount;
@@ -204,8 +285,8 @@ public class Encoder {
     double sumLeft = 0;
     double sumRight = 0;
     for (int c = 0; c < 3; ++c) {
-      lumLeft += LUM[c] * Math.sqrt(leftScore[c]);
-      lumRight += LUM[c] * Math.sqrt(rightScore[c]);
+      lumLeft += LUM2[c] * leftScore[c];
+      lumRight += LUM2[c] * rightScore[c];
       sumLeft += leftScore[c];
       sumRight += rightScore[c];
     }
@@ -215,7 +296,7 @@ public class Encoder {
     // 2) (incorrect?) solution of MSE optimization equation
     switch (goalFunction) {
       case 0: return Math.max(lumLeft, lumRight);
-      case 1: return Math.sqrt(lumLeft * lumRight);
+      case 1: return lumLeft * lumRight;
       case 2: return lumLeft + lumRight;
       case 3: return sumLeft + sumRight;
       default: throw new RuntimeException("unknown goal function");
@@ -243,21 +324,23 @@ public class Encoder {
 
     void findBestSubdivision(Cache cache, int goalFunction, CodecParams cp) {
       DistanceRange distanceRange = cache.distanceRange;
-      Stats left = cache.left;
-      Stats right = cache.right;
-      Stats stripe = cache.stripe;
-      int[] tmpLeft = cache.tmpLeft;
-      int[] tmpStripe = cache.tmpStripe;
-      int[] tmpRight = cache.tmpRight;
 
       int[] region = this.region;
       Stats stats = this.stats;
+      Stats tmpStats1 = cache.stats[cache.stats.length - 1];
+      Stats tmpStats2 = cache.stats[cache.stats.length - 2];
+      Stats tmpStats3 = cache.stats[cache.stats.length - 3];
       int level = cp.getLevel(region);
       int angleMax = 1 << cp.angleBits[level];
       int angleMult = (SinCos.MAX_ANGLE / angleMax);
       int bestAngleCode = 0;
       int bestLine = 0;
       double bestScore = -1.0;
+      cache.statsCache.prepare(cache, region);
+      stats.update(cache);
+
+      double[] leftScore = new double[3];
+      double[] rightScore = new double[3];
 
       // Find subdivision
       for (int angleCode = 0; angleCode < angleMax; ++angleCode) {
@@ -265,36 +348,20 @@ public class Encoder {
         distanceRange.update(region, angle, cp);
         int numLines = distanceRange.numLines;
         for (int line = 0; line < numLines; ++line) {
-          int d = distanceRange.distance(line);
+          cache.stats[line + 1].updateGe(cache, angle, distanceRange.distance(line));
+        }
+        cache.stats[numLines + 1].copy(stats);
+
+        for (int line = 0; line < numLines; ++line) {
           double fullScore = 0.0;
-/*
-          Region.splitStripe(region, angle, d - SinCos.SCALE, d + SinCos.SCALE, tmpStripe);
-          stripe.update(cache, tmpStripe);
-          left.updateGe(cache, tmpStripe, angle, d);
-          right.update(stripe, left);
-          fullScore += score(goalFunction, stripe, left, right);
 
-          Region.splitStripe(region, angle, d - 3 * SinCos.SCALE, d + 3 * SinCos.SCALE, tmpStripe);
-          stripe.update(cache, tmpStripe);
-          left.updateGe(cache, tmpStripe, angle, d);
-          right.update(stripe, left);
-          fullScore += score(goalFunction, stripe, left, right);
+          tmpStats3.update(cache.stats[line + 2], cache.stats[line]);
+          tmpStats2.update(tmpStats3, cache.stats[line + 1]);
+          tmpStats1.update(tmpStats3, tmpStats2);
+          fullScore += 0.25 * score(goalFunction, tmpStats3, tmpStats1, tmpStats2, leftScore, rightScore);
 
-          Region.splitStripe(region, angle, d - 5 * SinCos.SCALE, d + 5 * SinCos.SCALE, tmpStripe);
-          stripe.update(cache, tmpStripe);
-          left.updateGe(cache, tmpStripe, angle, d);
-          right.update(stripe, left);
-          fullScore += score(goalFunction, stripe, left, right);
-
-          Region.splitStripe(region, angle, d - 7 * SinCos.SCALE, d + 7 * SinCos.SCALE, tmpStripe);
-          stripe.update(cache, tmpStripe);
-          left.updateGe(cache, tmpStripe, angle, d);
-          right.update(stripe, left);
-          fullScore += score(goalFunction, stripe, left, right);
-*/
-          left.updateGe(cache, region, angle, d);
-          right.update(stats, left);
-          fullScore += 4.0 * score(goalFunction, stats, left, right);
+          tmpStats1.update(stats, cache.stats[line + 1]);
+          fullScore += 1.0 * score(goalFunction, stats, cache.stats[line + 1], tmpStats1, leftScore, rightScore);
 
           if (fullScore > bestScore) {
             bestAngleCode = angleCode;
@@ -311,13 +378,12 @@ public class Encoder {
         this.bestCost = -1.0;
       } else {
         distanceRange.update(region, bestAngleCode * angleMult, cp);
-        int[] leftRegion = new int[region[region.length - 1] * 3 + 1];
-        int[] rightRegion = new int[region[region.length - 1] * 3 + 1];
+        int childStep = Region.vectorFriendlySize(region[region.length - 1]);
+        int[] leftRegion = new int[childStep * 3 + 1];
+        int[] rightRegion = new int[childStep * 3 + 1];
         Region.splitLine(region, bestAngleCode * angleMult, distanceRange.distance(bestLine), leftRegion, rightRegion);
         this.leftChild = new Fragment(leftRegion);
-        this.leftChild.stats.update(cache, leftRegion);
         this.rightChild = new Fragment(rightRegion);
-        this.rightChild.stats.update(stats, this.leftChild.stats);
 
         this.bestAngleCode = bestAngleCode;
         this.bestNumLines = distanceRange.numLines;
@@ -400,15 +466,15 @@ public class Encoder {
 
     int width = cp.width;
     int height = cp.height;
-    int[] root = new int[height * 3 + 1];
+    int step = Region.vectorFriendlySize(height);
+    int[] root = new int[step * 3 + 1];
     for (int y = 0; y < height; ++y) {
-      root[3 * y] = y;
-      root[3 * y + 1] = 0;
-      root[3 * y + 2] = width;
+      root[y] = y;
+      root[step + y] = 0;
+      root[2 * step + y] = width;
     }
     root[root.length - 1] = height;
     Fragment rootFragment = new Fragment(root);
-    rootFragment.stats.update(cache, root);
 
     List<Fragment> result = new ArrayList<>();
     PriorityQueue<Fragment> queue = new PriorityQueue<>(16, FRAGMENT_COMPARATOR);
@@ -517,6 +583,7 @@ public class Encoder {
     Cache cache = new Cache(src.getRGB(0, 0, width, height, null, 0, width), width);
     List<SimulationTask> tasks = new ArrayList<>();
     for (int lineLimit = 0; lineLimit < CodecParams.MAX_LINE_LIMIT; ++lineLimit) {
+      if (lineLimit != 40) continue;
       for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
         for (int goalFunction = 0; goalFunction < 4; ++goalFunction) {
           if (((1 << goalFunction) & goalMask) == 0) continue;

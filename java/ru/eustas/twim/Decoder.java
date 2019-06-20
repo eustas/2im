@@ -44,9 +44,9 @@ public class Decoder {
 
       // Cutting with half-planes does not increase the number of scans.
       // TODO: region will remain unused; split to region and donate it to child?
-      int lastCount3 = region[region.length - 1] * 3;
-      int[] inner = new int[lastCount3 + 1];
-      int[] outer = new int[lastCount3 + 1];
+      int step = Region.vectorFriendlySize(region[region.length - 1]);
+      int[] inner = new int[3 * step + 1];
+      int[] outer = new int[3 * step + 1];
 
       switch (type) {
         case CodecParams.NODE_HALF_PLANE: {
@@ -73,12 +73,13 @@ public class Decoder {
 
     void render(int width, int[] rgb) {
       if (type == NODE_FILL) {
-        int count3 = region[region.length - 1] * 3;
+        int step = region.length / 3;
+        int count = region[region.length - 1];
         int clr = color;
-        for (int i = 0; i < count3; i += 3) {
+        for (int i = 0; i < count; i++) {
           int y = region[i];
-          int x0 = region[i + 1];
-          int x1 = region[i + 2];
+          int x0 = region[step + i];
+          int x1 = region[2 * step + i];
           for (int x = x0; x < x1; ++x) {
             rgb[y * width + x] = clr;
           }
@@ -96,12 +97,13 @@ public class Decoder {
     int width = cp.width;
     int height = cp.height;
 
-    int[] rootRegion = new int[height * 3 + 1];
+    int step = Region.vectorFriendlySize(height);
+    int[] rootRegion = new int[step * 3 + 1];
     rootRegion[rootRegion.length - 1] = height;
     for (int y = 0; y < height; ++y) {
-      rootRegion[y * 3] = y;
-      rootRegion[y * 3 + 1] = 0;
-      rootRegion[y * 3 + 2] = width;
+      rootRegion[y] = y;
+      rootRegion[step + y] = 0;
+      rootRegion[2 * step + y] = width;
     }
 
     Fragment root = new Fragment(rootRegion);
