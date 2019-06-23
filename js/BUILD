@@ -115,7 +115,7 @@ load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_binary")
 
 closure_js_binary(
     name = "twim",
-    entry_points = ["js/twim-lib.js"],
+    entry_points = ["twim-lib.js"],
     deps = [":twim-lib"],
     language = "ECMASCRIPT_NEXT",
     output_wrapper = "((zis)=>{%output%})(window);",
@@ -126,7 +126,7 @@ load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")
 closure_js_test(
     name = "Crc64Test",
     srcs = ["Crc64_test.js"],
-    entry_points = ["js/Crc64_test.js"],
+    entry_points = ["Crc64_test.js"],
     suppress = ["moduleLoad"],
     deps = [
         ":Crc64",
@@ -137,7 +137,7 @@ closure_js_test(
 closure_js_test(
     name = "CjkTest",
     srcs = ["Cjk_test.js"],
-    entry_points = ["js/Cjk_test.js"],
+    entry_points = ["Cjk_test.js"],
     suppress = ["moduleLoad"],
     deps = [
         ":CjkDecoder",
@@ -149,7 +149,7 @@ closure_js_test(
 closure_js_test(
     name = "RegionTest",
     srcs = ["Region_test.js"],
-    entry_points = ["js/Region_test.js"],
+    entry_points = ["Region_test.js"],
     suppress = ["moduleLoad"],
     deps = [
         ":CodecParams",
@@ -163,7 +163,7 @@ closure_js_test(
 closure_js_test(
     name = "RangeTest",
     srcs = ["Range_test.js"],
-    entry_points = ["js/Range_test.js"],
+    entry_points = ["Range_test.js"],
     suppress = ["moduleLoad"],
     deps = [
         ":RangeDecoder",
@@ -175,7 +175,7 @@ closure_js_test(
 closure_js_test(
     name = "SinCosTest",
     srcs = ["SinCos_test.js"],
-    entry_points = ["js/SinCos_test.js"],
+    entry_points = ["SinCos_test.js"],
     suppress = ["moduleLoad"],
     deps = [
         ":Crc64",

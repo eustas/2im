@@ -18,7 +18,6 @@ public class Main {
     int target = 200;
     Mode mode = Mode.ENCODE;
     boolean appendSize = false;
-    int goalMask = 0xF;
     for (String arg : args) {
       if (arg.startsWith("-t")) {
         target = Integer.parseInt(arg.substring(2));
@@ -35,16 +34,13 @@ public class Main {
       } else if (arg.equals("-s")) {
         appendSize = true;
         continue;
-      } else if (arg.startsWith("-g")) {
-        goalMask = 1 << Integer.parseInt(arg.substring(2));
-        continue;
       }
 
       String path = arg;
 
       if (mode == Mode.ENCODE || mode == Mode.ENCODE_DECODE) {
         BufferedImage image = ImageIO.read(new File(path));
-        byte[] data = Encoder.encode(image, target, goalMask);
+        byte[] data = Encoder.encode(image, target);
         if (appendSize) {
           path = path + "." + data.length;
         }

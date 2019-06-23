@@ -21,6 +21,7 @@ public class Encoder {
   static class StatsCache {
     int count;
     final float[] y;
+    final int[] rowOffset;
     final float[] x0;
     final float[] x1;
     final float[] x;
@@ -31,8 +32,7 @@ public class Encoder {
     static void sum(Cache cache, float[] regionX, int[] dst) {
       StatsCache statsCache = cache.statsCache;
       int count = statsCache.count;
-      float[] regionY = statsCache.y;
-      int sumStride = cache.sumStride;
+      int[] rowOffset = statsCache.rowOffset;
       int[] sumR = cache.sumR;
       int[] sumG = cache.sumG;
       int[] sumB = cache.sumB;
@@ -42,9 +42,8 @@ public class Encoder {
       int pixelCount = 0, r = 0, g = 0, b = 0, r2 = 0, g2 = 0, b2 = 0;
 
       for (int i = 0; i < count; i++) {
-        int y = (int) regionY[i];
         int x = (int) regionX[i];
-        int offset = y * sumStride + x;
+        int offset = rowOffset[i] + x;
         pixelCount += x;
         r += sumR[offset];
         g += sumG[offset];
@@ -69,6 +68,7 @@ public class Encoder {
       this.x0 = new float[step];
       this.x1 = new float[step];
       this.x = new float[step];
+      this.rowOffset = new int[step];
     }
 
     StatsCache(StatsCache other) {
@@ -77,15 +77,19 @@ public class Encoder {
       this.x0 = new float[step];
       this.x1 = new float[step];
       this.x = new float[step];
+      this.rowOffset = new int[step];
     }
 
     void prepare(Cache cache, int[] region) {
       int count = region[region.length - 1];
       int step = region.length / 3;
+      int sumStride = cache.sumStride;
       for (int i = 0; i < count; ++i) {
-        y[i] = region[i];
+        int row = region[i];
+        y[i] = row;
         x0[i] = region[step + i];
         x1[i] = region[2 * step + i];
+        rowOffset[i] = row * sumStride;
       }
       this.count = count;
       sum(cache, x1, plus);
@@ -102,6 +106,9 @@ public class Encoder {
     final int[] sumG2;
     final int[] sumB2;
     final int sumStride;
+
+    double[] leftScore = new double[3];
+    double[] rightScore = new double[3];
 
     final DistanceRange distanceRange = new DistanceRange();
 
@@ -163,6 +170,28 @@ public class Encoder {
       this.sumB2 = other.sumB2;
       this.sumStride = other.sumStride;
       this.statsCache = new StatsCache(other.statsCache);
+    }
+  }
+
+  private static class CachePool {
+    Cache origin;
+
+    ArrayList<Cache> pool = new ArrayList<>();
+
+    CachePool(Cache origin) {
+      this.origin = origin;
+      pool.add(origin);
+    }
+
+    synchronized Cache take() {
+      if (pool.isEmpty()) {
+        return new Cache(origin);
+      }
+      return pool.remove(pool.size() - 1);
+    }
+
+    synchronized void release(Cache cache) {
+      pool.add(cache);
     }
   }
 
@@ -264,7 +293,7 @@ public class Encoder {
     }
   }
 
-  private static double score(int goalFunction, Stats parent, Stats left, Stats right, double[] leftScore, double[] rightScore) {
+  private static double score(Stats parent, Stats left, Stats right, double[] leftScore, double[] rightScore) {
     if (left.pixelCount == 0 || right.pixelCount == 0) {
       return 0;
     }
@@ -280,27 +309,14 @@ public class Encoder {
       rightScore[c] = right.pixelCount * (parentAverage2 - rightAverage2) - 2.0 * right.rgb[c] * (parentAverage - rightAverage);
     }
 
-    double lumLeft = 0;
-    double lumRight = 0;
     double sumLeft = 0;
     double sumRight = 0;
     for (int c = 0; c < 3; ++c) {
-      lumLeft += LUM2[c] * leftScore[c];
-      lumRight += LUM2[c] * rightScore[c];
       sumLeft += leftScore[c];
       sumRight += rightScore[c];
     }
 
-    // Bad score functions:
-    // 1) delta ^ 2 * count
-    // 2) (incorrect?) solution of MSE optimization equation
-    switch (goalFunction) {
-      case 0: return Math.max(lumLeft, lumRight);
-      case 1: return lumLeft * lumRight;
-      case 2: return lumLeft + lumRight;
-      case 3: return sumLeft + sumRight;
-      default: throw new RuntimeException("unknown goal function");
-    }
+    return sumLeft + sumRight;
   }
 
   static class Fragment {
@@ -322,11 +338,13 @@ public class Encoder {
       this.region = region;
     }
 
-    void findBestSubdivision(Cache cache, int goalFunction, CodecParams cp) {
+    void findBestSubdivision(Cache cache, CodecParams cp) {
       DistanceRange distanceRange = cache.distanceRange;
 
       int[] region = this.region;
       Stats stats = this.stats;
+      double[] leftScore = cache.leftScore;
+      double[] rightScore = cache.rightScore;
       Stats tmpStats1 = cache.stats[cache.stats.length - 1];
       Stats tmpStats2 = cache.stats[cache.stats.length - 2];
       Stats tmpStats3 = cache.stats[cache.stats.length - 3];
@@ -338,9 +356,6 @@ public class Encoder {
       double bestScore = -1.0;
       cache.statsCache.prepare(cache, region);
       stats.update(cache);
-
-      double[] leftScore = new double[3];
-      double[] rightScore = new double[3];
 
       // Find subdivision
       for (int angleCode = 0; angleCode < angleMax; ++angleCode) {
@@ -358,10 +373,10 @@ public class Encoder {
           tmpStats3.update(cache.stats[line + 2], cache.stats[line]);
           tmpStats2.update(tmpStats3, cache.stats[line + 1]);
           tmpStats1.update(tmpStats3, tmpStats2);
-          fullScore += 0.25 * score(goalFunction, tmpStats3, tmpStats1, tmpStats2, leftScore, rightScore);
+          fullScore += 0.25 * score(tmpStats3, tmpStats1, tmpStats2, leftScore, rightScore);
 
           tmpStats1.update(stats, cache.stats[line + 1]);
-          fullScore += 1.0 * score(goalFunction, stats, cache.stats[line + 1], tmpStats1, leftScore, rightScore);
+          fullScore += 1.0 * score(stats, cache.stats[line + 1], tmpStats1, leftScore, rightScore);
 
           if (fullScore > bestScore) {
             bestAngleCode = angleCode;
@@ -460,7 +475,7 @@ public class Encoder {
    * Minimal color data cost is used.
    * Partition could be used to try multiple color quantizations to see, which one gives the best result.
    */
-  static List<Fragment> buildPartition(int sizeLimit, int goalFunction, CodecParams cp, Cache cache) {
+  static List<Fragment> buildPartition(int sizeLimit, CodecParams cp, Cache cache) {
     double tax = bitCost(CodecParams.NODE_TYPE_COUNT) + 3.0 * bitCost(CodecParams.makeColorQuant(0));
     double budget = sizeLimit * 8 - tax - bitCost(CodecParams.TAX);  // Minus flat image cost.
 
@@ -478,7 +493,7 @@ public class Encoder {
 
     List<Fragment> result = new ArrayList<>();
     PriorityQueue<Fragment> queue = new PriorityQueue<>(16, FRAGMENT_COMPARATOR);
-    rootFragment.findBestSubdivision(cache, goalFunction, cp);
+    rootFragment.findBestSubdivision(cache, cp);
     queue.add(rootFragment);
     while (!queue.isEmpty()) {
       Fragment candidate = queue.poll();
@@ -486,9 +501,9 @@ public class Encoder {
       if (tax + candidate.bestCost <= budget) {
         budget -= tax + candidate.bestCost;
         result.add(candidate);
-        candidate.leftChild.findBestSubdivision(cache, goalFunction, cp);
+        candidate.leftChild.findBestSubdivision(cache, cp);
         queue.add(candidate.leftChild);
-        candidate.rightChild.findBestSubdivision(cache, goalFunction, cp);
+        candidate.rightChild.findBestSubdivision(cache, cp);
         queue.add(candidate.rightChild);
       }
     }
@@ -546,52 +561,54 @@ public class Encoder {
 
   private static class SimulationTask implements Callable<SimulationTask> {
     final int targetSize;
-    final int goalFunction;
-    final Cache cache;
+    final CachePool cachePool;
     final CodecParams cp;
     double bestSqe = 1e20;
     int bestColorCode = -1;
 
-    SimulationTask(int targetSize, int goalFunction, Cache cache, CodecParams cp) {
+    SimulationTask(int targetSize, CachePool cachePool, CodecParams cp) {
       this.targetSize = targetSize;
-      this.goalFunction = goalFunction;
-      this.cache = new Cache(cache);
+      this.cachePool = cachePool;
       this.cp = cp;
     }
 
     @Override
     public SimulationTask call() {
-      List<Fragment> partition = buildPartition(targetSize, goalFunction, cp, cache);
-      for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_CODE; ++colorCode) {
-        cp.setColorCode(colorCode);
-        double sqe = simulateEncode(targetSize, partition, cp);
-        if (sqe < bestSqe) {
-          bestSqe = sqe;
-          bestColorCode = colorCode;
+      Cache cache = null;
+      try {
+        cache = cachePool.take();
+        List<Fragment> partition = buildPartition(targetSize, cp, cache);
+        for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_CODE; ++colorCode) {
+          cp.setColorCode(colorCode);
+          double sqe = simulateEncode(targetSize, partition, cp);
+          if (sqe < bestSqe) {
+            bestSqe = sqe;
+            bestColorCode = colorCode;
+          }
         }
+        cp.setColorCode(bestColorCode);
+        //System.out.println(
+        //    "Done cp: [" + cp + "], g: " + goalFunction + ", error: " + Math.sqrt(bestSqe / (cp.width * cp.height)));
+        return this;
+      } finally {
+        if (cache != null) cachePool.release(cache);
       }
-      cp.setColorCode(bestColorCode);
-      //System.out.println(
-      //    "Done cp: [" + cp + "], g: " + goalFunction + ", error: " + Math.sqrt(bestSqe / (cp.width * cp.height)));
-      return this;
     }
   }
 
-  static byte[] encode(BufferedImage src, int targetSize, int goalMask) throws InterruptedException {
+  static byte[] encode(BufferedImage src, int targetSize) throws InterruptedException {
     int width = src.getWidth();
     int height = src.getHeight();
     Cache cache = new Cache(src.getRGB(0, 0, width, height, null, 0, width), width);
+    CachePool cachePool = new CachePool(cache);
     List<SimulationTask> tasks = new ArrayList<>();
     for (int lineLimit = 0; lineLimit < CodecParams.MAX_LINE_LIMIT; ++lineLimit) {
-      if (lineLimit != 40) continue;
+      //if (lineLimit != 40) continue;
       for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
-        for (int goalFunction = 0; goalFunction < 4; ++goalFunction) {
-          if (((1 << goalFunction) & goalMask) == 0) continue;
-          CodecParams cp = new CodecParams(width, height);
-          cp.setPartitionCode(partitionCode);
-          cp.lineLimit = lineLimit + 1;
-          tasks.add(new SimulationTask(targetSize, goalFunction, cache, cp));
-        }
+        CodecParams cp = new CodecParams(width, height);
+        cp.setPartitionCode(partitionCode);
+        cp.lineLimit = lineLimit + 1;
+        tasks.add(new SimulationTask(targetSize, cachePool, cp));
       }
     }
     int numCores = Runtime.getRuntime().availableProcessors();
@@ -608,12 +625,11 @@ public class Encoder {
       }
     }
     bestResult.cp.setColorCode(bestResult.bestColorCode);
-    List<Fragment> partition = buildPartition(targetSize, bestResult.goalFunction, bestResult.cp, bestResult.cache);
+    List<Fragment> partition = buildPartition(targetSize, bestResult.cp, cache);
     byte[] data = encode(targetSize, partition, bestResult.cp);
     long t1 = System.nanoTime();
     System.out.println("time: " + (((t1 - t0) / 1000000) / 1000.0) + "s, size: " + data.length +
-        ", cp: [" + bestResult.cp + "], g: " + bestResult.goalFunction +
-        ", error: " + Math.sqrt(bestSqe / (width * height)));
+        ", cp: [" + bestResult.cp + "], error: " + Math.sqrt(bestSqe / (width * height)));
     return data;
   }
 }

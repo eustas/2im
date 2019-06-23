@@ -1,0 +1,9 @@
+# Description:
+#   Bazel workspace file for twim.
+
+workspace(name = "ru_eustas_twim_java")
+
+maven_jar(
+    name = "junit_junit",
+    artifact = "junit:junit:4.12",
+)

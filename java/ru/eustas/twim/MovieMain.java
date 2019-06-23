@@ -18,7 +18,7 @@ public class MovieMain {
     CodecParams cp = new CodecParams(width, height);
     cp.setPartitionCode(222);
     cp.setColorCode(6);
-    List<Encoder.Fragment> partition = Encoder.buildPartition(512, 3, cp, cache);
+    List<Encoder.Fragment> partition = Encoder.buildPartition(512, cp, cache);
 
     for (int targetSize = 7; targetSize < 500; ++targetSize) {
       String suffix = String.format(".%03d", targetSize);

@@ -32,9 +32,10 @@ public class RegionTest {
 
   @Test
   public void testVerticalSplit() {
-    int[] region = {0, 0, 1, 1, 0, 1, 2, 0, 1, 3, 0, 1, 4};
+    int[] region = {0, 1, 2, 3, 0, 0, 0, 0, 1, 1, 1, 1, 4};
     int angle = 0;
     CodecParams cp = new CodecParams(4, 4);
+    cp.lineLimit = 63;
     DistanceRange distanceRange = new DistanceRange();
     distanceRange.update(region, angle, cp);
     assertEquals(3, distanceRange.numLines);
@@ -43,7 +44,7 @@ public class RegionTest {
       int[] left = new int[10];
       int[] right = new int[4];
       Region.splitLine(region, angle, distanceRange.distance(0), left, right);
-      assertArrayEquals(new int[]{1, 0, 1, 2, 0, 1, 3, 0, 1, 3}, left);
+      assertArrayEquals(new int[]{1, 2, 3, 0, 0, 0, 1, 1, 1, 3}, left);
       assertArrayEquals(new int[]{0, 0, 1, 1}, right);
     }
     {
@@ -51,8 +52,8 @@ public class RegionTest {
       int[] left = new int[7];
       int[] right = new int[7];
       Region.splitLine(region, angle, distanceRange.distance(1), left, right);
-      assertArrayEquals(new int[]{2, 0, 1, 3, 0, 1, 2}, left);
-      assertArrayEquals(new int[]{0, 0, 1, 1, 0, 1, 2}, right);
+      assertArrayEquals(new int[]{2, 3, 0, 0, 1, 1, 2}, left);
+      assertArrayEquals(new int[]{0, 1, 0, 0, 1, 1, 2}, right);
     }
     {
       // 3/3
@@ -60,7 +61,7 @@ public class RegionTest {
       int[] right = new int[10];
       Region.splitLine(region, angle, distanceRange.distance(2), left, right);
       assertArrayEquals(new int[]{3, 0, 1, 1}, left);
-      assertArrayEquals(new int[]{0, 0, 1, 1, 0, 1, 2, 0, 1, 3}, right);
+      assertArrayEquals(new int[]{0, 1, 2, 0, 0, 0, 1, 1, 1, 3}, right);
     }
   }
 }

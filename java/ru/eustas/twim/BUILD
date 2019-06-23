@@ -17,15 +17,6 @@ java_library(
     srcs = ["Crc64.java"],
 )
 
-java_test(
-    name = "Crc64Test",
-    srcs = ["Crc64Test.java"],
-    deps = [
-        ":crc64",
-        "@junit_junit//jar",
-    ]
-)
-
 java_library(
     name = "cjk_decoder",
     srcs = ["CjkDecoder.java"],
@@ -43,17 +34,6 @@ java_library(
     srcs = ["CjkTransform.java"],
 )
 
-java_test(
-    name = "CjkTest",
-    srcs = ["CjkTest.java"],
-    deps = [
-        ":cjk_decoder",
-        ":cjk_encoder",
-        ":cjk_transform",
-        "@junit_junit//jar",
-    ]
-)
-
 java_library(
     name = "decoder",
     srcs = ["Decoder.java"],
@@ -65,12 +45,6 @@ java_library(
     ],
 )
 
-java_test(
-    name = "DecoderTest",
-    srcs = ["DecoderTest.java"],
-    deps = [":decoder"],
-)
-
 java_library(
     name = "encoder",
     srcs = ["Encoder.java"],
@@ -79,31 +53,6 @@ java_library(
         ":range_encoder",
         ":region",
         ":sin_cos",
-    ],
-)
-
-java_binary(
-    name = "Main",
-    srcs = ["Main.java"],
-    deps = [
-        ":decoder",
-        ":encoder",
-    ],
-)
-
-java_test(
-    name = "EncoderTest",
-    srcs = ["EncoderTest.java"],
-    deps = [":encoder"],
-)
-
-java_binary(
-    name = "MovieMain",
-    srcs = ["MovieMain.java"],
-    deps = [
-        ":codec_params",
-        ":decoder",
-        ":encoder",
     ],
 )
 
@@ -124,17 +73,6 @@ java_library(
     deps = [":range_code"],
 )
 
-java_test(
-    name = "RangeTest",
-    srcs = ["RangeTest.java"],
-    deps = [
-        ":range_code",
-        ":range_decoder",
-        ":range_encoder",
-        "@junit_junit//jar",
-    ]
-)
-
 java_library(
     name = "region",
     srcs = [
@@ -147,29 +85,9 @@ java_library(
     ],
 )
 
-java_test(
-    name = "RegionTest",
-    srcs = ["RegionTest.java"],
-    deps = [
-        ":codec_params",
-        ":region",
-        ":sin_cos",
-    ],
-)
-
 java_library(
     name = "sin_cos",
     srcs = ["SinCos.java"],
-)
-
-java_test(
-    name = "SinCosTest",
-    srcs = ["SinCosTest.java"],
-    deps = [
-        ":crc64",
-        ":sin_cos",
-        "@junit_junit//jar",
-    ]
 )
 
 java_library(
@@ -182,12 +100,106 @@ java_library(
     srcs = ["UtfEncoder.java"],
 )
 
-java_test(
-    name = "UtfTest",
-    srcs = ["UtfTest.java"],
+# binaries
+
+java_binary(
+    name = "Main",
+    srcs = ["Main.java"],
+    main_class = "ru.eustas.twim.Main",
     deps = [
+        ":decoder",
+        ":encoder",
+    ],
+)
+
+java_binary(
+    name = "MovieMain",
+    srcs = ["MovieMain.java"],
+    main_class = "ru.eustas.twim.MovieMain",
+    deps = [
+        ":codec_params",
+        ":decoder",
+        ":encoder",
+    ],
+)
+
+# tests
+
+java_library(
+    name = "test_lib",
+    srcs = [
+        "CjkTest.java",
+        "Crc64Test.java",
+        "DecoderTest.java",
+        "EncoderTest.java",
+        "RangeTest.java",
+        "RegionTest.java",
+        "SinCosTest.java",
+        "UtfTest.java",
+    ],
+    deps = [
+        ":codec_params",
+        ":cjk_decoder",
+        ":cjk_encoder",
+        ":cjk_transform",
+        ":crc64",
+        ":decoder",
+        ":encoder",
+        ":range_code",
+        ":range_decoder",
+        ":range_encoder",
+        ":region",
+        ":sin_cos",
         ":utf_decoder",
         ":utf_encoder",
         "@junit_junit//jar",
-    ]
+    ],
+)
+
+java_test(
+    name = "CjkTest",
+    test_class = "ru.eustas.twim.CjkTest",
+    runtime_deps = [":test_lib"],
+)
+
+java_test(
+    name = "Crc64Test",
+    test_class = "ru.eustas.twim.Crc64Test",
+    runtime_deps = [":test_lib"],
+)
+
+java_test(
+    name = "DecoderTest",
+    test_class = "ru.eustas.twim.DecoderTest",
+    runtime_deps = [":test_lib"],
+)
+
+java_test(
+    name = "EncoderTest",
+    test_class = "ru.eustas.twim.EncoderTest",
+    runtime_deps = [":test_lib"],
+)
+
+java_test(
+    name = "RangeTest",
+    test_class = "ru.eustas.twim.RangeTest",
+    runtime_deps = [":test_lib"],
+)
+
+java_test(
+    name = "RegionTest",
+    test_class = "ru.eustas.twim.RegionTest",
+    runtime_deps = [":test_lib"],
+)
+
+java_test(
+    name = "SinCosTest",
+    test_class = "ru.eustas.twim.SinCosTest",
+    runtime_deps = [":test_lib"],
+)
+
+java_test(
+    name = "UtfTest",
+    test_class = "ru.eustas.twim.UtfTest",
+    runtime_deps = [":test_lib"],
 )
