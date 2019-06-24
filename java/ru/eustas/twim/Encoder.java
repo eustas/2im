@@ -15,9 +15,6 @@ import static ru.eustas.twim.RangeEncoder.writeNumber;
 
 public class Encoder {
 
-  private static final float[] LUM = {0.299f, 0.587f, 0.114f};
-  private static final float[] LUM2 = {LUM[0] * LUM[0], LUM[1] * LUM[1], LUM[2] * LUM[2]};
-
   static class StatsCache {
     int count;
     final float[] y;
@@ -373,7 +370,7 @@ public class Encoder {
           tmpStats3.update(cache.stats[line + 2], cache.stats[line]);
           tmpStats2.update(tmpStats3, cache.stats[line + 1]);
           tmpStats1.update(tmpStats3, tmpStats2);
-          fullScore += 0.25 * score(tmpStats3, tmpStats1, tmpStats2, leftScore, rightScore);
+          fullScore += 0.0 * score(tmpStats3, tmpStats1, tmpStats2, leftScore, rightScore);
 
           tmpStats1.update(stats, cache.stats[line + 1]);
           fullScore += 1.0 * score(stats, cache.stats[line + 1], tmpStats1, leftScore, rightScore);
@@ -603,7 +600,7 @@ public class Encoder {
     CachePool cachePool = new CachePool(cache);
     List<SimulationTask> tasks = new ArrayList<>();
     for (int lineLimit = 0; lineLimit < CodecParams.MAX_LINE_LIMIT; ++lineLimit) {
-      //if (lineLimit != 40) continue;
+      //if (lineLimit != 17) continue;
       for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
         CodecParams cp = new CodecParams(width, height);
         cp.setPartitionCode(partitionCode);

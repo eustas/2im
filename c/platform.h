@@ -2,6 +2,9 @@
 #define TWIM_PLATFORM
 
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
+
 #include <immintrin.h>
 
 #ifdef _MSC_VER
