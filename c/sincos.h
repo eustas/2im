@@ -3,16 +3,19 @@
 
 #include <array>
 
+#include "platform.h"
+
 namespace twim {
 
-constexpr const int kOne = 1 << 18;
+class SinCos {
+ public:
+  static constexpr const int32_t kOne = 1 << 18;
+  static constexpr const int32_t kMaxAngleBits = 9;
+  static constexpr const int32_t kMaxAngle = 1 << kMaxAngleBits;
 
-constexpr const int kMaxAngleBits = 9;
-
-constexpr const int kMaxAngle = 1 << kMaxAngleBits;
-
-extern const std::array<int, kMaxAngle> kSin;
-extern const std::array<int, kMaxAngle> kCos;
+  static const std::array<int32_t, kMaxAngle> kSin;
+  static const std::array<int32_t, kMaxAngle> kCos;
+};
 
 }  // namespace twim
 

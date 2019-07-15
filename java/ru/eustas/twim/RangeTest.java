@@ -305,7 +305,7 @@ public class RangeTest {
 
     RangeEncoder enc = new RangeEncoder();
     for (int i = 0; i < n; ++i) {
-      enc.encodeRange(triplets[3 * i], triplets[3 * i + 1],triplets[3 * i + 2]);
+      enc.encodeRange(triplets[3 * i], triplets[3 * i + 1], triplets[3 * i + 2]);
     }
     byte[] data = enc.finish();
 

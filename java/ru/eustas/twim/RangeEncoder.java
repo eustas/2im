@@ -108,7 +108,7 @@ final class RangeEncoder {
           }
           range = -low & RANGE_LIMIT_MASK;
         }
-        long nibble = offset < dataLength ? (data[offset++] & 0xFF) : 0;
+        long nibble = (offset < dataLength) ? (data[offset++] & 0xFF) : 0;
         code = ((code << NIBBLE_BITS) & VALUE_MASK) | nibble;
         range = (range << NIBBLE_BITS) & VALUE_MASK;
         low = (low << NIBBLE_BITS) & VALUE_MASK;

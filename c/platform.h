@@ -1,11 +1,12 @@
 #ifndef TWIM_PLATFORM
 #define TWIM_PLATFORM
 
+#include <immintrin.h>
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-
-#include <immintrin.h>
+#include <memory>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -22,12 +23,68 @@
 
 namespace twim {
 
+template <typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args) {
+  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+namespace {
+
+constexpr const int32_t kAlign = 64;
+
+template<typename T>
+using Deleter = void (*)(T*);
+
+template <typename V>
+void destroyVector(V* v) {
+  void* memory = v->memory;
+  free(memory);
+}
+
+}  // namespace
+
+template<typename T>
+using Owned = std::unique_ptr<T, Deleter<T>>;
+
+template <typename T>
+struct Vector {
+  // System (const) fields.
+  void* memory;
+  T* data;
+  uint32_t capacity;
+
+  // User fields.
+  uint32_t len;
+};
+
+template <typename T>
+Owned<Vector<T>> allocVector(size_t capacity) {
+  using V = Vector<T>;
+  size_t size = capacity * sizeof(T);
+  static_assert(sizeof(V) < (kAlign / 2), "V is too long");
+  uintptr_t memory = reinterpret_cast<uintptr_t>(malloc(size + kAlign));
+  uintptr_t aligned_memory = (memory + kAlign - 1) & ~(kAlign - 1);
+  int32_t before = aligned_memory - memory;
+  V* v;
+  if (before >= sizeof(V)) {
+    v = reinterpret_cast<V*>(aligned_memory - sizeof(V));
+  } else {
+    v = reinterpret_cast<V*>(aligned_memory + size);
+  }
+  v->memory = reinterpret_cast<void*>(memory);
+  v->data = reinterpret_cast<T*>(aligned_memory);
+  v->capacity = capacity;
+  return {v, destroyVector};
+}
+
 typedef std::chrono::time_point<std::chrono::high_resolution_clock> NanoTime;
 
-NanoTime now() { return std::chrono::high_resolution_clock::now(); }
+INLINE NanoTime now() { return std::chrono::high_resolution_clock::now(); }
 
-double duration(NanoTime t0, NanoTime t1) {
-  return std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000000.0;
+INLINE double duration(NanoTime t0, NanoTime t1) {
+  const auto delta =
+      std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
+  return delta.count() / 1000000.0;
 }
 
 template <typename Lane, size_t kLanes>

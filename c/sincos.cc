@@ -4,22 +4,24 @@
 
 namespace twim {
 
-typedef std::array<int, kMaxAngle> Lut;
+typedef std::array<int, SinCos::kMaxAngle> Lut;
 
-const float kPi = std::acos(-1);
+const double kPi = std::acos(-1);
 
-const Lut kSin = []() -> Lut {
+const Lut SinCos::kSin = []() -> Lut {
   Lut result;
-  for (int i = 0; i < kMaxAngle; ++i) {
-    result[i] = std::round(kOne * std::sin((kPi * i) / kMaxAngle));
+  for (int32_t i = 0; i < SinCos::kMaxAngle; ++i) {
+    result[i] =
+        std::round(SinCos::kOne * std::sin((kPi * i) / SinCos::kMaxAngle));
   }
   return result;
 }();
 
-const Lut kCos = []() -> Lut {
+const Lut SinCos::kCos = []() -> Lut {
   Lut result;
-  for (int i = 0; i < kMaxAngle; ++i) {
-    result[i] = std::round(kOne * std::cos((kPi * i) / kMaxAngle));
+  for (int32_t i = 0; i < SinCos::kMaxAngle; ++i) {
+    result[i] =
+        std::round(SinCos::kOne * std::cos((kPi * i) / SinCos::kMaxAngle));
   }
   return result;
 }();

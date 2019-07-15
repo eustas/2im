@@ -6,6 +6,88 @@ workspace(name = "ru_eustas_twim_c")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
+    name = "zlib",
+    url = "http://www.zlib.net/zlib-1.2.11.tar.gz",
+    sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
+    build_file_content = """
+cc_library(
+    name = "zlib",
+    defines = ["HAVE_UNISTD_H"],
+    srcs = [
+        "adler32.c",
+        "compress.c",
+        "crc32.c",
+        "crc32.h",
+        "deflate.c",
+        "deflate.h",
+        "gzclose.c",
+        "gzguts.h",
+        "gzlib.c",
+        "gzread.c",
+        "gzwrite.c",
+        "infback.c",
+        "inffast.c",
+        "inffast.h",
+        "inffixed.h",
+        "inflate.c",
+        "inflate.h",
+        "inftrees.c",
+        "inftrees.h",
+        "trees.c",
+        "trees.h",
+        "uncompr.c",
+        "zconf.h",
+        "zutil.c",
+        "zutil.h",
+    ],
+    hdrs = ["zlib.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+    """,
+    strip_prefix = "zlib-1.2.11",
+)
+
+http_archive(
+    name = "png",
+    url = "https://download.sourceforge.net/libpng/libpng-1.6.37.tar.gz",
+    sha256 = "daeb2620d829575513e35fecc83f0d3791a620b9b93d800b763542ece9390fb4",
+    build_file_content = """
+cc_library(
+    name = "png",
+    srcs = [
+        "png.c",
+        "pngconf.h",
+        "pngdebug.h",
+        "pngerror.c",
+        "pngget.c",
+        "pnginfo.h",
+        "pngmem.c",
+        "pngpread.c",
+        "pngpriv.h",
+        "pngread.c",
+        "pngrio.c",
+        "pngrtran.c",
+        "pngrutil.c",
+        "pngset.c",
+        "pngstruct.h",
+        "pngtrans.c",
+        "pngwio.c",
+        "pngwrite.c",
+        "pngwtran.c",
+        "pngwutil.c",
+    ],
+    hdrs = ["png.h"],
+    includes = ["."],
+    linkopts = ["-lm"],
+    visibility = ["//visibility:public"],
+    deps = ["@zlib//:zlib"],
+)
+    """,
+    strip_prefix = "libpng-1.6.37",
+)
+
+http_archive(
     name = "gtest",
     url = "https://github.com/google/googletest/archive/release-1.7.0.zip",
     sha256 = "b58cb7547a28b2c718d1e38aee18a3659c9e3ff52440297e965f5edffe34b6d0",
