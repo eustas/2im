@@ -32,7 +32,7 @@ namespace {
 
 constexpr const int32_t kAlign = 64;
 
-template<typename T>
+template <typename T>
 using Deleter = void (*)(T*);
 
 template <typename V>
@@ -43,7 +43,7 @@ void destroyVector(V* v) {
 
 }  // namespace
 
-template<typename T>
+template <typename T>
 using Owned = std::unique_ptr<T, Deleter<T>>;
 
 template <typename T>

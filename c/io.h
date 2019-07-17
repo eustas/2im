@@ -11,7 +11,8 @@ namespace twim {
 
 class Io {
  public:
-  static std::vector<uint8_t> readFile(const std::string& path);
+  static std::unique_ptr<std::vector<uint8_t>> readFile(
+      const std::string& path);
   static bool writeFile(const std::string& path,
                         const std::vector<uint8_t>& data);
 

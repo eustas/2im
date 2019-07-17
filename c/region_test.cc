@@ -11,12 +11,12 @@ namespace twim {
 template <size_t N>
 void Set(Vector<int32_t>* to, const std::array<int32_t, N>& from) {
   std::copy(from.cbegin(), from.cend(), to->data);
-  to->len = N;
+  to->len = N / 3;
 }
 
 template <size_t N>
 void ExpectEq(const std::array<int32_t, N>& expected, Vector<int32_t>* actual) {
-  EXPECT_EQ(N, actual->len);
+  EXPECT_EQ(N / 3, actual->len);
   EXPECT_TRUE(0 == memcmp(expected.data(), actual->data, N * sizeof(int)));
 }
 

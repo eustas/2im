@@ -349,12 +349,12 @@ TEST(RangeTest, Golden) {
   EXPECT_EQ(expected_size, data.size());
   EXPECT_EQ(0, std::memcmp(expected, data.data(), sizeof(expected)));
 
-  // RangeDecoder decoder = new RangeDecoder(data);
-  // for (int32_t i = 0; i < triplets.length; i += 3) {
-  //  int32_t val = decoder.currentCount(triplets[i + 2]);
-  //  assertTrue((val >= triplets[i]) && (val < triplets[i + 1]));
-  //  decoder.removeRange(triplets[i], triplets[i + 1]);
-  //}
+  RangeDecoder decoder(std::move(data));
+  for (int32_t i = 0; i < triplets_size; i += 3) {
+    int32_t val = decoder.currentCount(triplets[i + 2]);
+    EXPECT_TRUE((val >= triplets[i]) && (val < triplets[i + 1]));
+    decoder.removeRange(triplets[i], triplets[i + 1]);
+  }
 }
 
 TEST(RangeTest, Optimizer) {

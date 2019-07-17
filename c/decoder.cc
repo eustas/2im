@@ -6,7 +6,9 @@
 #include "codec_params.h"
 #include "distance_range.h"
 #include "platform.h"
+#include "range_decoder.h"
 #include "region.h"
+#include "sincos.h"
 
 namespace twim {
 

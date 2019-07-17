@@ -20,8 +20,8 @@ std::unique_ptr<FILE, void (*)(FILE*)> openFile(const std::string& path,
   return {fopen(path.c_str(), mode), closeFile};
 }
 
-std::vector<uint8_t> Io::readFile(const std::string& path) {
-  std::vector<uint8_t> result;
+std::unique_ptr<std::vector<uint8_t>> Io::readFile(const std::string& path) {
+  auto result = make_unique<std::vector<uint8_t>>();
   auto f = openFile(path, "rb");
   if (!f) return result;
 
@@ -30,10 +30,10 @@ std::vector<uint8_t> Io::readFile(const std::string& path) {
     size_t read_bytes =
         fread(buffer.data(), sizeof(char), buffer.size(), f.get());
     if (ferror(f.get())) {
-      result.clear();
+      result->clear();
       return result;
     }
-    result.insert(result.end(), buffer.data(), buffer.data() + read_bytes);
+    result->insert(result->end(), buffer.data(), buffer.data() + read_bytes);
   }
 
   return result;
@@ -42,7 +42,8 @@ std::vector<uint8_t> Io::readFile(const std::string& path) {
 bool Io::writeFile(const std::string& path, const std::vector<uint8_t>& data) {
   auto f = openFile(path, "wb");
   if (!f) return false;
-  return fwrite(data.data(), 1, data.size(), f.get()) == data.size();
+  size_t written = fwrite(data.data(), 1, data.size(), f.get());
+  return written == data.size();
 }
 
 struct Png {
@@ -102,12 +103,16 @@ void pngWriteStream(png_structp png_ptr, png_bytep in, png_size_t count) {
 
 void pngFlushStream(png_structp png_ptr) {}
 
+static const uint8_t kPngHdr[8] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'};
+
 Image Io::readPng(const std::string& path) {
   Image result;
 
-  std::vector<uint8_t> data = readFile(path);
-  if (data.size() == 0) return result;
-  Stream input = {&data, 0};
+  auto data = readFile(path);
+  if (data->size() < 8) return result;
+  Stream input = {data.get(), 0};
+
+  if (memcmp(data->data(), kPngHdr, sizeof(kPngHdr)) != 0) return result;
 
   auto png = createPngStruct(/* read */ true);
   if (!png) return result;
@@ -159,7 +164,7 @@ bool Io::writePng(const std::string& path, const Image& img) {
   std::vector<uint8_t> data;
   Stream output = {&data, 0};
   const size_t width = img.width;
-  std::vector<png_byte> row(width * 3);   
+  std::vector<png_byte> row(width * 3);
 
   if (setjmp(png_jmpbuf(png->png_ptr)) != 0) {
     // Burn in hell, authors of linpng API.
@@ -178,17 +183,17 @@ bool Io::writePng(const std::string& path, const Image& img) {
     const uint8_t* RESTRICT r = img.r.data() + width * y;
     const uint8_t* RESTRICT g = img.g.data() + width * y;
     const uint8_t* RESTRICT b = img.b.data() + width * y;
-    for (size_t x = 0 ; x < width; ++x) {
-      rgb[3 * x] = r[x];
+    for (size_t x = 0; x < width; ++x) {
+      rgb[3 * x + 2] = r[x];
       rgb[3 * x + 1] = g[x];
-      rgb[3 * x + 2] = b[x];
+      rgb[3 * x] = b[x];
     }
     png_write_row(png->png_ptr, rgb);
   }
 
   png_write_end(png->png_ptr, nullptr);
 
-  return true;
+  return writeFile(path, data);
 }
 
 }  // namespace twim
