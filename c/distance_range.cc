@@ -12,7 +12,7 @@ void DistanceRange::update(const Vector<int32_t>& region, int32_t angle,
                            const CodecParams& cp) {
   if (region.len == 0) {
     // Exception!
-    numLines = -1;
+    num_lines = -1;
     return;
   }
   const size_t count = region.len;
@@ -35,11 +35,11 @@ void DistanceRange::update(const Vector<int32_t>& region, int32_t angle,
   min = mi;
   max = ma;
 
-  lineQuant = cp.getLineQuant();
+  line_quant = cp.getLineQuant();
   while (true) {
-    numLines = (ma - mi) / lineQuant;
-    if (numLines > cp.lineLimit) {
-      lineQuant = lineQuant + lineQuant / 16;
+    num_lines = (ma - mi) / line_quant;
+    if (num_lines > cp.line_limit) {
+      line_quant = line_quant + line_quant / 16;
     } else {
       break;
     }

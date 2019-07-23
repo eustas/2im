@@ -9,8 +9,8 @@
 namespace twim {
 
 void CodecParams::setColorCode(int32_t code) {
-  colorCode = code;
-  colorQuant = makeColorQuant(code);
+  color_code = code;
+  color_quant = makeColorQuant(code);
 }
 
 /*constexpr*/ CodecParams::Params CodecParams::splitCode(int32_t code) {
@@ -43,14 +43,14 @@ void CodecParams::setPartitionParams(Params params) {
 
   int32_t bits = SinCos::kMaxAngleBits - f1;
   for (int32_t i = 0; i < kMaxLevel; ++i) {
-    angleBits[i] = std::max(bits - i - (i * f4) / 2, 0);
+    angle_bits[i] = std::max(bits - i - (i * f4) / 2, 0);
   }
 }
 
 std::string CodecParams::toString() const {
   std::stringstream out;
   out << "p: " << params[0] << params[1] << params[2] << params[3]
-      << ", l: " << lineLimit << ", c: " << colorCode;
+      << ", l: " << line_limit << ", c: " << color_code;
   return out.str();
 }
 
@@ -63,7 +63,7 @@ CodecParams CodecParams::read(RangeDecoder* src) {
                    RangeDecoder::readNumber(src, kMaxF3),
                    RangeDecoder::readNumber(src, kMaxF4)};
   cp.setPartitionParams(params);
-  cp.lineLimit = RangeDecoder::readNumber(src, kMaxLineLimit) + 1;
+  cp.line_limit = RangeDecoder::readNumber(src, kMaxLineLimit) + 1;
   cp.setColorCode(RangeDecoder::readNumber(src, kMaxColorCode));
   return cp;
 }
@@ -75,8 +75,8 @@ void CodecParams::write(RangeEncoder* dst) const {
   RangeEncoder::writeNumber(dst, kMaxF2, params[1]);
   RangeEncoder::writeNumber(dst, kMaxF3, params[2]);
   RangeEncoder::writeNumber(dst, kMaxF4, params[3]);
-  RangeEncoder::writeNumber(dst, kMaxLineLimit, lineLimit - 1);
-  RangeEncoder::writeNumber(dst, kMaxColorCode, colorCode);
+  RangeEncoder::writeNumber(dst, kMaxLineLimit, line_limit - 1);
+  RangeEncoder::writeNumber(dst, kMaxColorCode, color_code);
 }
 
 int32_t CodecParams::getLevel(const Vector<int32_t>& region) const {

@@ -15,7 +15,7 @@ namespace twim {
 int32_t readColor(RangeDecoder* src, const CodecParams& cp) {
   int32_t argb = 0xFF;  // alpha = 1
   for (size_t c = 0; c < 3; ++c) {
-    int32_t q = cp.colorQuant;
+    int32_t q = cp.color_quant;
     argb = (argb << 8) |
            CodecParams::dequantizeColor(RangeDecoder::readNumber(src, q), q);
   }
@@ -45,12 +45,13 @@ class Fragment {
 
     if (type != NodeType::HALF_PLANE) return false;
 
-    int32_t angleMax = 1 << cp.angleBits[level];
+    int32_t angleMax = 1 << cp.angle_bits[level];
     int32_t angleMult = (SinCos::kMaxAngle / angleMax);
     int32_t angleCode = RangeDecoder::readNumber(src, angleMax);
     int32_t angle = angleCode * angleMult;
     distanceRange->update(*region.get(), angle, cp);
-    int32_t line = RangeDecoder::readNumber(src, distanceRange->numLines);
+    if (distanceRange->num_lines < 0) return false;
+    int32_t line = RangeDecoder::readNumber(src, distanceRange->num_lines);
 
     // Cutting with half-planes does not increase the number of scans.
     constexpr auto vi32 = VecTag<int32_t>();

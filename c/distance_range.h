@@ -12,19 +12,19 @@ class DistanceRange {
               const CodecParams& cp);
 
   int32_t INLINE distance(int32_t line) {
-    if (numLines > 1) {
-      return min + ((max - min) - (numLines - 1) * lineQuant) / 2 +
-             lineQuant * line;
+    if (num_lines > 1) {
+      return min + ((max - min) - (num_lines - 1) * line_quant) / 2 +
+             line_quant * line;
     } else {
       return (max + min) / 2;
     }
   }
-  int32_t numLines;
+  int32_t num_lines;
 
  private:
   int32_t min;
   int32_t max;
-  int32_t lineQuant;
+  int32_t line_quant;
 };
 
 }  // namespace twim

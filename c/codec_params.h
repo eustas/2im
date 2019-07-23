@@ -61,14 +61,14 @@ class CodecParams {
   int32_t levelScale[kMaxLevel];
 
   Params params;
-  int32_t colorCode;
+  int32_t color_code;
 
  public:
   const int32_t width;
   const int32_t height;
-  int32_t colorQuant;
-  int32_t lineLimit = kMaxLineLimit;
-  int32_t angleBits[kMaxLevel];
+  int32_t color_quant;
+  int32_t line_limit = kMaxLineLimit;
+  int32_t angle_bits[kMaxLevel];
   static constexpr const int32_t kMaxPartitionCode =
       kMaxF1 * kMaxF2 * kMaxF3 * kMaxF4;
   static constexpr const int32_t kTax =
