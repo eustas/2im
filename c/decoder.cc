@@ -12,6 +12,8 @@
 
 namespace twim {
 
+namespace {
+
 int32_t readColor(RangeDecoder* src, const CodecParams& cp) {
   int32_t argb = 0xFF;  // alpha = 1
   for (size_t c = 0; c < 3; ++c) {
@@ -54,16 +56,14 @@ class Fragment {
     int32_t line = RangeDecoder::readNumber(src, distanceRange->num_lines);
 
     // Cutting with half-planes does not increase the number of scans.
-    constexpr auto vi32 = VecTag<int32_t>();
-    int32_t N = vi32.N;
-    int32_t step = (region->len + N - 1) & ~(N - 1);
+    int32_t step = vecSize<int32_t>(region->len);
     auto inner = allocVector<int32_t>(3 * step);
     auto outer = allocVector<int32_t>(3 * step);
     Region::splitLine(*region.get(), angle, distanceRange->distance(line),
                       inner.get(), outer.get());
-    left_child = make_unique<Fragment>(std::move(inner));
+    left_child.reset(new Fragment(std::move(inner)));
     children->push_back(left_child.get());
-    right_child = make_unique<Fragment>(std::move(outer));
+    right_child.reset(new Fragment(std::move(outer)));
     children->push_back(right_child.get());
     return true;
   }
@@ -99,6 +99,8 @@ class Fragment {
   }
 };
 
+}  // namespace
+
 Image Decoder::decode(std::unique_ptr<std::vector<uint8_t>> encoded) {
   Image result;
 
@@ -107,9 +109,7 @@ Image Decoder::decode(std::unique_ptr<std::vector<uint8_t>> encoded) {
   int32_t width = cp.width;
   int32_t height = cp.height;
 
-  constexpr auto vi32 = VecTag<int32_t>();
-  int32_t N = vi32.N;
-  int32_t step = (height + N - 1) & ~(N - 1);
+  int32_t step = vecSize<int32_t>(height);
   auto root_region = allocVector<int32_t>(3 * step);
   int32_t* RESTRICT y = root_region->data;
   int32_t* RESTRICT x0 = y + step;

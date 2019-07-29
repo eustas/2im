@@ -1,13 +1,17 @@
 #include <cstdio>
 
 #include "decoder.h"
+#include "encoder.h"
 #include "io.h"
 #include "platform.h"
 
-int main (int argc, char* argv[]) {
-  using namespace twim;
+namespace twim {
 
+int main (int argc, char* argv[]) {
   bool encode = false;
+  bool roundtrip = false;
+  int32_t target_size = 128;
+
   for (int i = 1; i < argc; ++i) {
     if (argv[i] == nullptr) {
       continue;
@@ -21,15 +25,21 @@ int main (int argc, char* argv[]) {
         encode = false;
         continue;
       }
+      if (argv[i][1] == 'r') {
+        roundtrip = true;
+        continue;
+      }
       fprintf(stderr, "Unknown option: %s\n", argv[i]);
       exit(EXIT_FAILURE);
     }
     std::string path(argv[i]);
     if (encode) {
-      fprintf(stderr, "Encoding is not implemented yet\n");
-      exit(EXIT_FAILURE);
+      const Image src = Io::readPng(path);
+      path = path + ".2im";
+      auto data = Encoder::encode(src, target_size);
+      Io::writeFile(path, data);
     }
-    if (!encode) {
+    if (!encode || roundtrip) {
       auto data = Io::readFile(path);
       if (data->size() == 0) {
         fprintf(stderr, "Failed to read [%s].\n", path.c_str());
@@ -49,4 +59,10 @@ int main (int argc, char* argv[]) {
   }
 
   return 0;
+}
+
+}  // namespace
+
+int main (int argc, char* argv[]) {
+  return twim::main(argc, argv);
 }

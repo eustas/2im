@@ -31,7 +31,7 @@ final class RangeEncoder {
       if (i > 1) {
         writeNumber(dst, 2, 1);
       }
-      writeNumber(dst, 8,  (value >> (3 * (chunks - i - 1))) & 7);
+      writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7);
     }
     writeNumber(dst, 2, 0);
   }

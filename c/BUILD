@@ -105,7 +105,11 @@ cc_library(
     srcs = ["encoder.cc"],
     hdrs = ["encoder.h"],
     deps = [
+        ":codec_params",
+        ":distance_range",
+        ":image",
         ":platform",
+        ":region",
     ],
 )
 
@@ -171,6 +175,7 @@ cc_binary(
     srcs = ["main.cc"],
     deps = [
         ":decoder",
+        ":encoder",
         ":io",
         ":platform",
     ],

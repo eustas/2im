@@ -1,11 +1,20 @@
 #include "encoder.h"
 
+#include <cmath>
+#include <future>
+#include <list>
+#include <queue>
+#include <unordered_set>
+
 #include "codec_params.h"
 #include "distance_range.h"
 #include "image.h"
 #include "platform.h"
+#include "region.h"
 
 namespace twim {
+
+namespace {
 
 class Cache;
 
@@ -18,81 +27,20 @@ class StatsCache {
   Owned<Vector<float>> x1;
   Owned<Vector<float>> x;
 
-  int32_t plus[8];
-  int32_t minus[8];
-
-  template <typename T>
-  static Owned<Vector<T>> alloc(size_t len) {
-    VecTag<int32_t> d_i32;
-    constexpr size_t n_i32 = d_i32.N;
-    return allocVector<T>((len + n_i32 - 1) & ~(n_i32 - 1));
-  }
+  std::array<int32_t, 8> plus;
+  std::array<int32_t, 8> minus;
 
   StatsCache(size_t capacity)
-      : row_offset(alloc<int32_t>(capacity)),
-        y(alloc<float>(capacity)),
-        x0(alloc<float>(capacity)),
-        x1(alloc<float>(capacity)),
-        x(alloc<float>(capacity)) {}
+      : row_offset(allocVector<int32_t>(vecSize<int32_t>(capacity))),
+        y(allocVector<float>(vecSize<float>(capacity))),
+        x0(allocVector<float>(vecSize<float>(capacity))),
+        x1(allocVector<float>(vecSize<float>(capacity))),
+        x(allocVector<float>(vecSize<float>(capacity))) {}
 
-  static void sum(Cache* cache, float* RESTRICT regionX, int32_t dst[8]) {
-    StatsCache& stats_cache = cache->stats_cache;
-    size_t count = stats_cache.count;
-    int32_t* RESTRICT rowOffset = stats_cache.row_offset->data;
-    const int32_t* RESTRICT sum_r = cache->uber->sum_r->data;
-    const int32_t* RESTRICT sum_g = cache->uber->sum_g->data;
-    const int32_t* RESTRICT sum_b = cache->uber->sum_b->data;
-    const int32_t* RESTRICT sum_r2 = cache->uber->sum_r2->data;
-    const int32_t* RESTRICT sum_g2 = cache->uber->sum_g2->data;
-    const int32_t* RESTRICT sum_b2 = cache->uber->sum_b2->data;
+  static void sum(Cache* cache, float* RESTRICT regionX,
+                  std::array<int32_t, 8>* dst);
 
-    int32_t pixel_count = 0;
-    int32_t r = 0;
-    int32_t g = 0;
-    int32_t b = 0;
-    int32_t r2 = 0;
-    int32_t g2 = 0;
-    int32_t b2 = 0;
-    for (size_t i = 0; i < count; i++) {
-      int32_t x = (int32_t)regionX[i];
-      int32_t offset = rowOffset[i] + x;
-      pixel_count += x;
-      r += sum_r[offset];
-      g += sum_g[offset];
-      b += sum_b[offset];
-      r2 += sum_r2[offset];
-      g2 += sum_g2[offset];
-      b2 += sum_b2[offset];
-    }
-
-    dst[0] = pixel_count;
-    dst[1] = r;
-    dst[2] = g;
-    dst[3] = b;
-    dst[4] = r2;
-    dst[5] = g2;
-    dst[6] = b2;
-  }
-
-  void prepare(Cache* cache, Vector<int32_t>* region) {
-    size_t count = region->len;
-    size_t step = region->capacity / 3;
-    size_t sum_stride = cache->uber->stride;
-    int32_t* RESTRICT data = region->data;
-    float* RESTRICT y = this->y->data;
-    float* RESTRICT x0 = this->x0->data;
-    float* RESTRICT x1 = this->x1->data;
-    int32_t* RESTRICT row_offset = this->row_offset->data;
-    for (size_t i = 0; i < count; ++i) {
-      int32_t row = data[i];
-      y[i] = row;
-      x0[i] = data[step + i];
-      x1[i] = data[2 * step + i];
-      row_offset[i] = row * sum_stride;
-    }
-    this->count = count;
-    sum(cache, x1, plus);
-  }
+  void prepare(Cache* cache, Vector<int32_t>* region);
 };
 
 class Stats {
@@ -101,23 +49,20 @@ class Stats {
   int32_t rgb[3];
   int32_t rgb2[3];
 
-  void delta(Cache* cache, float* RESTRICT regionX) {
-    StatsCache& stats_cache = cache->stats_cache;
-    int32_t* RESTRICT minus = stats_cache.minus;
-    StatsCache::sum(cache, regionX, minus);
-
-    int32_t* RESTRICT plus = stats_cache.plus;
-    pixel_count = plus[0] - minus[0];
-    rgb[0] = plus[1] - minus[1];
-    rgb[1] = plus[2] - minus[2];
-    rgb[2] = plus[3] - minus[3];
-    rgb2[0] = plus[4] - minus[4];
-    rgb2[1] = plus[5] - minus[5];
-    rgb2[2] = plus[6] - minus[6];
+  void setEmpty() {
+    pixel_count = 0;
+    rgb[0] = 0;
+    rgb[1] = 0;
+    rgb[2] = 0;
+    rgb2[0] = 0;
+    rgb2[1] = 0;
+    rgb2[2] = 0;
   }
 
+  void delta(Cache* cache, float* RESTRICT region_x);
+
   // Calculate stats from own region.
-  void update(Cache* cache) { delta(cache, cache->stats_cache.x0->data); }
+  void update(Cache* cache);
 
   void copy(const Stats& other) {
     pixel_count = other.pixel_count;
@@ -145,59 +90,17 @@ class Stats {
   }
 
   // y * ny >= d
-  static void updateGeHorizontal(Cache* cache, int32_t d) {
-    int32_t ny = SinCos::kCos[0];
-    float dny = d / (float)ny;
-    StatsCache& stats_cache = cache->stats_cache;
-    int32_t count = stats_cache.count;
-    float* RESTRICT region_y = stats_cache.y->data;
-    float* RESTRICT region_x0 = stats_cache.x0->data;
-    float* RESTRICT region_x1 = stats_cache.x1->data;
-    float* RESTRICT region_x = stats_cache.x->data;
-
-    for (size_t i = 0; i < count; i++) {
-      float y = region_y[i];
-      float x0 = region_x0[i];
-      float x1 = region_x1[i];
-      region_x[i] = ((y - dny) < 0) ? x1 : x0;
-    }
-  }
+  static void updateGeHorizontal(Cache* cache, int32_t d);
 
   // x >= (d - y * ny) / nx
-  static void updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
-    int32_t nx = SinCos::kSin[angle];
-    int32_t ny = SinCos::kCos[angle];
-    float dnx = (2 * d + nx) / (float)(2 * nx);
-    float mnynx = -(2 * ny) / (float)(2 * nx);
-    StatsCache& stats_cache = cache->stats_cache;
-    size_t count = stats_cache.count;
-    float* RESTRICT region_y = stats_cache.y->data;
-    float* RESTRICT region_x0 = stats_cache.x0->data;
-    float* RESTRICT region_x1 = stats_cache.x1->data;
-    float* RESTRICT region_x = stats_cache.x->data;
+  static void updateGeGeneric(Cache* cache, int32_t angle, int32_t d);
 
-    for (size_t i = 0; i < count; i++) {
-      float y = region_y[i];
-      float xf = y * mnynx + dnx;  // FMA
-      float x0 = region_x0[i];
-      float x1 = region_x1[i];
-      float m = ((xf - x0) > 0) ? xf : x0;
-      region_x[i] = ((x1 - xf) > 0) ? m : x1;
-    }
-  }
-
-  void updateGe(Cache* cache, int angle, int d) {
-    if (angle == 0) {
-      updateGeHorizontal(cache, d);
-    } else {
-      updateGeGeneric(cache, angle, d);
-    }
-    delta(cache, cache->stats_cache.x->data);
-  }
+  void updateGe(Cache* cache, int angle, int d);
 };
 
 class UberCache {
  public:
+  const size_t width;
   const size_t height;
   const size_t stride;
   /* Cumulative sums. Extra column with total sum. */
@@ -209,7 +112,8 @@ class UberCache {
   Owned<Vector<int32_t>> sum_b2;
 
   UberCache(const Image& src)
-      : height(src.height),
+      : width(src.width),
+        height(src.height),
         stride(src.width + 1),
         sum_r(allocVector<int32_t>(stride * src.height)),
         sum_g(allocVector<int32_t>(stride * src.height)),
@@ -253,15 +157,145 @@ class UberCache {
 
 class Cache {
  public:
-  StatsCache stats_cache;
   const UberCache* uber;
+  StatsCache stats_cache;
 
   Stats stats[CodecParams::kMaxLineLimit + 3];
 
-  Cache(const UberCache& uber) : stats_cache(uber.height) {}
+  Cache(const UberCache& uber) : uber(&uber), stats_cache(uber.height) {}
 };
 
-static double score(const Stats& parent, const Stats& left, const Stats& right) {
+void StatsCache::sum(Cache* cache, float* RESTRICT region_x,
+                     std::array<int32_t, 8>* dst) {
+  StatsCache& stats_cache = cache->stats_cache;
+  size_t count = stats_cache.count;
+  int32_t* RESTRICT rowOffset = stats_cache.row_offset->data;
+  const int32_t* RESTRICT sum_r = cache->uber->sum_r->data;
+  const int32_t* RESTRICT sum_g = cache->uber->sum_g->data;
+  const int32_t* RESTRICT sum_b = cache->uber->sum_b->data;
+  const int32_t* RESTRICT sum_r2 = cache->uber->sum_r2->data;
+  const int32_t* RESTRICT sum_g2 = cache->uber->sum_g2->data;
+  const int32_t* RESTRICT sum_b2 = cache->uber->sum_b2->data;
+
+  int32_t pixel_count = 0;
+  int32_t r = 0;
+  int32_t g = 0;
+  int32_t b = 0;
+  int32_t r2 = 0;
+  int32_t g2 = 0;
+  int32_t b2 = 0;
+  for (size_t i = 0; i < count; i++) {
+    int32_t x = (int32_t)region_x[i];
+    int32_t offset = rowOffset[i] + x;
+    pixel_count += x;
+    r += sum_r[offset];
+    g += sum_g[offset];
+    b += sum_b[offset];
+    r2 += sum_r2[offset];
+    g2 += sum_g2[offset];
+    b2 += sum_b2[offset];
+  }
+
+  dst->at(0) = pixel_count;
+  dst->at(1) = r;
+  dst->at(2) = g;
+  dst->at(3) = b;
+  dst->at(4) = r2;
+  dst->at(5) = g2;
+  dst->at(6) = b2;
+}
+
+void StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
+  size_t count = region->len;
+  size_t step = region->capacity / 3;
+  size_t sum_stride = cache->uber->stride;
+  int32_t* RESTRICT data = region->data;
+  float* RESTRICT y = this->y->data;
+  float* RESTRICT x0 = this->x0->data;
+  float* RESTRICT x1 = this->x1->data;
+  int32_t* RESTRICT row_offset = this->row_offset->data;
+  for (size_t i = 0; i < count; ++i) {
+    int32_t row = data[i];
+    y[i] = row;
+    x0[i] = data[step + i];
+    x1[i] = data[2 * step + i];
+    row_offset[i] = row * sum_stride;
+  }
+  this->count = count;
+  sum(cache, x1, &plus);
+}
+
+void Stats::delta(Cache* cache, float* RESTRICT region_x) {
+  StatsCache& stats_cache = cache->stats_cache;
+  std::array<int32_t, 8>& minus = stats_cache.minus;
+  StatsCache::sum(cache, region_x, &minus);
+
+  std::array<int32_t, 8>& plus = stats_cache.plus;
+  pixel_count = plus[0] - minus[0];
+  rgb[0] = plus[1] - minus[1];
+  rgb[1] = plus[2] - minus[2];
+  rgb[2] = plus[3] - minus[3];
+  rgb2[0] = plus[4] - minus[4];
+  rgb2[1] = plus[5] - minus[5];
+  rgb2[2] = plus[6] - minus[6];
+}
+
+// Calculate stats from own region.
+void Stats::update(Cache* cache) {
+  delta(cache, cache->stats_cache.x0->data);
+}
+
+void Stats::updateGeHorizontal(Cache* cache, int32_t d) {
+  int32_t ny = SinCos::kCos[0];
+  float dny = d / (float)ny;
+  StatsCache& stats_cache = cache->stats_cache;
+  int32_t count = stats_cache.count;
+  float* RESTRICT region_y = stats_cache.y->data;
+  float* RESTRICT region_x0 = stats_cache.x0->data;
+  float* RESTRICT region_x1 = stats_cache.x1->data;
+  float* RESTRICT region_x = stats_cache.x->data;
+
+  for (size_t i = 0; i < count; i++) {
+    float y = region_y[i];
+    float x0 = region_x0[i];
+    float x1 = region_x1[i];
+    region_x[i] = ((y - dny) < 0) ? x1 : x0;
+  }
+}
+
+void Stats::updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
+  int32_t nx = SinCos::kSin[angle];
+  int32_t ny = SinCos::kCos[angle];
+  float dnx = (2 * d + nx) / (float)(2 * nx);
+  float mnynx = -(2 * ny) / (float)(2 * nx);
+  StatsCache& stats_cache = cache->stats_cache;
+  size_t count = stats_cache.count;
+  float* RESTRICT region_y = stats_cache.y->data;
+  float* RESTRICT region_x0 = stats_cache.x0->data;
+  float* RESTRICT region_x1 = stats_cache.x1->data;
+  float* RESTRICT region_x = stats_cache.x->data;
+
+  for (size_t i = 0; i < count; i++) {
+    float y = region_y[i];
+    float xf = y * mnynx + dnx;  // FMA
+    float x0 = region_x0[i];
+    float x1 = region_x1[i];
+    float m = ((xf - x0) > 0) ? xf : x0;
+    region_x[i] = ((x1 - xf) > 0) ? m : x1;
+  }
+}
+
+void Stats::updateGe(Cache* cache, int angle, int d) {
+  if (angle == 0) {
+    updateGeHorizontal(cache, d);
+  } else {
+    updateGeGeneric(cache, angle, d);
+  }
+  delta(cache, cache->stats_cache.x->data);
+}
+
+static double score(const Stats& parent, const Stats& left,
+                    const Stats& right) {
   if (left.pixel_count == 0 || right.pixel_count == 0) {
     return 0.0;
   }
@@ -291,6 +325,22 @@ static double score(const Stats& parent, const Stats& left, const Stats& right) 
   return sum_left + sum_right;
 }
 
+static double bitCost(int32_t range) {
+  static double kInvLog2 = 1.0 / std::log(2.0);
+  return std::log(range) * kInvLog2;
+}
+
+static int32_t sizeCost(int32_t value) {
+  if (value < 8) return -1;
+  value -= 8;
+  int32_t bits = 6;
+  while (value > (1 << bits)) {
+    value -= (1 << bits);
+    bits += 3;
+  }
+  return bits + (bits / 3) - 1;
+}
+
 class Fragment {
  public:
   Owned<Vector<int32_t>> region;
@@ -307,7 +357,13 @@ class Fragment {
   int32_t best_num_lines;
   double best_cost;
 
-  Fragment(Owned<Vector<int32_t>> region) : region(std::move(region)) {}
+  Fragment(Fragment&&) = default;
+  Fragment& operator=(Fragment&&) = default;
+  Fragment(const Fragment&) = delete;
+  Fragment& operator=(const Fragment&) = delete;
+
+  explicit Fragment(Owned<Vector<int32_t>>&& region)
+      : region(std::move(region)) {}
 
   void encode(RangeEncoder* dst, const CodecParams& cp, bool is_leaf,
               std::vector<Fragment*>* children) {
@@ -382,8 +438,7 @@ class Fragment {
         tmp_stats2.update(tmp_stats3, cache_stats[line + 1]);
         Stats tmp_stats1;
         tmp_stats1.update(tmp_stats3, tmp_stats2);
-        full_score +=
-            0.0 * score(tmp_stats3, tmp_stats1, tmp_stats2);
+        full_score += 0.0 * score(tmp_stats3, tmp_stats1, tmp_stats2);
 
         tmp_stats1.update(stats, cache_stats[line + 1]);
         full_score += 1.0 * score(stats, cache_stats[line + 1], tmp_stats1);
@@ -404,22 +459,222 @@ class Fragment {
     } else {
       DistanceRange distance_range;
       distance_range.update(region, best_angle_code * angle_mult, cp);
-      int32_t child_step = Region.vectorFriendlySize(region[region.length - 1]);
-      Owned<Vector<int32_t>> left_region = new int[child_step * 3 + 1];
-      Owned<Vector<int32_t>>  right_region = new int[child_step * 3 + 1];
-      Region.splitLine(region, best_angle_code * angle_mult,
-                       distance_range.distance(best_line), left_region,
-                       right_region);
-      this->left_child = make_unique<Fragment>(std::move(left_region));
-      this->right_child = make_unique<Fragment>(std::move(right_region));
+      int32_t child_step = vecSize<int32_t>(region.len);
+      this->left_child.reset(new Fragment(allocVector<int32_t>(3 * child_step)));
+      this->right_child.reset(new Fragment(allocVector<int32_t>(3 * child_step)));
+      Region::splitLine(region, best_angle_code * angle_mult,
+                        distance_range.distance(best_line),
+                        this->left_child->region.get(),
+                        this->right_child->region.get());
 
       this->best_angle_code = best_angle_code;
       this->best_num_lines = distance_range.num_lines;
       this->best_line = best_line;
-      this->best_cost = bitCost(NodeType::COUNT * angle_max *
-                              distance_range.num_lines);
+      this->best_cost =
+          bitCost(NodeType::COUNT * angle_max * distance_range.num_lines);
     }
   }
 };
+
+struct FragmentComparator {
+  bool operator()(const Fragment* left, const Fragment* right) const {
+    return left->best_score < right->best_score;
+  }
+};
+
+static Fragment makeRoot(int32_t width, int32_t height) {
+  int32_t step = vecSize<int32_t>(height);
+  Owned<Vector<int32_t>> root = allocVector<int32_t>(3 * step);
+  int32_t* RESTRICT data = root->data;
+  for (int32_t y = 0; y < height; ++y) {
+    data[y] = y;
+    data[step + y] = 0;
+    data[2 * step + y] = width;
+  }
+  root->len = height;
+  return Fragment(std::move(root));
+}
+
+/**
+ * Builds the space partition.
+ *
+ * Minimal color data cost is used.
+ * Partition could be used to try multiple color quantizations to see, which one
+ * gives the best result.
+ */
+static std::vector<Fragment*> buildPartition(Fragment* root, size_t size_limit,
+                                             const CodecParams& cp,
+                                             Cache* cache) {
+  double tax =
+      bitCost(NodeType::COUNT) + 3.0 * bitCost(CodecParams::makeColorQuant(0));
+  double budget = size_limit * 8 - tax -
+                  bitCost(CodecParams::kTax);  // Minus flat image cost.
+
+  std::vector<Fragment*> result;
+  std::priority_queue<Fragment*, std::vector<Fragment*>, FragmentComparator>
+      queue;
+  root->findBestSubdivision(cache, cp);
+  queue.push(root);
+  while (!queue.empty()) {
+    Fragment* candidate = queue.top();
+    queue.pop();
+    if (candidate->best_score < 0.0 || candidate->best_cost < 0.0) break;
+    if (tax + candidate->best_cost <= budget) {
+      budget -= tax + candidate->best_cost;
+      result.push_back(candidate);
+      candidate->left_child->findBestSubdivision(cache, cp);
+      queue.push(candidate->left_child.get());
+      candidate->right_child->findBestSubdivision(cache, cp);
+      queue.push(candidate->right_child.get());
+    }
+  }
+  return result;
+}
+
+static std::unordered_set<Fragment*> subpartition(
+    int32_t target_size, const std::vector<Fragment*>& partition,
+    CodecParams cp) {
+  double tax = bitCost(NodeType::COUNT * cp.color_quant * cp.color_quant *
+                       cp.color_quant);
+  double budget = 8.0 * target_size - bitCost(CodecParams::kTax) - tax;
+  budget -= sizeCost(cp.width);
+  budget -= sizeCost(cp.height);
+  std::unordered_set<Fragment*> non_leaf;
+  for (Fragment* node : partition) {
+    if (node->best_cost < 0.0) break;
+    double cost = node->best_cost + tax;
+    if (budget < cost) break;
+    budget -= cost;
+    non_leaf.insert(node);
+  }
+  return non_leaf;
+}
+
+static double simulateEncode(int32_t target_size,
+                             std::vector<Fragment*>& partition,
+                             const CodecParams& cp) {
+  std::unordered_set<Fragment*> non_leaf =
+      subpartition(target_size, partition, cp);
+  std::vector<Fragment*> queue;
+  queue.reserve(2 * non_leaf.size() + 1);
+  queue.push_back(partition[0]);
+
+  double sqe[3] = {0};
+
+  int32_t encoded = 0;
+  while (encoded < queue.size()) {
+    Fragment* node = queue[encoded++];
+    node->simulateEncode(cp, non_leaf.find(node) == non_leaf.end(), &queue,
+                         sqe);
+  }
+
+  return sqe[0] + sqe[1] + sqe[2];
+}
+
+static std::vector<uint8_t> doEncode(int32_t target_size,
+                                     const std::vector<Fragment*>& partition,
+                                     const CodecParams& cp) {
+  std::unordered_set<Fragment*> non_leaf =
+      subpartition(target_size, partition, cp);
+  std::vector<Fragment*> queue;
+  queue.reserve(2 * non_leaf.size() + 1);
+  queue.push_back(partition[0]);
+
+  RangeEncoder dst;
+  cp.write(&dst);
+
+  int32_t encoded = 0;
+  while (encoded < queue.size()) {
+    Fragment* node = queue[encoded++];
+    node->encode(&dst, cp, non_leaf.find(node) == non_leaf.end(), &queue);
+  }
+
+  return dst.finish();
+}
+
+class SimulationTask {
+ public:
+  const int32_t target_size;
+  const UberCache* uber;
+  CodecParams cp;
+  double best_sqe = 1e20;
+  int32_t best_color_code = -1;
+
+  SimulationTask(int32_t target_size, const UberCache* uber)
+      : target_size(target_size), uber(uber), cp(uber->width, uber->height) {}
+
+  void run() {
+    Cache cache(*uber);
+    Fragment root = makeRoot(uber->width, uber->height);
+    std::vector<Fragment*> partition =
+        buildPartition(&root, target_size, cp, &cache);
+    for (int32_t color_code = 0; color_code < CodecParams::kMaxColorCode;
+         ++color_code) {
+      cp.setColorCode(color_code);
+      double sqe = simulateEncode(target_size, partition, cp);
+      if (sqe < best_sqe) {
+        best_sqe = sqe;
+        best_color_code = color_code;
+      }
+    }
+    cp.setColorCode(best_color_code);
+  }
+};
+
+}  // namespace
+
+std::vector<uint8_t> Encoder::encode(const Image& src, int32_t target_size) {
+  int32_t width = src.width;
+  int32_t height = src.height;
+  if (width < 8 || height < 8) {
+    fprintf(stderr, "image is too small (%d x %d)", width, height);
+    return {};
+  }
+  UberCache uber(src);
+  std::vector<SimulationTask> tasks;
+  size_t max_tasks =
+      CodecParams::kMaxLineLimit * CodecParams::kMaxPartitionCode;
+  tasks.reserve(max_tasks);
+  std::vector<std::future<void>> futures;
+  futures.reserve(max_tasks);
+  for (int32_t line_limit = 0; line_limit < CodecParams::kMaxLineLimit;
+       ++line_limit) {
+    //if (line_limit != 17) continue;
+    for (int32_t partition_code = 0;
+         partition_code < CodecParams::kMaxPartitionCode; ++partition_code) {
+      tasks.emplace_back(target_size, &uber);
+      SimulationTask& task = tasks.back();
+      task.cp.setPartitionCode(partition_code);
+      task.cp.line_limit = line_limit + 1;
+      futures.push_back(
+          std::async(std::launch::async, &SimulationTask::run, &task));
+    }
+  }
+  auto t0 = now();
+  size_t best_task_index = 0;
+  double best_sqe = 1e20;
+  for (size_t task_index = 0; task_index < tasks.size(); ++task_index) {
+    futures[task_index].get();
+    const SimulationTask& task = tasks[task_index];
+    if (task.best_sqe < best_sqe) {
+      best_task_index = task_index;
+      best_sqe = task.best_sqe;
+    }
+  }
+  SimulationTask& best_task = tasks[best_task_index];
+  best_task.cp.setColorCode(best_task.best_color_code);
+  Fragment root = makeRoot(width, height);
+  Cache cache(uber);
+  std::vector<Fragment*> partition =
+      buildPartition(&root, target_size, best_task.cp, &cache);
+  std::vector<uint8_t> result = doEncode(target_size, partition, best_task.cp);
+  auto t1 = now();
+
+  std::string best_cp = best_task.cp.toString();
+  fprintf(stdout, "time: %.3fs, size: %zu, cp: [%s], error: %.3f\n",
+          duration(t0, t1), result.size(), best_cp.c_str(),
+          std::sqrt(best_sqe / (width * height)));
+  return result;
+}
 
 }  // namespace twim

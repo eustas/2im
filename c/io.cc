@@ -1,6 +1,7 @@
 #include "io.h"
 
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -21,7 +22,7 @@ std::unique_ptr<FILE, void (*)(FILE*)> openFile(const std::string& path,
 }
 
 std::unique_ptr<std::vector<uint8_t>> Io::readFile(const std::string& path) {
-  auto result = make_unique<std::vector<uint8_t>>();
+  std::unique_ptr<std::vector<uint8_t>> result(new std::vector<uint8_t>());
   auto f = openFile(path, "rb");
   if (!f) return result;
 
@@ -92,7 +93,7 @@ void pngReadStream(png_structp png_ptr, png_bytep out, png_size_t count) {
   if (stream->pos + count > stream->data->size()) {
     png_error(png_ptr, "unexpected end of data");
   }
-  memccpy(out, stream->data->data() + stream->pos, 1, count);
+  memcpy(out, stream->data->data() + stream->pos, count);
   stream->pos += count;
 }
 
@@ -123,7 +124,7 @@ Image Io::readPng(const std::string& path) {
   }
 
   png_set_read_fn(png->png_ptr, &input, pngReadStream);
-  constexpr const uint32_t kTransforms =
+  constexpr const uint32_t kTransforms = PNG_TRANSFORM_STRIP_ALPHA |
       PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND | PNG_TRANSFORM_STRIP_16;
   png_read_png(png->png_ptr, png->info_ptr, kTransforms, nullptr);
 

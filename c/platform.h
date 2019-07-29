@@ -23,11 +23,6 @@
 
 namespace twim {
 
-template <typename T, typename... Args>
-std::unique_ptr<T> make_unique(Args&&... args) {
-  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-}
-
 namespace {
 
 constexpr const int32_t kAlign = 64;
@@ -56,6 +51,24 @@ struct Vector {
   // User fields.
   uint32_t len;
 };
+
+template <typename Lane, size_t kLanes>
+struct Desc {
+  constexpr Desc() = default;
+  using T = Lane;
+  static constexpr size_t N = kLanes;
+  static_assert((N & (N - 1)) == 0, "N must be a power of two");
+};
+
+template <typename T>
+using VecTag = Desc<T, 32 / sizeof(T)>;
+
+template <typename T>
+static size_t vecSize(size_t capacity) {
+  constexpr auto vi32 = VecTag<T>();
+  int32_t N = vi32.N;
+  return (capacity + N - 1) & ~(N - 1);
+}
 
 template <typename T>
 Owned<Vector<T>> allocVector(size_t capacity) {
@@ -86,17 +99,6 @@ INLINE double duration(NanoTime t0, NanoTime t1) {
       std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
   return delta.count() / 1000000.0;
 }
-
-template <typename Lane, size_t kLanes>
-struct Desc {
-  constexpr Desc() = default;
-  using T = Lane;
-  static constexpr size_t N = kLanes;
-  static_assert((N & (N - 1)) == 0, "N must be a power of two");
-};
-
-template <typename T>
-using VecTag = Desc<T, 32 / sizeof(T)>;
 
 // load
 
