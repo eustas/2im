@@ -9,8 +9,8 @@ namespace {
 
 struct Decoder {
   const uint8_t* data;
-  int32_t data_length;
-  int32_t offset = 0;
+  size_t data_length;
+  size_t offset = 0;
   int64_t code = 0;
   int64_t low = 0;
   int64_t range = RangeCode::kValueMask;
@@ -128,7 +128,7 @@ std::vector<uint8_t> RangeEncoder::optimize(std::vector<uint8_t> data) {
     for (int32_t delta = -1; delta <= 1; ++delta) {
       current = good;
       data[current.data_length - 1] = (uint8_t)(original_tail + delta);
-      int32_t j = i;
+      size_t j = i;
       bool ok = true;
       while (ok && (j < triplets_size)) {
         ok = current.decodeRange(triplets[j++]);

@@ -24,7 +24,7 @@ class RangeDecoder {
   int64_t low;
   int64_t range;
   int64_t code;
-  int32_t offset;
+  size_t offset;
   // TODO(eustas): add getter?
   bool healthy;
 };

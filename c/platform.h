@@ -77,7 +77,7 @@ Owned<Vector<T>> allocVector(size_t capacity) {
   static_assert(sizeof(V) < (kAlign / 2), "V is too long");
   uintptr_t memory = reinterpret_cast<uintptr_t>(malloc(size + kAlign));
   uintptr_t aligned_memory = (memory + kAlign - 1) & ~(kAlign - 1);
-  int32_t before = aligned_memory - memory;
+  size_t before = aligned_memory - memory;
   V* v;
   if (before >= sizeof(V)) {
     v = reinterpret_cast<V*>(aligned_memory - sizeof(V));
