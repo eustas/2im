@@ -312,7 +312,7 @@ TEST(RangeTest, Golden) {
   for (size_t i = 0; i < triplets_size; i += 3) {
     encoder.encodeRange({triplets[i], triplets[i + 1], triplets[i + 2]});
   }
-  const auto data = encoder.finish();
+  auto data = encoder.finish();
 
   int8_t expected[] = {
       102,  70,   -56,  -121, -17,  117,  17,   3,    -61,  97,   -97,  84,

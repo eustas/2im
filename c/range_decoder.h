@@ -10,7 +10,7 @@ namespace twim {
 
 class RangeDecoder {
  public:
-  RangeDecoder(std::unique_ptr<std::vector<uint8_t>> data);
+  RangeDecoder(std::vector<uint8_t>&& data);
   void removeRange(int32_t bottom, int32_t top);
   int32_t currentCount(int32_t totalRange);
 
@@ -20,7 +20,7 @@ class RangeDecoder {
  private:
   uint8_t readNibble();
 
-  std::unique_ptr<std::vector<uint8_t>> data;
+  std::vector<uint8_t> data;
   int64_t low;
   int64_t range;
   int64_t code;

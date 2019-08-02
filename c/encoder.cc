@@ -18,45 +18,23 @@ namespace {
 
 class Cache;
 
-class StatsCache {
- public:
-  int32_t count;
-  Owned<Vector<int32_t>> row_offset;
-  Owned<Vector<float>> y;
-  Owned<Vector<int32_t>> x0;
-  Owned<Vector<int32_t>> x1;
-  Owned<Vector<int32_t>> x;
-
-  std::array<int32_t, 8> plus;
-  std::array<int32_t, 8> minus;
-
-  StatsCache(size_t capacity)
-      : row_offset(allocVector<int32_t>(vecSize<int32_t>(capacity))),
-        y(allocVector<float>(vecSize<float>(capacity))),
-        x0(allocVector<int32_t>(vecSize<int32_t>(capacity))),
-        x1(allocVector<int32_t>(vecSize<int32_t>(capacity))),
-        x(allocVector<int32_t>(vecSize<int32_t>(capacity))) {}
-
-  static void sum(Cache* cache, int32_t* RESTRICT region_x,
-                  std::array<int32_t, 8>* dst);
-
-  void prepare(Cache* cache, Vector<int32_t>* region);
-};
-
 class Stats {
  public:
-  int32_t pixel_count;
-  int32_t rgb[3];
-  int32_t rgb2[3];
+  // r, g, b, pixel_count, r2, g2, b2, reserved
+  ALIGNED int32_t values[8];
 
-  void setEmpty() {
-    pixel_count = 0;
-    rgb[0] = 0;
-    rgb[1] = 0;
-    rgb[2] = 0;
-    rgb2[0] = 0;
-    rgb2[1] = 0;
-    rgb2[2] = 0;
+  INLINE int32_t r() const { return values[0]; }
+  INLINE int32_t g() const { return values[1]; }
+  INLINE int32_t b() const { return values[2]; }
+  INLINE int32_t rgb(size_t c) const { return values[c]; }
+  INLINE int32_t pixelCount() const { return values[3]; }
+  INLINE int32_t r2() const { return values[4]; }
+  INLINE int32_t g2() const { return values[5]; }
+  INLINE int32_t b2() const { return values[6]; }
+  INLINE int32_t rgb2(size_t c) const { return values[c + 4]; }
+
+  INLINE void setEmpty() {
+    for (size_t i = 0; i < 8; ++i) values[i] = 0;
   }
 
   void delta(Cache* cache, int32_t* RESTRICT region_x);
@@ -65,23 +43,11 @@ class Stats {
   void update(Cache* cache);
 
   void INLINE copy(const Stats& other) {
-    pixel_count = other.pixel_count;
-    rgb[0] = other.rgb[0];
-    rgb[1] = other.rgb[1];
-    rgb[2] = other.rgb[2];
-    rgb2[0] = other.rgb2[0];
-    rgb2[1] = other.rgb2[0];
-    rgb2[2] = other.rgb2[0];
+    for (size_t i = 0; i < 8; ++i) values[i] = other.values[i];
   }
 
   void INLINE sub(const Stats& other) {
-    pixel_count -= other.pixel_count;
-    rgb[0] -= other.rgb[0];
-    rgb[1] -= other.rgb[1];
-    rgb[2] -= other.rgb[2];
-    rgb2[0] -= other.rgb2[0];
-    rgb2[1] -= other.rgb2[0];
-    rgb2[2] -= other.rgb2[0];
+    for (size_t i = 0; i < 8; ++i) values[i] -= other.values[i];
   }
 
   void INLINE update(const Stats& parent, const Stats& sibling) {
@@ -98,58 +64,64 @@ class Stats {
   void updateGe(Cache* cache, int angle, int d);
 };
 
+class StatsCache {
+ public:
+  Stats plus;
+  Stats minus;
+
+  int32_t count;
+  Owned<Vector<int32_t>> row_offset;
+  Owned<Vector<float>> y;
+  Owned<Vector<int32_t>> x0;
+  Owned<Vector<int32_t>> x1;
+  Owned<Vector<int32_t>> x;
+
+  StatsCache(size_t capacity)
+      : row_offset(allocVector<int32_t>(vecSize<int32_t>(capacity))),
+        y(allocVector<float>(vecSize<float>(capacity))),
+        x0(allocVector<int32_t>(vecSize<int32_t>(capacity))),
+        x1(allocVector<int32_t>(vecSize<int32_t>(capacity))),
+        x(allocVector<int32_t>(vecSize<int32_t>(capacity))) {}
+
+  static void sum(Cache* cache, int32_t* RESTRICT region_x, Stats* dst);
+
+  void prepare(Cache* cache, Vector<int32_t>* region);
+};
+
 class UberCache {
  public:
   const size_t width;
   const size_t height;
   const size_t stride;
   /* Cumulative sums. Extra column with total sum. */
-  Owned<Vector<int32_t>> sum_r;
-  Owned<Vector<int32_t>> sum_g;
-  Owned<Vector<int32_t>> sum_b;
-  Owned<Vector<int32_t>> sum_r2;
-  Owned<Vector<int32_t>> sum_g2;
-  Owned<Vector<int32_t>> sum_b2;
+  Owned<Vector<int32_t>> sum;
 
   UberCache(const Image& src)
       : width(src.width),
         height(src.height),
-        stride(src.width + 1),
-        sum_r(allocVector<int32_t>(stride * src.height)),
-        sum_g(allocVector<int32_t>(stride * src.height)),
-        sum_b(allocVector<int32_t>(stride * src.height)),
-        sum_r2(allocVector<int32_t>(stride * src.height)),
-        sum_g2(allocVector<int32_t>(stride * src.height)),
-        sum_b2(allocVector<int32_t>(stride * src.height)) {
-    int32_t* RESTRICT sum_r = this->sum_r->data;
-    int32_t* RESTRICT sum_g = this->sum_g->data;
-    int32_t* RESTRICT sum_b = this->sum_b->data;
-    int32_t* RESTRICT sum_r2 = this->sum_r2->data;
-    int32_t* RESTRICT sum_g2 = this->sum_g2->data;
-    int32_t* RESTRICT sum_b2 = this->sum_b2->data;
+        stride(8 * (src.width + 1)),
+        sum(allocVector<int32_t>(stride * src.height)) {
+    int32_t* RESTRICT sum = this->sum->data();
     for (size_t y = 0; y < src.height; ++y) {
       size_t src_row_offset = y * src.width;
       const uint8_t* RESTRICT r_row = src.r.data() + src_row_offset;
       const uint8_t* RESTRICT g_row = src.g.data() + src_row_offset;
       const uint8_t* RESTRICT b_row = src.b.data() + src_row_offset;
       size_t dstRowOffset = y * stride;
-      sum_r[dstRowOffset] = 0;
-      sum_r2[dstRowOffset] = 0;
-      sum_g[dstRowOffset] = 0;
-      sum_g2[dstRowOffset] = 0;
-      sum_b[dstRowOffset] = 0;
-      sum_b2[dstRowOffset] = 0;
+      for (size_t i = 0; i < 8; ++i) sum[dstRowOffset + i] = 0;
       for (size_t x = 0; x < src.width; ++x) {
-        size_t dstOffset = dstRowOffset + x;
+        size_t dstOffset = dstRowOffset + 8 * x;
         int32_t r = r_row[x];
         int32_t g = g_row[x];
         int32_t b = b_row[x];
-        sum_r[dstOffset + 1] = sum_r[dstOffset] + r;
-        sum_r2[dstOffset + 1] = sum_r2[dstOffset] + r * r;
-        sum_g[dstOffset + 1] = sum_g[dstOffset] + g;
-        sum_g2[dstOffset + 1] = sum_g2[dstOffset] + g * g;
-        sum_b[dstOffset + 1] = sum_b[dstOffset] + b;
-        sum_b2[dstOffset + 1] = sum_b2[dstOffset] + b * b;
+        sum[dstOffset +  8] = sum[dstOffset + 0] + r;
+        sum[dstOffset +  9] = sum[dstOffset + 1] + g;
+        sum[dstOffset + 10] = sum[dstOffset + 2] + b;
+        sum[dstOffset + 11] = sum[dstOffset + 3] + 1;
+        sum[dstOffset + 12] = sum[dstOffset + 4] + r * r;
+        sum[dstOffset + 13] = sum[dstOffset + 5] + g * g;
+        sum[dstOffset + 14] = sum[dstOffset + 6] + b * b;
+        sum[dstOffset + 15] = 0;
       }
     }
   }
@@ -166,54 +138,30 @@ class Cache {
 };
 
 void INLINE StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
-                            std::array<int32_t, 8>* dst) {
+                            Stats* dst) {
   StatsCache& stats_cache = cache->stats_cache;
   size_t count = stats_cache.count;
-  const int32_t* RESTRICT rowOffset = stats_cache.row_offset->data;
-  const int32_t* RESTRICT sum_r = cache->uber->sum_r->data;
-  const int32_t* RESTRICT sum_g = cache->uber->sum_g->data;
-  const int32_t* RESTRICT sum_b = cache->uber->sum_b->data;
-  const int32_t* RESTRICT sum_r2 = cache->uber->sum_r2->data;
-  const int32_t* RESTRICT sum_g2 = cache->uber->sum_g2->data;
-  const int32_t* RESTRICT sum_b2 = cache->uber->sum_b2->data;
+  const int32_t* RESTRICT rowOffset = stats_cache.row_offset->data();
+  const int32_t* RESTRICT sum = cache->uber->sum->data();
 
-  int32_t pixel_count = 0;
-  int32_t r = 0;
-  int32_t g = 0;
-  int32_t b = 0;
-  int32_t r2 = 0;
-  int32_t g2 = 0;
-  int32_t b2 = 0;
-  for (size_t i = 0; i < count; i++) {
-    int32_t x = region_x[i];
-    int32_t offset = rowOffset[i] + x;
-    pixel_count += x;
-    r += sum_r[offset];
-    g += sum_g[offset];
-    b += sum_b[offset];
-    r2 += sum_r2[offset];
-    g2 += sum_g2[offset];
-    b2 += sum_b2[offset];
+  Stats tmp;
+  tmp.setEmpty();
+  for (size_t i = 0; i < count; ++i) {
+    int32_t offset = rowOffset[i] + 8 * region_x[i];
+    for (size_t j = 0; j < 8; ++j) tmp.values[j] += sum[offset + j];
   }
-
-  dst->at(0) = pixel_count;
-  dst->at(1) = r;
-  dst->at(2) = g;
-  dst->at(3) = b;
-  dst->at(4) = r2;
-  dst->at(5) = g2;
-  dst->at(6) = b2;
+  dst->copy(tmp);
 }
 
 void INLINE StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
   size_t count = region->len;
   size_t step = region->capacity / 3;
   size_t sum_stride = cache->uber->stride;
-  int32_t* RESTRICT data = region->data;
-  float* RESTRICT y = this->y->data;
-  int32_t* RESTRICT x0 = this->x0->data;
-  int32_t* RESTRICT x1 = this->x1->data;
-  int32_t* RESTRICT row_offset = this->row_offset->data;
+  int32_t* RESTRICT data = region->data();
+  float* RESTRICT y = this->y->data();
+  int32_t* RESTRICT x0 = this->x0->data();
+  int32_t* RESTRICT x1 = this->x1->data();
+  int32_t* RESTRICT row_offset = this->row_offset->data();
   for (size_t i = 0; i < count; ++i) {
     int32_t row = data[i];
     y[i] = row;
@@ -227,22 +175,16 @@ void INLINE StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
 
 void INLINE Stats::delta(Cache* cache, int32_t* RESTRICT region_x) {
   StatsCache& stats_cache = cache->stats_cache;
-  std::array<int32_t, 8>& minus = stats_cache.minus;
+  Stats& minus = stats_cache.minus;
   StatsCache::sum(cache, region_x, &minus);
 
-  std::array<int32_t, 8>& plus = stats_cache.plus;
-  pixel_count = plus[0] - minus[0];
-  rgb[0] = plus[1] - minus[1];
-  rgb[1] = plus[2] - minus[2];
-  rgb[2] = plus[3] - minus[3];
-  rgb2[0] = plus[4] - minus[4];
-  rgb2[1] = plus[5] - minus[5];
-  rgb2[2] = plus[6] - minus[6];
+  Stats& plus = stats_cache.plus;
+  for (size_t i = 0; i < 8; ++i) values[i] = plus.values[i] - minus.values[i];
 }
 
 // Calculate stats from own region.
 void INLINE Stats::update(Cache* cache) {
-  delta(cache, cache->stats_cache.x0->data);
+  delta(cache, cache->stats_cache.x0->data());
 }
 
 void INLINE Stats::updateGeHorizontal(Cache* cache, int32_t d) {
@@ -250,10 +192,10 @@ void INLINE Stats::updateGeHorizontal(Cache* cache, int32_t d) {
   float dny = d / (float)ny;
   StatsCache& stats_cache = cache->stats_cache;
   size_t count = stats_cache.count;
-  float* RESTRICT region_y = stats_cache.y->data;
-  int32_t* RESTRICT region_x0 = stats_cache.x0->data;
-  int32_t* RESTRICT region_x1 = stats_cache.x1->data;
-  int32_t* RESTRICT region_x = stats_cache.x->data;
+  float* RESTRICT region_y = stats_cache.y->data();
+  int32_t* RESTRICT region_x0 = stats_cache.x0->data();
+  int32_t* RESTRICT region_x1 = stats_cache.x1->data();
+  int32_t* RESTRICT region_x = stats_cache.x->data();
 
   for (size_t i = 0; i < count; i++) {
     float y = region_y[i];
@@ -270,10 +212,10 @@ void INLINE Stats::updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   float mnynx = -(2 * ny) / (float)(2 * nx);
   StatsCache& stats_cache = cache->stats_cache;
   size_t count = stats_cache.count;
-  float* RESTRICT region_y = stats_cache.y->data;
-  int32_t* RESTRICT region_x0 = stats_cache.x0->data;
-  int32_t* RESTRICT region_x1 = stats_cache.x1->data;
-  int32_t* RESTRICT region_x = stats_cache.x->data;
+  float* RESTRICT region_y = stats_cache.y->data();
+  int32_t* RESTRICT region_x0 = stats_cache.x0->data();
+  int32_t* RESTRICT region_x1 = stats_cache.x1->data();
+  int32_t* RESTRICT region_x = stats_cache.x->data();
 
   for (size_t i = 0; i < count; i++) {
     float y = region_y[i];
@@ -290,19 +232,19 @@ void INLINE Stats::updateGe(Cache* cache, int angle, int d) {
   } else {
     updateGeGeneric(cache, angle, d);
   }
-  delta(cache, cache->stats_cache.x->data);
+  delta(cache, cache->stats_cache.x->data());
 }
 
 static INLINE float score(const Stats& whole, const Stats& part) {
-  if (part.pixel_count == 0) return 0.0f;
+  if (part.pixelCount() == 0) return 0.0f;
   float result = 0.0f;
   for (size_t c = 0; c < 3; ++c) {
-    float whole_average = static_cast<float>(whole.rgb[c]) / whole.pixel_count;
-    float part_average = static_cast<float>(part.rgb[c]) / part.pixel_count;
+    float whole_average = static_cast<float>(whole.rgb(c)) / whole.pixelCount();
+    float part_average = static_cast<float>(part.rgb(c)) / part.pixelCount();
     float whole_average2 = whole_average * whole_average;
     float part_average2 = part_average * part_average;
-    result += part.pixel_count * (whole_average2 - part_average2) -
-              2.0f * part.rgb[c] * (whole_average - part_average);
+    result += part.pixelCount() * (whole_average2 - part_average2) -
+              2.0f * part.rgb(c) * (whole_average - part_average);
   }
   return result;
 }
@@ -353,8 +295,8 @@ class Fragment {
       RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
       for (size_t c = 0; c < 3; ++c) {
         int32_t q = cp.color_quant;
-        int32_t d = 255 * stats.pixel_count;
-        int32_t v = (2 * (q - 1) * stats.rgb[c] + d) / (2 * d);
+        int32_t d = 255 * stats.pixelCount();
+        int32_t v = (2 * (q - 1) * stats.rgb(c) + d) / (2 * d);
         RangeEncoder::writeNumber(dst, q, v);
       }
       return;
@@ -373,13 +315,13 @@ class Fragment {
     if (is_leaf) {
       for (size_t c = 0; c < 3; ++c) {
         int32_t q = cp.color_quant;
-        int32_t d = 255 * stats.pixel_count;
-        int32_t v = (2 * (q - 1) * stats.rgb[c] + d) / (2 * d);
+        int32_t d = 255 * stats.pixelCount();
+        int32_t v = (2 * (q - 1) * stats.rgb(c) + d) / (2 * d);
         int32_t vq = CodecParams::dequantizeColor(v, q);
         // sum((vi - v)^2) == sum(vi^2 - 2 * vi * v + v^2)
         //                 == n * v^2 + sum(vi^2) - 2 * v * sum(vi)
-        result +=
-            stats.pixel_count * vq * vq + stats.rgb2[c] - 2 * vq * stats.rgb[c];
+        result += stats.pixelCount() * vq * vq + stats.rgb2(c) -
+                  2 * vq * stats.rgb(c);
       }
       return result;
     }
@@ -477,7 +419,7 @@ struct FragmentComparator {
 static Fragment makeRoot(int32_t width, int32_t height) {
   int32_t step = vecSize<int32_t>(height);
   Owned<Vector<int32_t>> root = allocVector<int32_t>(3 * step);
-  int32_t* RESTRICT data = root->data;
+  int32_t* RESTRICT data = root->data();
   for (int32_t y = 0; y < height; ++y) {
     data[y] = y;
     data[step + y] = 0;

@@ -41,7 +41,7 @@ int main (int argc, char* argv[]) {
     }
     if (!encode || roundtrip) {
       auto data = Io::readFile(path);
-      if (data->size() == 0) {
+      if (data.size() == 0) {
         fprintf(stderr, "Failed to read [%s].\n", path.c_str());
         continue;
       }

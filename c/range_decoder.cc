@@ -27,7 +27,7 @@ int32_t RangeDecoder::readSize(RangeDecoder* src) {
   return bits + plus;
 }
 
-RangeDecoder::RangeDecoder(std::unique_ptr<std::vector<uint8_t>> data)
+RangeDecoder::RangeDecoder(std::vector<uint8_t>&& data)
     : data(std::move(data)),
       low(0),
       range(RangeCode::kValueMask),
@@ -40,8 +40,7 @@ RangeDecoder::RangeDecoder(std::unique_ptr<std::vector<uint8_t>> data)
 }
 
 uint8_t RangeDecoder::readNibble() {
-  return (offset < data->size()) ? (data->at(offset++) & RangeCode::kNibbleMask)
-                                 : 0;
+  return (offset < data.size()) ? (data[offset++] & RangeCode::kNibbleMask) : 0;
 }
 
 void RangeDecoder::removeRange(int32_t bottom, int32_t top) {

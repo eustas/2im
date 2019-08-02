@@ -9,17 +9,17 @@ void Region::splitLine(const Vector<int32_t>& region, int32_t angle, int32_t d,
                        Vector<int32_t>* left, Vector<int32_t>* right) {
   const size_t region_step = region.capacity / 3;
   const size_t region_count = region.len;
-  const int32_t* RESTRICT region_y = region.data;
+  const int32_t* RESTRICT region_y = region.data();
   const int32_t* RESTRICT region_x0 = region_y + region_step;
   const int32_t* RESTRICT region_x1 = region_x0 + region_step;
 
   const size_t left_step = left->capacity / 3;
-  int32_t* RESTRICT left_y = left->data;
+  int32_t* RESTRICT left_y = left->data();
   int32_t* RESTRICT left_x0 = left_y + left_step;
   int32_t* RESTRICT left_x1 = left_x0 + left_step;
 
   const size_t right_step = right->capacity / 3;
-  int32_t* RESTRICT right_y = right->data;
+  int32_t* RESTRICT right_y = right->data();
   int32_t* RESTRICT right_x0 = right_y + right_step;
   int32_t* RESTRICT right_x1 = right_x0 + right_step;
 

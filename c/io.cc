@@ -21,8 +21,8 @@ std::unique_ptr<FILE, void (*)(FILE*)> openFile(const std::string& path,
   return {fopen(path.c_str(), mode), closeFile};
 }
 
-std::unique_ptr<std::vector<uint8_t>> Io::readFile(const std::string& path) {
-  std::unique_ptr<std::vector<uint8_t>> result(new std::vector<uint8_t>());
+std::vector<uint8_t> Io::readFile(const std::string& path) {
+  std::vector<uint8_t> result;
   auto f = openFile(path, "rb");
   if (!f) return result;
 
@@ -31,10 +31,10 @@ std::unique_ptr<std::vector<uint8_t>> Io::readFile(const std::string& path) {
     size_t read_bytes =
         fread(buffer.data(), sizeof(char), buffer.size(), f.get());
     if (ferror(f.get())) {
-      result->clear();
+      result.clear();
       return result;
     }
-    result->insert(result->end(), buffer.data(), buffer.data() + read_bytes);
+    result.insert(result.end(), buffer.data(), buffer.data() + read_bytes);
   }
 
   return result;
@@ -110,10 +110,10 @@ Image Io::readPng(const std::string& path) {
   Image result;
 
   auto data = readFile(path);
-  if (data->size() < 8) return result;
-  Stream input = {data.get(), 0};
+  if (data.size() < 8) return result;
+  Stream input = {&data, 0};
 
-  if (memcmp(data->data(), kPngHdr, sizeof(kPngHdr)) != 0) return result;
+  if (memcmp(data.data(), kPngHdr, sizeof(kPngHdr)) != 0) return result;
 
   auto png = createPngStruct(/* read */ true);
   if (!png) return result;

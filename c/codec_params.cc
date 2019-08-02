@@ -86,9 +86,9 @@ int32_t CodecParams::getLevel(const Vector<int32_t>& region) const {
     return -1;
   }
 
-  int32_t* RESTRICT y = region.data;
-  int32_t* RESTRICT x0 = y + step;
-  int32_t* RESTRICT x1 = x0 + step;
+  const int32_t* RESTRICT y = region.data();
+  const int32_t* RESTRICT x0 = y + step;
+  const int32_t* RESTRICT x1 = x0 + step;
 
   // TODO(eustas): perhaps box area is not the best value for level calculation.
   int32_t min_y = height + 1;

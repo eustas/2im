@@ -10,8 +10,8 @@
 
 #ifdef _MSC_VER
 #include <intrin.h>
-#define SIMD_RESTRICT __restrict
-#define SIMD_INLINE __forceinline
+#define RESTRICT __restrict
+#define INLINE __forceinline
 #else
 #define RESTRICT __restrict__
 #define INLINE inline __attribute__((always_inline)) __attribute__((flatten))
@@ -19,21 +19,21 @@
 
 #define SIMD __attribute__((target("avx,avx2,fma")))
 
-#define ALIGNED alignas(64)
+// AVX: 256 bits = 32 bytes = 8 floats / int32_t
+#define ALIGNMENT 32
+#define ALIGNED alignas(ALIGNMENT)
 
 namespace twim {
 
 namespace {
-
-constexpr const int32_t kAlign = 64;
 
 template <typename T>
 using Deleter = void (*)(T*);
 
 template <typename V>
 void destroyVector(V* v) {
-  void* memory = v->memory;
-  free(memory);
+  uintptr_t memory = (uintptr_t)v->data() - v->offset;
+  free((void*)memory);
 }
 
 }  // namespace
@@ -43,13 +43,16 @@ using Owned = std::unique_ptr<T, Deleter<T>>;
 
 template <typename T>
 struct Vector {
-  // System (const) fields.
-  void* memory;
-  T* data;
+  uint32_t offset;
   uint32_t capacity;
-
-  // User fields.
   uint32_t len;
+
+  INLINE T* RESTRICT data() {
+    return (T*)((uintptr_t)this + sizeof(Vector<T>));
+  }
+  INLINE const T* RESTRICT data() const {
+    return (const T*)((uintptr_t)this + sizeof(Vector<T>));
+  }
 };
 
 template <typename Lane, size_t kLanes>
@@ -61,31 +64,24 @@ struct Desc {
 };
 
 template <typename T>
-using VecTag = Desc<T, 32 / sizeof(T)>;
+using VecTag = Desc<T, ALIGNMENT / sizeof(T)>;
 
 template <typename T>
 static size_t vecSize(size_t capacity) {
-  constexpr auto vi32 = VecTag<T>();
-  int32_t N = vi32.N;
+  constexpr auto vt = VecTag<T>();
+  int32_t N = vt.N;
   return (capacity + N - 1) & ~(N - 1);
 }
 
 template <typename T>
 Owned<Vector<T>> allocVector(size_t capacity) {
   using V = Vector<T>;
-  size_t size = capacity * sizeof(T);
-  static_assert(sizeof(V) < (kAlign / 2), "V is too long");
-  uintptr_t memory = reinterpret_cast<uintptr_t>(malloc(size + kAlign));
-  uintptr_t aligned_memory = (memory + kAlign - 1) & ~(kAlign - 1);
-  size_t before = aligned_memory - memory;
-  V* v;
-  if (before >= sizeof(V)) {
-    v = reinterpret_cast<V*>(aligned_memory - sizeof(V));
-  } else {
-    v = reinterpret_cast<V*>(aligned_memory + size);
-  }
-  v->memory = reinterpret_cast<void*>(memory);
-  v->data = reinterpret_cast<T*>(aligned_memory);
+  size_t size = sizeof(V) + capacity * sizeof(T);
+  uintptr_t memory = reinterpret_cast<uintptr_t>(malloc(size + ALIGNMENT));
+  uintptr_t aligned_memory =
+      (memory + sizeof(V) + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
+  V* v = reinterpret_cast<V*>(aligned_memory - sizeof(V));
+  v->offset = static_cast<uint32_t>(aligned_memory - memory);
   v->capacity = capacity;
   return {v, destroyVector};
 }

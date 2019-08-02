@@ -17,7 +17,7 @@ void DistanceRange::update(const Vector<int32_t>& region, int32_t angle,
   }
   const size_t count = region.len;
   const size_t step = region.capacity / 3;
-  const int32_t* RESTRICT y = region.data;
+  const int32_t* RESTRICT y = region.data();
   const int32_t* RESTRICT x0 = y + step;
   const int32_t* RESTRICT x1 = x0 + step;
 

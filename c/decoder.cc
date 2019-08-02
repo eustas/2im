@@ -79,7 +79,7 @@ class Fragment {
       uint8_t cr = color & 0xFF;
       uint8_t cg = (color >> 8) & 0xFF;
       uint8_t cb = (color >> 16) & 0xFF;
-      const int32_t* RESTRICT vy = region->data;
+      const int32_t* RESTRICT vy = region->data();
       const int32_t* RESTRICT vx0 = vy + step;
       const int32_t* RESTRICT vx1 = vx0 + step;
       for (size_t i = 0; i < count; i++) {
@@ -101,7 +101,7 @@ class Fragment {
 
 }  // namespace
 
-Image Decoder::decode(std::unique_ptr<std::vector<uint8_t>> encoded) {
+Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   Image result;
 
   RangeDecoder src(std::move(encoded));
@@ -111,7 +111,7 @@ Image Decoder::decode(std::unique_ptr<std::vector<uint8_t>> encoded) {
 
   int32_t step = vecSize<int32_t>(height);
   auto root_region = allocVector<int32_t>(3 * step);
-  int32_t* RESTRICT y = root_region->data;
+  int32_t* RESTRICT y = root_region->data();
   int32_t* RESTRICT x0 = y + step;
   int32_t* RESTRICT x1 = x0 + step;
   for (int32_t i = 0; i < height; ++i) {

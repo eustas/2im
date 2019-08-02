@@ -8,7 +8,7 @@ namespace twim {
 
 class Decoder {
  public:
-  static Image decode(std::unique_ptr<std::vector<uint8_t>> encoded);
+  static Image decode(std::vector<uint8_t>&& encoded);
 };
 
 }  // namespace twim

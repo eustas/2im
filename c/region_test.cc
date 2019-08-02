@@ -10,14 +10,14 @@ namespace twim {
 
 template <size_t N>
 void Set(Vector<int32_t>* to, const std::array<int32_t, N>& from) {
-  std::copy(from.cbegin(), from.cend(), to->data);
+  std::copy(from.cbegin(), from.cend(), to->data());
   to->len = N / 3;
 }
 
 template <size_t N>
 void ExpectEq(const std::array<int32_t, N>& expected, Vector<int32_t>* actual) {
   EXPECT_EQ(N / 3, actual->len);
-  EXPECT_TRUE(0 == memcmp(expected.data(), actual->data, N * sizeof(int)));
+  EXPECT_TRUE(0 == memcmp(expected.data(), actual->data(), N * sizeof(int)));
 }
 
 TEST(RegionTest, HorizontalSplit) {
@@ -28,7 +28,7 @@ TEST(RegionTest, HorizontalSplit) {
   CodecParams cp(4, 4);
   DistanceRange distanceRange;
   distanceRange.update(*region.get(), angle, cp);
-  EXPECT_EQ(3, distanceRange.numLines);
+  EXPECT_EQ(3, distanceRange.num_lines);
   auto left = allocVector<int32_t>(3);
   auto right = allocVector<int32_t>(3);
 
@@ -56,10 +56,10 @@ TEST(RegionTest, VerticalSplit) {
   Set<12>(region.get(), {0, 1, 2, 3, 0, 0, 0, 0, 1, 1, 1, 1});
   int32_t angle = 0;
   CodecParams cp(4, 4);
-  cp.lineLimit = 63;
+  cp.line_limit = 63;
   DistanceRange distanceRange;
   distanceRange.update(*region.get(), angle, cp);
-  EXPECT_EQ(3, distanceRange.numLines);
+  EXPECT_EQ(3, distanceRange.num_lines);
 
   // 1/3
   auto left = allocVector<int32_t>(9);
