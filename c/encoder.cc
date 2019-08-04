@@ -21,20 +21,20 @@ class Cache;
 class Stats {
  public:
   // r, g, b, pixel_count, r2, g2, b2, reserved
-  ALIGNED int32_t values[8];
+  ALIGNED float values[8];
 
-  INLINE int32_t r() const { return values[0]; }
-  INLINE int32_t g() const { return values[1]; }
-  INLINE int32_t b() const { return values[2]; }
-  INLINE int32_t rgb(size_t c) const { return values[c]; }
-  INLINE int32_t pixelCount() const { return values[3]; }
-  INLINE int32_t r2() const { return values[4]; }
-  INLINE int32_t g2() const { return values[5]; }
-  INLINE int32_t b2() const { return values[6]; }
-  INLINE int32_t rgb2(size_t c) const { return values[c + 4]; }
+  INLINE float r() const { return values[0]; }
+  INLINE float g() const { return values[1]; }
+  INLINE float b() const { return values[2]; }
+  INLINE float rgb(size_t c) const { return values[c]; }
+  INLINE float pixelCount() const { return values[3]; }
+  INLINE float r2() const { return values[4]; }
+  INLINE float g2() const { return values[5]; }
+  INLINE float b2() const { return values[6]; }
+  INLINE float rgb2(size_t c) const { return values[c + 4]; }
 
   INLINE void setEmpty() {
-    for (size_t i = 0; i < 8; ++i) values[i] = 0;
+    for (size_t i = 0; i < 8; ++i) values[i] = 0.0f;
   }
 
   void delta(Cache* cache, int32_t* RESTRICT region_x);
@@ -94,34 +94,34 @@ class UberCache {
   const size_t height;
   const size_t stride;
   /* Cumulative sums. Extra column with total sum. */
-  Owned<Vector<int32_t>> sum;
+  Owned<Vector<float>> sum;
 
   UberCache(const Image& src)
       : width(src.width),
         height(src.height),
         stride(8 * (src.width + 1)),
-        sum(allocVector<int32_t>(stride * src.height)) {
-    int32_t* RESTRICT sum = this->sum->data();
+        sum(allocVector<float>(stride * src.height)) {
+    float* RESTRICT sum = this->sum->data();
     for (size_t y = 0; y < src.height; ++y) {
       size_t src_row_offset = y * src.width;
       const uint8_t* RESTRICT r_row = src.r.data() + src_row_offset;
       const uint8_t* RESTRICT g_row = src.g.data() + src_row_offset;
       const uint8_t* RESTRICT b_row = src.b.data() + src_row_offset;
       size_t dstRowOffset = y * stride;
-      for (size_t i = 0; i < 8; ++i) sum[dstRowOffset + i] = 0;
+      for (size_t i = 0; i < 8; ++i) sum[dstRowOffset + i] = 0.0f;
       for (size_t x = 0; x < src.width; ++x) {
         size_t dstOffset = dstRowOffset + 8 * x;
-        int32_t r = r_row[x];
-        int32_t g = g_row[x];
-        int32_t b = b_row[x];
+        float r = r_row[x];
+        float g = g_row[x];
+        float b = b_row[x];
         sum[dstOffset +  8] = sum[dstOffset + 0] + r;
         sum[dstOffset +  9] = sum[dstOffset + 1] + g;
         sum[dstOffset + 10] = sum[dstOffset + 2] + b;
-        sum[dstOffset + 11] = sum[dstOffset + 3] + 1;
+        sum[dstOffset + 11] = sum[dstOffset + 3] + 1.0f;
         sum[dstOffset + 12] = sum[dstOffset + 4] + r * r;
         sum[dstOffset + 13] = sum[dstOffset + 5] + g * g;
         sum[dstOffset + 14] = sum[dstOffset + 6] + b * b;
-        sum[dstOffset + 15] = 0;
+        sum[dstOffset + 15] = 0.0f;
       }
     }
   }
@@ -137,23 +137,32 @@ class Cache {
   Cache(const UberCache& uber) : uber(&uber), stats_cache(uber.height) {}
 };
 
-void INLINE StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
+void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
                             Stats* dst) {
   StatsCache& stats_cache = cache->stats_cache;
   size_t count = stats_cache.count;
   const int32_t* RESTRICT rowOffset = stats_cache.row_offset->data();
-  const int32_t* RESTRICT sum = cache->uber->sum->data();
+  const float* RESTRICT sum = cache->uber->sum->data();
 
-  Stats tmp;
-  tmp.setEmpty();
-  for (size_t i = 0; i < count; ++i) {
-    int32_t offset = rowOffset[i] + 8 * region_x[i];
-    for (size_t j = 0; j < 8; ++j) tmp.values[j] += sum[offset + j];
+  constexpr auto vf = VecTag<float>();
+  if (vf.N == 8) {
+    auto tmp = zero(vf);
+    for (size_t i = 0; i < count; ++i) {
+      tmp = add(vf, tmp, load(vf, sum + rowOffset[i] + 8 * region_x[i]));
+    }
+    store(tmp, vf, dst->values);
+  } else {
+    Stats tmp;
+    tmp.setEmpty();
+    for (size_t i = 0; i < count; ++i) {
+      int32_t offset = rowOffset[i] + 8 * region_x[i];
+      for (size_t j = 0; j < 8; ++j) tmp.values[j] += sum[offset + j];
+    }
+    dst->copy(tmp);
   }
-  dst->copy(tmp);
 }
 
-void INLINE StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
+void INLINE SIMD StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
   size_t count = region->len;
   size_t step = region->capacity / 3;
   size_t sum_stride = cache->uber->stride;
@@ -173,7 +182,7 @@ void INLINE StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
   sum(cache, x1, &plus);
 }
 
-void INLINE Stats::delta(Cache* cache, int32_t* RESTRICT region_x) {
+void INLINE SIMD Stats::delta(Cache* cache, int32_t* RESTRICT region_x) {
   StatsCache& stats_cache = cache->stats_cache;
   Stats& minus = stats_cache.minus;
   StatsCache::sum(cache, region_x, &minus);
@@ -236,15 +245,16 @@ void INLINE Stats::updateGe(Cache* cache, int angle, int d) {
 }
 
 static INLINE float score(const Stats& whole, const Stats& part) {
-  if (part.pixelCount() == 0) return 0.0f;
+  if (part.pixelCount() <= 0.0f) return 0.0f;
   float result = 0.0f;
+  const float inv_whole_pixel_count = 1.0f / whole.pixelCount();
+  const float inv_part_pixel_count = 1.0f / part.pixelCount();
   for (size_t c = 0; c < 3; ++c) {
-    float whole_average = static_cast<float>(whole.rgb(c)) / whole.pixelCount();
-    float part_average = static_cast<float>(part.rgb(c)) / part.pixelCount();
-    float whole_average2 = whole_average * whole_average;
-    float part_average2 = part_average * part_average;
-    result += part.pixelCount() * (whole_average2 - part_average2) -
-              2.0f * part.rgb(c) * (whole_average - part_average);
+    float whole_average = whole.rgb(c) * inv_whole_pixel_count;
+    float part_average = part.rgb(c) * inv_part_pixel_count;
+    float plus = whole_average + part_average;
+    float minus = whole_average - part_average;
+    result += minus * (part.pixelCount() * plus - 2.0f * part.rgb(c));
   }
   return result;
 }
@@ -289,7 +299,7 @@ class Fragment {
   explicit Fragment(Owned<Vector<int32_t>>&& region)
       : region(std::move(region)) {}
 
-  void encode(RangeEncoder* dst, const CodecParams& cp, bool is_leaf,
+  void INLINE encode(RangeEncoder* dst, const CodecParams& cp, bool is_leaf,
               std::vector<Fragment*>* children) {
     if (is_leaf) {
       RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
@@ -309,7 +319,7 @@ class Fragment {
     children->push_back(right_child.get());
   }
 
-  float simulateEncode(CodecParams cp, bool is_leaf,
+  float INLINE simulateEncode(CodecParams cp, bool is_leaf,
                        std::vector<Fragment*>* children) {
     float result = 0.0f;
     if (is_leaf) {
@@ -327,10 +337,10 @@ class Fragment {
     }
     children->push_back(left_child.get());
     children->push_back(right_child.get());
-    return 0.0;
+    return 0.0f;
   }
 
-  void findBestSubdivision(Cache* cache, CodecParams cp) {
+  void INLINE findBestSubdivision(Cache* cache, CodecParams cp) {
     Vector<int32_t>& region = *this->region.get();
     Stats& stats = this->stats;
     Stats* cache_stats = cache->stats;
@@ -358,7 +368,8 @@ class Fragment {
 
       for (int32_t line = 0; line < num_lines; ++line) {
         float full_score = 0.0f;
-        {
+        constexpr const float kLocalWeight = 0.0f;
+        if (kLocalWeight > 0.0f) {
           Stats band;
           band.update(cache_stats[line + 2], cache_stats[line]);
           Stats left;
@@ -436,7 +447,7 @@ static Fragment makeRoot(int32_t width, int32_t height) {
  * Partition could be used to try multiple color quantizations to see, which one
  * gives the best result.
  */
-static std::vector<Fragment*> buildPartition(Fragment* root, size_t size_limit,
+static INLINE std::vector<Fragment*> buildPartition(Fragment* root, size_t size_limit,
                                              const CodecParams& cp,
                                              Cache* cache) {
   float tax =
@@ -465,7 +476,7 @@ static std::vector<Fragment*> buildPartition(Fragment* root, size_t size_limit,
   return result;
 }
 
-static std::unordered_set<Fragment*> subpartition(
+static INLINE std::unordered_set<Fragment*> subpartition(
     int32_t target_size, const std::vector<Fragment*>& partition,
     CodecParams cp) {
   float tax = bitCost(NodeType::COUNT * cp.color_quant * cp.color_quant *
@@ -484,7 +495,7 @@ static std::unordered_set<Fragment*> subpartition(
   return non_leaf;
 }
 
-static float simulateEncode(int32_t target_size,
+static float INLINE simulateEncode(int32_t target_size,
                             std::vector<Fragment*>& partition,
                             const CodecParams& cp) {
   std::unordered_set<Fragment*> non_leaf =

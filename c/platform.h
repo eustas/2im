@@ -12,9 +12,11 @@
 #include <intrin.h>
 #define RESTRICT __restrict
 #define INLINE __forceinline
+#define NOINLINE
 #else
 #define RESTRICT __restrict__
 #define INLINE inline __attribute__((always_inline)) __attribute__((flatten))
+#define NOINLINE __attribute__((noinline))
 #endif
 
 #define SIMD __attribute__((target("avx,avx2,fma")))
@@ -116,10 +118,31 @@ SIMD INLINE void store(const __m256 v, VecTag<float>, float* RESTRICT ptr) {
   _mm256_store_ps(ptr, v);
 }
 
+// zero
+
+template <typename T>
+SIMD INLINE __m256i zero(VecTag<T>) {
+  return _mm256_setzero_si256();
+}
+
+SIMD INLINE __m256 zero(VecTag<float>) {
+  return _mm256_setzero_ps();
+}
+
 // set1
 
 SIMD INLINE __m256 set1(VecTag<float>, const float t) {
   return _mm256_set1_ps(t);
+}
+
+// add
+
+SIMD INLINE __m256i add(VecTag<int32_t>, const __m256i a, const __m256i b) {
+  return _mm256_add_epi32(a, b);
+}
+
+SIMD INLINE __m256 add(VecTag<float>, const __m256 a, const __m256 b) {
+  return _mm256_add_ps(a, b);
 }
 
 }  // namespace twim
