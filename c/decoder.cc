@@ -55,10 +55,11 @@ class Fragment {
     if (distanceRange->num_lines < 0) return false;
     int32_t line = RangeDecoder::readNumber(src, distanceRange->num_lines);
 
+    constexpr const auto vi32 = AvxVecTag<int32_t>();
     // Cutting with half-planes does not increase the number of scans.
-    int32_t step = vecSize<int32_t>(region->len);
-    auto inner = allocVector<int32_t>(3 * step);
-    auto outer = allocVector<int32_t>(3 * step);
+    int32_t step = vecSize(vi32, region->len);
+    auto inner = allocVector(vi32, 3 * step);
+    auto outer = allocVector(vi32, 3 * step);
     Region::splitLine(*region.get(), angle, distanceRange->distance(line),
                       inner.get(), outer.get());
     left_child.reset(new Fragment(std::move(inner)));
@@ -109,8 +110,9 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   int32_t width = cp.width;
   int32_t height = cp.height;
 
-  int32_t step = vecSize<int32_t>(height);
-  auto root_region = allocVector<int32_t>(3 * step);
+  constexpr const auto vi32 = AvxVecTag<int32_t>();
+  int32_t step = vecSize(vi32, height);
+  auto root_region = allocVector(vi32, 3 * step);
   int32_t* RESTRICT y = root_region->data();
   int32_t* RESTRICT x0 = y + step;
   int32_t* RESTRICT x1 = x0 + step;

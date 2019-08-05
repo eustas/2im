@@ -21,16 +21,10 @@ class Cache;
 class Stats {
  public:
   // r, g, b, pixel_count, r2, g2, b2, reserved
-  ALIGNED float values[8];
+  ALIGNED_32 float values[8];
 
-  INLINE float r() const { return values[0]; }
-  INLINE float g() const { return values[1]; }
-  INLINE float b() const { return values[2]; }
   INLINE float rgb(size_t c) const { return values[c]; }
   INLINE float pixelCount() const { return values[3]; }
-  INLINE float r2() const { return values[4]; }
-  INLINE float g2() const { return values[5]; }
-  INLINE float b2() const { return values[6]; }
   INLINE float rgb2(size_t c) const { return values[c + 4]; }
 
   INLINE void setEmpty() {
@@ -76,12 +70,15 @@ class StatsCache {
   Owned<Vector<int32_t>> x1;
   Owned<Vector<int32_t>> x;
 
+  using DI32 = AvxVecTag<int32_t>;
+  using DF = AvxVecTag<float>;
+
   StatsCache(size_t capacity)
-      : row_offset(allocVector<int32_t>(vecSize<int32_t>(capacity))),
-        y(allocVector<float>(vecSize<float>(capacity))),
-        x0(allocVector<int32_t>(vecSize<int32_t>(capacity))),
-        x1(allocVector<int32_t>(vecSize<int32_t>(capacity))),
-        x(allocVector<int32_t>(vecSize<int32_t>(capacity))) {}
+      : row_offset(allocVector(DI32(), capacity)),
+        y(allocVector(DF(), capacity)),
+        x0(allocVector(DI32(), capacity)),
+        x1(allocVector(DI32(), capacity)),
+        x(allocVector(DI32(), capacity)) {}
 
   static void sum(Cache* cache, int32_t* RESTRICT region_x, Stats* dst);
 
@@ -96,11 +93,13 @@ class UberCache {
   /* Cumulative sums. Extra column with total sum. */
   Owned<Vector<float>> sum;
 
+  using DF = AvxVecTag<float>;
+
   UberCache(const Image& src)
       : width(src.width),
         height(src.height),
         stride(8 * (src.width + 1)),
-        sum(allocVector<float>(stride * src.height)) {
+        sum(allocVector(DF(), stride * src.height)) {
     float* RESTRICT sum = this->sum->data();
     for (size_t y = 0; y < src.height; ++y) {
       size_t src_row_offset = y * src.width;
@@ -144,7 +143,7 @@ void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
   const int32_t* RESTRICT rowOffset = stats_cache.row_offset->data();
   const float* RESTRICT sum = cache->uber->sum->data();
 
-  constexpr auto vf = VecTag<float>();
+  constexpr auto vf = DF();
   if (vf.N == 8) {
     auto tmp = zero(vf);
     for (size_t i = 0; i < count; ++i) {
@@ -400,13 +399,14 @@ class Fragment {
     if (best_score < 0.0f) {
       this->best_cost = -1.0f;
     } else {
+      constexpr const auto vi32 = AvxVecTag<int32_t>();
       DistanceRange distance_range;
       distance_range.update(region, best_angle_code * angle_mult, cp);
-      int32_t child_step = vecSize<int32_t>(region.len);
+      int32_t child_step = vecSize(vi32, region.len);
       this->left_child.reset(
-          new Fragment(allocVector<int32_t>(3 * child_step)));
+          new Fragment(allocVector(vi32, 3 * child_step)));
       this->right_child.reset(
-          new Fragment(allocVector<int32_t>(3 * child_step)));
+          new Fragment(allocVector(vi32, 3 * child_step)));
       Region::splitLine(region, best_angle_code * angle_mult,
                         distance_range.distance(best_line),
                         this->left_child->region.get(),
@@ -428,8 +428,9 @@ struct FragmentComparator {
 };
 
 static Fragment makeRoot(int32_t width, int32_t height) {
-  int32_t step = vecSize<int32_t>(height);
-  Owned<Vector<int32_t>> root = allocVector<int32_t>(3 * step);
+  constexpr const auto vi32 = AvxVecTag<int32_t>();
+  int32_t step = vecSize(vi32, height);
+  Owned<Vector<int32_t>> root = allocVector(vi32, 3 * step);
   int32_t* RESTRICT data = root->data();
   for (int32_t y = 0; y < height; ++y) {
     data[y] = y;
