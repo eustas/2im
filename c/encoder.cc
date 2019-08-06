@@ -153,8 +153,10 @@ void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
   constexpr auto vhf = SseVecTag<float>();
   if (vhf.N == 4) {
     auto tmp = zero(vhf);
-    for (size_t i = 0; i < count; ++i) {
-      tmp = add(vhf, tmp, load(vhf, sum + rowOffset[i] + 4 * region_x[i]));
+    for (size_t i = 0; i < count; i += 4) {
+      for (size_t j = 0; j < 4; ++j) {
+        tmp = add(vhf, tmp, load(vhf, sum + rowOffset[i + j] + 4 * region_x[i + j]));
+      }
     }
     store(tmp, vhf, dst->values);
   } else {
@@ -183,6 +185,13 @@ void INLINE SIMD StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
     x0[i] = data[step + i];
     x1[i] = data[2 * step + i];
     row_offset[i] = row * sum_stride;
+  }
+  while ((count & 3) != 0) {
+    y[count] = 0;
+    x0[count] = 0;
+    x1[count] = 0;
+    row_offset[count] = 0;
+    count++;
   }
   this->count = count;
 }
