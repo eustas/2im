@@ -20,15 +20,14 @@ class Cache;
 
 class Stats {
  public:
-  // r, g, b, pixel_count, r2, g2, b2, reserved
-  ALIGNED_32 float values[8];
+  // r, g, b, pixel_count
+  ALIGNED_16 float values[4];
 
   INLINE float rgb(size_t c) const { return values[c]; }
   INLINE float pixelCount() const { return values[3]; }
-  INLINE float rgb2(size_t c) const { return values[c + 4]; }
 
   INLINE void setEmpty() {
-    for (size_t i = 0; i < 8; ++i) values[i] = 0.0f;
+    for (size_t i = 0; i < 4; ++i) values[i] = 0.0f;
   }
 
   void delta(Cache* cache, int32_t* RESTRICT region_x);
@@ -37,11 +36,11 @@ class Stats {
   void update(Cache* cache);
 
   void INLINE copy(const Stats& other) {
-    for (size_t i = 0; i < 8; ++i) values[i] = other.values[i];
+    for (size_t i = 0; i < 4; ++i) values[i] = other.values[i];
   }
 
   void INLINE sub(const Stats& other) {
-    for (size_t i = 0; i < 8; ++i) values[i] -= other.values[i];
+    for (size_t i = 0; i < 4; ++i) values[i] -= other.values[i];
   }
 
   void INLINE update(const Stats& parent, const Stats& sibling) {
@@ -80,6 +79,7 @@ class StatsCache {
         x1(allocVector(DI32(), capacity)),
         x(allocVector(DI32(), capacity)) {}
 
+  template <bool SQ>
   static void sum(Cache* cache, int32_t* RESTRICT region_x, Stats* dst);
 
   void prepare(Cache* cache, Vector<int32_t>* region);
@@ -92,35 +92,40 @@ class UberCache {
   const size_t stride;
   /* Cumulative sums. Extra column with total sum. */
   Owned<Vector<float>> sum;
+  Owned<Vector<float>> sum2;
 
   using DF = AvxVecTag<float>;
+  using DHF = SseVecTag<float>;
 
   UberCache(const Image& src)
       : width(src.width),
         height(src.height),
-        stride(8 * (src.width + 1)),
-        sum(allocVector(DF(), stride * src.height)) {
+        stride(4 * (src.width + 1)),
+        sum(allocVector(DHF(), stride * src.height)),
+        sum2(allocVector(DHF(), stride * src.height)) {
     float* RESTRICT sum = this->sum->data();
+    float* RESTRICT sum2 = this->sum2->data();
     for (size_t y = 0; y < src.height; ++y) {
       size_t src_row_offset = y * src.width;
       const uint8_t* RESTRICT r_row = src.r.data() + src_row_offset;
       const uint8_t* RESTRICT g_row = src.g.data() + src_row_offset;
       const uint8_t* RESTRICT b_row = src.b.data() + src_row_offset;
       size_t dstRowOffset = y * stride;
-      for (size_t i = 0; i < 8; ++i) sum[dstRowOffset + i] = 0.0f;
+      for (size_t i = 0; i < 4; ++i) sum[dstRowOffset + i] = 0.0f;
+      for (size_t i = 0; i < 4; ++i) sum2[dstRowOffset + i] = 0.0f;
       for (size_t x = 0; x < src.width; ++x) {
-        size_t dstOffset = dstRowOffset + 8 * x;
+        size_t dstOffset = dstRowOffset + 4 * x;
         float r = r_row[x];
         float g = g_row[x];
         float b = b_row[x];
-        sum[dstOffset +  8] = sum[dstOffset + 0] + r;
-        sum[dstOffset +  9] = sum[dstOffset + 1] + g;
-        sum[dstOffset + 10] = sum[dstOffset + 2] + b;
-        sum[dstOffset + 11] = sum[dstOffset + 3] + 1.0f;
-        sum[dstOffset + 12] = sum[dstOffset + 4] + r * r;
-        sum[dstOffset + 13] = sum[dstOffset + 5] + g * g;
-        sum[dstOffset + 14] = sum[dstOffset + 6] + b * b;
-        sum[dstOffset + 15] = 0.0f;
+        sum[dstOffset + 4] = sum[dstOffset + 0] + r;
+        sum[dstOffset + 5] = sum[dstOffset + 1] + g;
+        sum[dstOffset + 6] = sum[dstOffset + 2] + b;
+        sum[dstOffset + 7] = sum[dstOffset + 3] + 1.0f;
+        sum2[dstOffset + 4] = sum2[dstOffset + 0] + r * r;
+        sum2[dstOffset + 5] = sum2[dstOffset + 1] + g * g;
+        sum2[dstOffset + 6] = sum2[dstOffset + 2] + b * b;
+        sum2[dstOffset + 7] = sum2[dstOffset + 3] + 1.0f;
       }
     }
   }
@@ -136,26 +141,28 @@ class Cache {
   Cache(const UberCache& uber) : uber(&uber), stats_cache(uber.height) {}
 };
 
+template <bool SQ>
 void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
-                            Stats* dst) {
+                                 Stats* dst) {
   StatsCache& stats_cache = cache->stats_cache;
   size_t count = stats_cache.count;
   const int32_t* RESTRICT rowOffset = stats_cache.row_offset->data();
-  const float* RESTRICT sum = cache->uber->sum->data();
+  const UberCache* uber = cache->uber;
+  const float* RESTRICT sum = SQ ? uber->sum2->data() : uber->sum->data();
 
-  constexpr auto vf = DF();
-  if (vf.N == 8) {
-    auto tmp = zero(vf);
+  constexpr auto vhf = SseVecTag<float>();
+  if (vhf.N == 4) {
+    auto tmp = zero(vhf);
     for (size_t i = 0; i < count; ++i) {
-      tmp = add(vf, tmp, load(vf, sum + rowOffset[i] + 8 * region_x[i]));
+      tmp = add(vhf, tmp, load(vhf, sum + rowOffset[i] + 4 * region_x[i]));
     }
-    store(tmp, vf, dst->values);
+    store(tmp, vhf, dst->values);
   } else {
     Stats tmp;
     tmp.setEmpty();
     for (size_t i = 0; i < count; ++i) {
-      int32_t offset = rowOffset[i] + 8 * region_x[i];
-      for (size_t j = 0; j < 8; ++j) tmp.values[j] += sum[offset + j];
+      int32_t offset = rowOffset[i] + 4 * region_x[i];
+      for (size_t j = 0; j < 4; ++j) tmp.values[j] += sum[offset + j];
     }
     dst->copy(tmp);
   }
@@ -178,16 +185,15 @@ void INLINE SIMD StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
     row_offset[i] = row * sum_stride;
   }
   this->count = count;
-  sum(cache, x1, &plus);
 }
 
 void INLINE SIMD Stats::delta(Cache* cache, int32_t* RESTRICT region_x) {
   StatsCache& stats_cache = cache->stats_cache;
   Stats& minus = stats_cache.minus;
-  StatsCache::sum(cache, region_x, &minus);
+  StatsCache::sum<false>(cache, region_x, &minus);
 
   Stats& plus = stats_cache.plus;
-  for (size_t i = 0; i < 8; ++i) values[i] = plus.values[i] - minus.values[i];
+  for (size_t i = 0; i < 4; ++i) values[i] = plus.values[i] - minus.values[i];
 }
 
 // Calculate stats from own region.
@@ -281,6 +287,7 @@ class Fragment {
   std::unique_ptr<Fragment> right_child;
 
   Stats stats;
+  Stats stats2;
 
   // Subdivision.
   int32_t level;
@@ -298,8 +305,28 @@ class Fragment {
   explicit Fragment(Owned<Vector<int32_t>>&& region)
       : region(std::move(region)) {}
 
+  void SIMD updateSqStats(Cache* cache) {
+    constexpr const auto vhf = SseVecTag<float>();
+    static_assert(vhf.N == 4, "SSE is required");
+    if (!left_child.get()) {
+      StatsCache& stats_cache = cache->stats_cache;
+      stats_cache.prepare(cache, region.get());
+      StatsCache::sum<true>(cache, stats_cache.x1->data(), &stats2);
+      const auto p = load(vhf, stats2.values);
+      StatsCache::sum<true>(cache, stats_cache.x0->data(), &stats2);
+      const auto m = load(vhf, stats2.values);
+      store(sub(vhf, p, m), vhf, stats2.values);
+    } else {
+      left_child->updateSqStats(cache);
+      right_child->updateSqStats(cache);
+      const auto l = load(vhf, left_child->stats2.values);
+      const auto r = load(vhf, right_child->stats2.values);
+      store(add(vhf, l, r), vhf, stats2.values);
+    }
+  }
+
   void INLINE encode(RangeEncoder* dst, const CodecParams& cp, bool is_leaf,
-              std::vector<Fragment*>* children) {
+                     std::vector<Fragment*>* children) {
     if (is_leaf) {
       RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
       for (size_t c = 0; c < 3; ++c) {
@@ -319,7 +346,7 @@ class Fragment {
   }
 
   float INLINE simulateEncode(CodecParams cp, bool is_leaf,
-                       std::vector<Fragment*>* children) {
+                              std::vector<Fragment*>* children) {
     float result = 0.0f;
     if (is_leaf) {
       for (size_t c = 0; c < 3; ++c) {
@@ -329,17 +356,17 @@ class Fragment {
         int32_t vq = CodecParams::dequantizeColor(v, q);
         // sum((vi - v)^2) == sum(vi^2 - 2 * vi * v + v^2)
         //                 == n * v^2 + sum(vi^2) - 2 * v * sum(vi)
-        result += stats.pixelCount() * vq * vq + stats.rgb2(c) -
+        result += stats.pixelCount() * vq * vq + stats2.rgb(c) -
                   2 * vq * stats.rgb(c);
       }
-      return result;
+    } else {
+      children->push_back(left_child.get());
+      children->push_back(right_child.get());
     }
-    children->push_back(left_child.get());
-    children->push_back(right_child.get());
-    return 0.0f;
+    return result;
   }
 
-  void INLINE findBestSubdivision(Cache* cache, CodecParams cp) {
+  void SIMD INLINE findBestSubdivision(Cache* cache, CodecParams cp) {
     Vector<int32_t>& region = *this->region.get();
     Stats& stats = this->stats;
     Stats* cache_stats = cache->stats;
@@ -349,7 +376,9 @@ class Fragment {
     int32_t best_angle_code = 0;
     int32_t best_line = 0;
     float best_score = -1.0f;
-    cache->stats_cache.prepare(cache, &region);
+    StatsCache& stats_cache = cache->stats_cache;
+    stats_cache.prepare(cache, &region);
+    StatsCache::sum<false>(cache, stats_cache.x1->data(), &stats_cache.plus);
     stats.update(cache);
 
     // Find subdivision
@@ -403,10 +432,8 @@ class Fragment {
       DistanceRange distance_range;
       distance_range.update(region, best_angle_code * angle_mult, cp);
       int32_t child_step = vecSize(vi32, region.len);
-      this->left_child.reset(
-          new Fragment(allocVector(vi32, 3 * child_step)));
-      this->right_child.reset(
-          new Fragment(allocVector(vi32, 3 * child_step)));
+      this->left_child.reset(new Fragment(allocVector(vi32, 3 * child_step)));
+      this->right_child.reset(new Fragment(allocVector(vi32, 3 * child_step)));
       Region::splitLine(region, best_angle_code * angle_mult,
                         distance_range.distance(best_line),
                         this->left_child->region.get(),
@@ -448,9 +475,10 @@ static Fragment makeRoot(int32_t width, int32_t height) {
  * Partition could be used to try multiple color quantizations to see, which one
  * gives the best result.
  */
-static INLINE std::vector<Fragment*> buildPartition(Fragment* root, size_t size_limit,
-                                             const CodecParams& cp,
-                                             Cache* cache) {
+static INLINE std::vector<Fragment*> buildPartition(Fragment* root,
+                                                    size_t size_limit,
+                                                    const CodecParams& cp,
+                                                    Cache* cache) {
   float tax =
       bitCost(NodeType::COUNT) + 3.0f * bitCost(CodecParams::makeColorQuant(0));
   float budget = size_limit * 8.0f - tax -
@@ -497,8 +525,8 @@ static INLINE std::unordered_set<Fragment*> subpartition(
 }
 
 static float INLINE simulateEncode(int32_t target_size,
-                            std::vector<Fragment*>& partition,
-                            const CodecParams& cp) {
+                                   std::vector<Fragment*>& partition,
+                                   const CodecParams& cp) {
   std::unordered_set<Fragment*> non_leaf =
       subpartition(target_size, partition, cp);
   std::vector<Fragment*> queue;
@@ -512,7 +540,6 @@ static float INLINE simulateEncode(int32_t target_size,
     result +=
         node->simulateEncode(cp, non_leaf.find(node) == non_leaf.end(), &queue);
   }
-
   return result;
 }
 
@@ -553,6 +580,7 @@ class SimulationTask {
     Fragment root = makeRoot(uber->width, uber->height);
     std::vector<Fragment*> partition =
         buildPartition(&root, target_size, cp, &cache);
+    root.updateSqStats(&cache);
     for (int32_t color_code = 0; color_code < CodecParams::kMaxColorCode;
          ++color_code) {
       cp.setColorCode(color_code);
@@ -584,9 +612,10 @@ std::vector<uint8_t> Encoder::encode(const Image& src, int32_t target_size) {
   futures.reserve(max_tasks);
   for (int32_t line_limit = 0; line_limit < CodecParams::kMaxLineLimit;
        ++line_limit) {
-    // if (line_limit != 17) continue;
     for (int32_t partition_code = 0;
          partition_code < CodecParams::kMaxPartitionCode; ++partition_code) {
+      // if (line_limit != 17) continue;
+      // if (partition_code != 0) continue;
       tasks.emplace_back(target_size, &uber);
       SimulationTask& task = tasks.back();
       task.cp.setPartitionCode(partition_code);

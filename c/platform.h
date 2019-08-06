@@ -42,6 +42,8 @@ void destroyVector(V* v) {
 
 }  // namespace
 
+#define TRAP() { uint8_t* _trap_ptr_ = nullptr; _trap_ptr_[0] = 0; }
+
 template <typename T>
 using Owned = std::unique_ptr<T, Deleter<T>>;
 
@@ -109,9 +111,15 @@ template <typename T>
 SIMD INLINE __m256i load(const Desc<T, 8>& /* tag */, const T* RESTRICT ptr) {
   return _mm256_load_si256(reinterpret_cast<const __m256i*>(ptr));
 }
+
 SIMD INLINE __m256 load(const Desc<float, 8>& /* tag */,
                         const float* RESTRICT ptr) {
   return _mm256_load_ps(ptr);
+}
+
+SIMD INLINE __m128 load(const Desc<float, 4>& /* tag */,
+                        const float* RESTRICT ptr) {
+  return _mm_load_ps(ptr);
 }
 
 // store
@@ -121,9 +129,15 @@ SIMD INLINE void store(const __m256i v, const Desc<T, 8>& /* tag */,
                        T* RESTRICT ptr) {
   _mm256_store_si256(reinterpret_cast<__m256i*>(ptr), v);
 }
+
 SIMD INLINE void store(const __m256 v, const Desc<float, 8>& /* tag */,
                        float* RESTRICT ptr) {
   _mm256_store_ps(ptr, v);
+}
+
+SIMD INLINE void store(const __m128 v, const Desc<float, 4>& /* tag */,
+                       float* RESTRICT ptr) {
+  _mm_store_ps(ptr, v);
 }
 
 // zero
@@ -135,6 +149,10 @@ SIMD INLINE __m256i zero(const Desc<T, 8>& /* tag */) {
 
 SIMD INLINE __m256 zero(const Desc<float, 8>& /* tag */) {
   return _mm256_setzero_ps();
+}
+
+SIMD INLINE __m128 zero(const Desc<float, 4>& /* tag */) {
+  return _mm_setzero_ps();
 }
 
 // set1
@@ -153,6 +171,18 @@ SIMD INLINE __m256i add(const Desc<int32_t, 8>& /* tag */, const __m256i a,
 SIMD INLINE __m256 add(const Desc<float, 8>& /* tag */, const __m256 a,
                        const __m256 b) {
   return _mm256_add_ps(a, b);
+}
+
+SIMD INLINE __m128 add(const Desc<float, 4>& /* tag */, const __m128 a,
+                       const __m128 b) {
+  return _mm_add_ps(a, b);
+}
+
+// sub
+
+SIMD INLINE __m128 sub(const Desc<float, 4>& /* tag */, const __m128 a,
+                       const __m128 b) {
+  return _mm_sub_ps(a, b);
 }
 
 }  // namespace twim
