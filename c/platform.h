@@ -161,6 +161,10 @@ SIMD INLINE __m256 set1(const Desc<float, 8>& /* tag */, const float t) {
   return _mm256_set1_ps(t);
 }
 
+SIMD INLINE __m128 set1(const Desc<float, 4>& /* tag */, const float t) {
+  return _mm_set1_ps(t);
+}
+
 // add
 
 SIMD INLINE __m256i add(const Desc<int32_t, 8>& /* tag */, const __m256i a,
@@ -183,6 +187,20 @@ SIMD INLINE __m128 add(const Desc<float, 4>& /* tag */, const __m128 a,
 SIMD INLINE __m128 sub(const Desc<float, 4>& /* tag */, const __m128 a,
                        const __m128 b) {
   return _mm_sub_ps(a, b);
+}
+
+// div
+
+SIMD INLINE __m128 div(const Desc<float, 4>& /* tag */, const __m128 a,
+                       const __m128 b) {
+  return _mm_div_ps(a, b);
+}
+
+// mul
+
+SIMD INLINE __m128 mul(const Desc<float, 4>& /* tag */, const __m128 a,
+                       const __m128 b) {
+  return _mm_mul_ps(a, b);
 }
 
 }  // namespace twim

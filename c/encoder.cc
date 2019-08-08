@@ -18,6 +18,17 @@ namespace {
 
 class Cache;
 
+constexpr auto kVHF = SseVecTag<float>();
+static_assert(kVHF.N == 4, "Expected vector size is 4");
+
+constexpr auto kVF = AvxVecTag<float>();
+static_assert(kVF.N == 8, "Expected vector size is 8");
+
+constexpr auto kVI32 = AvxVecTag<int32_t>();
+static_assert(kVI32.N == 8, "Expected vector size is 8");
+
+constexpr const size_t kStride = kVHF.N;
+
 class Stats {
  public:
   // r, g, b, pixel_count
@@ -26,26 +37,22 @@ class Stats {
   INLINE float rgb(size_t c) const { return values[c]; }
   INLINE float pixelCount() const { return values[3]; }
 
-  INLINE void setEmpty() {
-    for (size_t i = 0; i < 4; ++i) values[i] = 0.0f;
+  SIMD INLINE void zero() { store(::twim::zero(kVHF), kVHF, values); }
+
+  SIMD INLINE void add(const Stats& a, const Stats& b) {
+    const auto av = load(kVHF, a.values);
+    const auto bv = load(kVHF, b.values);
+    store(::twim::add(kVHF, av, bv), kVHF, values);
   }
 
-  void delta(Cache* cache, int32_t* RESTRICT region_x);
-
-  // Calculate stats from own region.
-  void update(Cache* cache);
-
-  void INLINE copy(const Stats& other) {
-    for (size_t i = 0; i < 4; ++i) values[i] = other.values[i];
+  SIMD INLINE void sub(const Stats& plus, const Stats& minus) {
+    const auto p = load(kVHF, plus.values);
+    const auto m = load(kVHF, minus.values);
+    store(::twim::sub(kVHF, p, m), kVHF, values);
   }
 
-  void INLINE sub(const Stats& other) {
-    for (size_t i = 0; i < 4; ++i) values[i] -= other.values[i];
-  }
-
-  void INLINE update(const Stats& parent, const Stats& sibling) {
-    copy(parent);
-    sub(sibling);
+  SIMD INLINE void copy(const Stats& other) {
+    store(load(kVHF, other.values), kVHF, values);
   }
 
   // y * ny >= d
@@ -69,17 +76,14 @@ class StatsCache {
   Owned<Vector<int32_t>> x1;
   Owned<Vector<int32_t>> x;
 
-  using DI32 = AvxVecTag<int32_t>;
-  using DF = AvxVecTag<float>;
-
   StatsCache(size_t capacity)
-      : row_offset(allocVector(DI32(), capacity)),
-        y(allocVector(DF(), capacity)),
-        x0(allocVector(DI32(), capacity)),
-        x1(allocVector(DI32(), capacity)),
-        x(allocVector(DI32(), capacity)) {}
+      : row_offset(allocVector(kVI32, capacity)),
+        y(allocVector(kVF, capacity)),
+        x0(allocVector(kVI32, capacity)),
+        x1(allocVector(kVI32, capacity)),
+        x(allocVector(kVI32, capacity)) {}
 
-  template <bool SQ>
+  template <bool SQ, bool ABS>
   static void sum(Cache* cache, int32_t* RESTRICT region_x, Stats* dst);
 
   void prepare(Cache* cache, Vector<int32_t>* region);
@@ -94,15 +98,12 @@ class UberCache {
   Owned<Vector<float>> sum;
   Owned<Vector<float>> sum2;
 
-  using DF = AvxVecTag<float>;
-  using DHF = SseVecTag<float>;
-
   UberCache(const Image& src)
       : width(src.width),
         height(src.height),
         stride(4 * (src.width + 1)),
-        sum(allocVector(DHF(), stride * src.height)),
-        sum2(allocVector(DHF(), stride * src.height)) {
+        sum(allocVector(kVHF, stride * src.height)),
+        sum2(allocVector(kVHF, stride * src.height)) {
     float* RESTRICT sum = this->sum->data();
     float* RESTRICT sum2 = this->sum2->data();
     for (size_t y = 0; y < src.height; ++y) {
@@ -141,7 +142,7 @@ class Cache {
   Cache(const UberCache& uber) : uber(&uber), stats_cache(uber.height) {}
 };
 
-template <bool SQ>
+template <bool SQ, bool ABS>
 void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
                                  Stats* dst) {
   StatsCache& stats_cache = cache->stats_cache;
@@ -151,23 +152,14 @@ void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
   const float* RESTRICT sum = SQ ? uber->sum2->data() : uber->sum->data();
 
   constexpr auto vhf = SseVecTag<float>();
-  if (vhf.N == 4) {
-    auto tmp = zero(vhf);
-    for (size_t i = 0; i < count; i += 4) {
-      for (size_t j = 0; j < 4; ++j) {
-        tmp = add(vhf, tmp, load(vhf, sum + rowOffset[i + j] + 4 * region_x[i + j]));
-      }
+  auto tmp = zero(vhf);
+  for (size_t i = 0; i < count; i += kStride) {
+    for (size_t j = 0; j < kStride; ++j) {
+      int32_t offset = ABS ? region_x[i + j] : (rowOffset[i + j] + 4 * region_x[i + j]);
+      tmp = add(vhf, tmp, load(vhf, sum + offset));
     }
-    store(tmp, vhf, dst->values);
-  } else {
-    Stats tmp;
-    tmp.setEmpty();
-    for (size_t i = 0; i < count; ++i) {
-      int32_t offset = rowOffset[i] + 4 * region_x[i];
-      for (size_t j = 0; j < 4; ++j) tmp.values[j] += sum[offset + j];
-    }
-    dst->copy(tmp);
   }
+  store(tmp, vhf, dst->values);
 }
 
 void INLINE SIMD StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
@@ -186,7 +178,7 @@ void INLINE SIMD StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
     x1[i] = data[2 * step + i];
     row_offset[i] = row * sum_stride;
   }
-  while ((count & 3) != 0) {
+  while ((count & (kStride - 1)) != 0) {
     y[count] = 0;
     x0[count] = 0;
     x1[count] = 0;
@@ -196,25 +188,12 @@ void INLINE SIMD StatsCache::prepare(Cache* cache, Vector<int32_t>* region) {
   this->count = count;
 }
 
-void INLINE SIMD Stats::delta(Cache* cache, int32_t* RESTRICT region_x) {
-  StatsCache& stats_cache = cache->stats_cache;
-  Stats& minus = stats_cache.minus;
-  StatsCache::sum<false>(cache, region_x, &minus);
-
-  Stats& plus = stats_cache.plus;
-  for (size_t i = 0; i < 4; ++i) values[i] = plus.values[i] - minus.values[i];
-}
-
-// Calculate stats from own region.
-void INLINE Stats::update(Cache* cache) {
-  delta(cache, cache->stats_cache.x0->data());
-}
-
 void INLINE Stats::updateGeHorizontal(Cache* cache, int32_t d) {
   int32_t ny = SinCos::kCos[0];
-  float dny = d / (float)ny;
+  float dny = d / (float)ny;  // TODO: precalculate
   StatsCache& stats_cache = cache->stats_cache;
   size_t count = stats_cache.count;
+  int32_t* RESTRICT row_offset = stats_cache.row_offset->data();
   float* RESTRICT region_y = stats_cache.y->data();
   int32_t* RESTRICT region_x0 = stats_cache.x0->data();
   int32_t* RESTRICT region_x1 = stats_cache.x1->data();
@@ -222,9 +201,11 @@ void INLINE Stats::updateGeHorizontal(Cache* cache, int32_t d) {
 
   for (size_t i = 0; i < count; i++) {
     float y = region_y[i];
+    int32_t offset = row_offset[i];
     int32_t x0 = region_x0[i];
     int32_t x1 = region_x1[i];
-    region_x[i] = (y < dny) ? x1 : x0;
+    int32_t xx = (y < dny) ? x1 : x0;
+    region_x[i] = offset + 4 * xx;
   }
 }
 
@@ -234,18 +215,22 @@ void INLINE Stats::updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   float dnx = (2 * d + nx) / (float)(2 * nx);
   float mnynx = -(2 * ny) / (float)(2 * nx);
   StatsCache& stats_cache = cache->stats_cache;
-  size_t count = stats_cache.count;
+  int32_t* RESTRICT row_offset = stats_cache.row_offset->data();
   float* RESTRICT region_y = stats_cache.y->data();
   int32_t* RESTRICT region_x0 = stats_cache.x0->data();
   int32_t* RESTRICT region_x1 = stats_cache.x1->data();
   int32_t* RESTRICT region_x = stats_cache.x->data();
 
+  size_t count = stats_cache.count & ~(kStride - 1);
   for (size_t i = 0; i < count; i++) {
     float y = region_y[i];
-    int32_t xf = static_cast<int32_t>(y * mnynx + dnx);  // FMA
+    int32_t offset = row_offset[i];
+    float xf = y * mnynx + dnx;  // FMA
+    int32_t xi = static_cast<int32_t>(xf);
     int32_t x0 = region_x0[i];
     int32_t x1 = region_x1[i];
-    region_x[i] = (x1 > xf) ? ((xf > x0) ? xf : x0) : x1;
+    int32_t xx = (x1 > xi) ? ((xi > x0) ? xi : x0) : x1;
+    region_x[i] = offset + 4 * xx;
   }
 }
 
@@ -255,21 +240,41 @@ void INLINE Stats::updateGe(Cache* cache, int angle, int d) {
   } else {
     updateGeGeneric(cache, angle, d);
   }
-  delta(cache, cache->stats_cache.x->data());
 }
 
-static INLINE float score(const Stats& whole, const Stats& part) {
-  if (part.pixelCount() <= 0.0f) return 0.0f;
-  float result = 0.0f;
-  const float inv_whole_pixel_count = 1.0f / whole.pixelCount();
-  const float inv_part_pixel_count = 1.0f / part.pixelCount();
-  for (size_t c = 0; c < 3; ++c) {
-    float whole_average = whole.rgb(c) * inv_whole_pixel_count;
-    float part_average = part.rgb(c) * inv_part_pixel_count;
-    float plus = whole_average + part_average;
-    float minus = whole_average - part_average;
-    result += minus * (part.pixelCount() * plus - 2.0f * part.rgb(c));
-  }
+static SIMD INLINE float score(const Stats& whole, const Stats& left, const Stats& right) {
+  if ((left.pixelCount() <= 0.0f) || (right.pixelCount() <= 0.0f)) return 0.0f;
+
+  const auto k2 = set1(kVHF, 2.0f);
+  const auto whole_values = load(kVHF, whole.values);
+  const auto whole_pixel_count = set1(kVHF, whole.pixelCount());
+  const auto whole_average = div(kVHF, whole_values, whole_pixel_count);
+
+  const auto left_values = load(kVHF, left.values);
+  const auto left_pixel_count = set1(kVHF, left.pixelCount());
+  const auto left_average = div(kVHF, left_values, left_pixel_count);
+  const auto left_plus = add(kVHF, whole_average, left_average);
+  const auto left_minus = sub(kVHF, whole_average, left_average);
+  const auto left_a = mul(kVHF, left_pixel_count, left_plus);
+  const auto left_b = mul(kVHF, k2, left_values);
+  const auto left_sum = mul(kVHF, left_minus, sub(kVHF, left_a, left_b));
+
+  const auto right_values = load(kVHF, right.values);
+  const auto right_pixel_count = set1(kVHF, right.pixelCount());
+  const auto right_average = div(kVHF, right_values, right_pixel_count);
+  const auto right_plus = add(kVHF, whole_average, right_average);
+  const auto right_minus = sub(kVHF, whole_average, right_average);
+  const auto right_a = mul(kVHF, right_pixel_count, right_plus);
+  const auto right_b = mul(kVHF, k2, right_values);
+  const auto right_sum = mul(kVHF, right_minus, sub(kVHF, right_a, right_b));
+
+  auto sum = _mm_hadd_ps(left_sum, right_sum);
+  sum = _mm_hadd_ps(sum, sum);
+  sum = _mm_hadd_ps(sum, sum);
+
+  float result;
+  _mm_store_ss(&result, sum);
+
   return result;
 }
 
@@ -314,23 +319,17 @@ class Fragment {
   explicit Fragment(Owned<Vector<int32_t>>&& region)
       : region(std::move(region)) {}
 
-  void SIMD updateSqStats(Cache* cache) {
-    constexpr const auto vhf = SseVecTag<float>();
-    static_assert(vhf.N == 4, "SSE is required");
+  SIMD void updateSqStats(Cache* cache) {
     if (!left_child.get()) {
       StatsCache& stats_cache = cache->stats_cache;
       stats_cache.prepare(cache, region.get());
-      StatsCache::sum<true>(cache, stats_cache.x1->data(), &stats2);
-      const auto p = load(vhf, stats2.values);
-      StatsCache::sum<true>(cache, stats_cache.x0->data(), &stats2);
-      const auto m = load(vhf, stats2.values);
-      store(sub(vhf, p, m), vhf, stats2.values);
+      StatsCache::sum<true, false>(cache, stats_cache.x1->data(), &stats_cache.plus);
+      StatsCache::sum<true, false>(cache, stats_cache.x0->data(), &stats_cache.minus);
+      stats2.sub(stats_cache.plus, stats_cache.minus);
     } else {
       left_child->updateSqStats(cache);
       right_child->updateSqStats(cache);
-      const auto l = load(vhf, left_child->stats2.values);
-      const auto r = load(vhf, right_child->stats2.values);
-      store(add(vhf, l, r), vhf, stats2.values);
+      stats2.add(left_child->stats2, right_child->stats2);
     }
   }
 
@@ -387,8 +386,9 @@ class Fragment {
     float best_score = -1.0f;
     StatsCache& stats_cache = cache->stats_cache;
     stats_cache.prepare(cache, &region);
-    StatsCache::sum<false>(cache, stats_cache.x1->data(), &stats_cache.plus);
-    stats.update(cache);
+    StatsCache::sum<false, false>(cache, stats_cache.x1->data(), &stats_cache.plus);
+    StatsCache::sum<false, false>(cache, stats_cache.x0->data(), &stats_cache.minus);
+    stats.sub(stats_cache.plus, stats_cache.minus);
 
     // Find subdivision
     for (int32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
@@ -396,10 +396,11 @@ class Fragment {
       DistanceRange distance_range;
       distance_range.update(region, angle, cp);
       int32_t num_lines = distance_range.num_lines;
-      cache_stats[0].setEmpty();
+      cache_stats[0].zero();
       for (int32_t line = 0; line < num_lines; ++line) {
-        cache_stats[line + 1].updateGe(cache, angle,
-                                       distance_range.distance(line));
+        cache_stats[line + 1].updateGe(cache, angle, distance_range.distance(line));
+        StatsCache::sum<false, true>(cache, stats_cache.x->data(), &stats_cache.minus);
+        cache_stats[line + 1].sub(stats_cache.plus, stats_cache.minus);
       }
       cache_stats[num_lines + 1].copy(stats);
 
@@ -408,19 +409,18 @@ class Fragment {
         constexpr const float kLocalWeight = 0.0f;
         if (kLocalWeight > 0.0f) {
           Stats band;
-          band.update(cache_stats[line + 2], cache_stats[line]);
+          band.sub(cache_stats[line + 2], cache_stats[line]);
           Stats left;
-          left.update(band, cache_stats[line + 1]);
+          left.sub(band, cache_stats[line + 1]);
           Stats right;
-          right.update(band, left);
-          full_score += 0.0f * (score(band, left) + score(band, right));
+          right.sub(band, left);
+          full_score += kLocalWeight * (score(band, left, right));
         }
 
         {
           Stats right;
-          right.update(stats, cache_stats[line + 1]);
-          full_score += 1.0f * (score(stats, cache_stats[line + 1]) +
-                                score(stats, right));
+          right.sub(stats, cache_stats[line + 1]);
+          full_score += score(stats, cache_stats[line + 1], right);
         }
 
         if (full_score > best_score) {
@@ -437,12 +437,11 @@ class Fragment {
     if (best_score < 0.0f) {
       this->best_cost = -1.0f;
     } else {
-      constexpr const auto vi32 = AvxVecTag<int32_t>();
       DistanceRange distance_range;
       distance_range.update(region, best_angle_code * angle_mult, cp);
-      int32_t child_step = vecSize(vi32, region.len);
-      this->left_child.reset(new Fragment(allocVector(vi32, 3 * child_step)));
-      this->right_child.reset(new Fragment(allocVector(vi32, 3 * child_step)));
+      int32_t child_step = vecSize(kVI32, region.len);
+      this->left_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
+      this->right_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
       Region::splitLine(region, best_angle_code * angle_mult,
                         distance_range.distance(best_line),
                         this->left_child->region.get(),
