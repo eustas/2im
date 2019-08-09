@@ -155,7 +155,8 @@ void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
   auto tmp = zero(vhf);
   for (size_t i = 0; i < count; i += kStride) {
     for (size_t j = 0; j < kStride; ++j) {
-      int32_t offset = ABS ? region_x[i + j] : (rowOffset[i + j] + 4 * region_x[i + j]);
+      int32_t offset =
+          ABS ? region_x[i + j] : (rowOffset[i + j] + 4 * region_x[i + j]);
       tmp = add(vhf, tmp, load(vhf, sum + offset));
     }
   }
@@ -242,7 +243,8 @@ void INLINE Stats::updateGe(Cache* cache, int angle, int d) {
   }
 }
 
-static SIMD INLINE float score(const Stats& whole, const Stats& left, const Stats& right) {
+static SIMD INLINE float score(const Stats& whole, const Stats& left,
+                               const Stats& right) {
   if ((left.pixelCount() <= 0.0f) || (right.pixelCount() <= 0.0f)) return 0.0f;
 
   const auto k2 = set1(kVHF, 2.0f);
@@ -323,8 +325,10 @@ class Fragment {
     if (!left_child.get()) {
       StatsCache& stats_cache = cache->stats_cache;
       stats_cache.prepare(cache, region.get());
-      StatsCache::sum<true, false>(cache, stats_cache.x1->data(), &stats_cache.plus);
-      StatsCache::sum<true, false>(cache, stats_cache.x0->data(), &stats_cache.minus);
+      StatsCache::sum<true, false>(cache, stats_cache.x1->data(),
+                                   &stats_cache.plus);
+      StatsCache::sum<true, false>(cache, stats_cache.x0->data(),
+                                   &stats_cache.minus);
       stats2.sub(stats_cache.plus, stats_cache.minus);
     } else {
       left_child->updateSqStats(cache);
@@ -386,8 +390,10 @@ class Fragment {
     float best_score = -1.0f;
     StatsCache& stats_cache = cache->stats_cache;
     stats_cache.prepare(cache, &region);
-    StatsCache::sum<false, false>(cache, stats_cache.x1->data(), &stats_cache.plus);
-    StatsCache::sum<false, false>(cache, stats_cache.x0->data(), &stats_cache.minus);
+    StatsCache::sum<false, false>(cache, stats_cache.x1->data(),
+                                  &stats_cache.plus);
+    StatsCache::sum<false, false>(cache, stats_cache.x0->data(),
+                                  &stats_cache.minus);
     stats.sub(stats_cache.plus, stats_cache.minus);
 
     // Find subdivision
@@ -398,8 +404,10 @@ class Fragment {
       int32_t num_lines = distance_range.num_lines;
       cache_stats[0].zero();
       for (int32_t line = 0; line < num_lines; ++line) {
-        cache_stats[line + 1].updateGe(cache, angle, distance_range.distance(line));
-        StatsCache::sum<false, true>(cache, stats_cache.x->data(), &stats_cache.minus);
+        cache_stats[line + 1].updateGe(cache, angle,
+                                       distance_range.distance(line));
+        StatsCache::sum<false, true>(cache, stats_cache.x->data(),
+                                     &stats_cache.minus);
         cache_stats[line + 1].sub(stats_cache.plus, stats_cache.minus);
       }
       cache_stats[num_lines + 1].copy(stats);
@@ -483,10 +491,8 @@ static Fragment makeRoot(int32_t width, int32_t height) {
  * Partition could be used to try multiple color quantizations to see, which one
  * gives the best result.
  */
-static INLINE std::vector<Fragment*> buildPartition(Fragment* root,
-                                                    size_t size_limit,
-                                                    const CodecParams& cp,
-                                                    Cache* cache) {
+static SIMD NOINLINE std::vector<Fragment*> buildPartition(
+    Fragment* root, size_t size_limit, const CodecParams& cp, Cache* cache) {
   float tax =
       bitCost(NodeType::COUNT) + 3.0f * bitCost(CodecParams::makeColorQuant(0));
   float budget = size_limit * 8.0f - tax -
