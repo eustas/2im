@@ -42,7 +42,11 @@ void destroyVector(V* v) {
 
 }  // namespace
 
-#define TRAP() { uint8_t* _trap_ptr_ = nullptr; _trap_ptr_[0] = 0; }
+#define TRAP()                     \
+  {                                \
+    uint8_t* _trap_ptr_ = nullptr; \
+    _trap_ptr_[0] = 0;             \
+  }
 
 template <typename T>
 using Owned = std::unique_ptr<T, Deleter<T>>;
@@ -117,6 +121,11 @@ SIMD INLINE __m256 load(const Desc<float, 8>& /* tag */,
   return _mm256_load_ps(ptr);
 }
 
+template <typename T>
+SIMD INLINE __m128i load(const Desc<T, 4>& /* tag */, const T* RESTRICT ptr) {
+  return _mm_load_si128(reinterpret_cast<const __m128i*>(ptr));
+}
+
 SIMD INLINE __m128 load(const Desc<float, 4>& /* tag */,
                         const float* RESTRICT ptr) {
   return _mm_load_ps(ptr);
@@ -138,6 +147,12 @@ SIMD INLINE void store(const __m256 v, const Desc<float, 8>& /* tag */,
 SIMD INLINE void store(const __m128 v, const Desc<float, 4>& /* tag */,
                        float* RESTRICT ptr) {
   _mm_store_ps(ptr, v);
+}
+
+template <typename T>
+SIMD INLINE void store(const __m128i v, const Desc<T, 4>& /* tag */,
+                       T* RESTRICT ptr) {
+  _mm_store_si128(reinterpret_cast<__m128i*>(ptr), v);
 }
 
 // zero
@@ -165,6 +180,10 @@ SIMD INLINE __m128 set1(const Desc<float, 4>& /* tag */, const float t) {
   return _mm_set1_ps(t);
 }
 
+SIMD INLINE __m128i set1(const Desc<int32_t, 4>& /* tag */, const int32_t t) {
+  return _mm_set1_epi32(t);
+}
+
 // add
 
 SIMD INLINE __m256i add(const Desc<int32_t, 8>& /* tag */, const __m256i a,
@@ -180,6 +199,11 @@ SIMD INLINE __m256 add(const Desc<float, 8>& /* tag */, const __m256 a,
 SIMD INLINE __m128 add(const Desc<float, 4>& /* tag */, const __m128 a,
                        const __m128 b) {
   return _mm_add_ps(a, b);
+}
+
+SIMD INLINE __m128i add(const Desc<int32_t, 4>& /* tag */, const __m128i a,
+                        const __m128i b) {
+  return _mm_add_epi32(a, b);
 }
 
 // sub
@@ -201,6 +225,32 @@ SIMD INLINE __m128 div(const Desc<float, 4>& /* tag */, const __m128 a,
 SIMD INLINE __m128 mul(const Desc<float, 4>& /* tag */, const __m128 a,
                        const __m128 b) {
   return _mm_mul_ps(a, b);
+}
+
+SIMD INLINE __m128i mul(const Desc<int32_t, 4>& /* tag */, const __m128i a,
+                        const __m128i b) {
+  return _mm_mullo_epi32(a, b);
+}
+
+// cast
+
+SIMD INLINE __m128i cast(const Desc<float, 4>& /* from */,
+                         const Desc<int32_t, 4>& /* to */, const __m128 a) {
+  return _mm_cvttps_epi32(a);
+}
+
+// max
+
+SIMD INLINE __m128i max(const Desc<int32_t, 4>& /* tag */, const __m128i a,
+                        const __m128i b) {
+  return _mm_max_epi32(a, b);
+}
+
+// min
+
+SIMD INLINE __m128i min(const Desc<int32_t, 4>& /* tag */, const __m128i a,
+                        const __m128i b) {
+  return _mm_min_epi32(a, b);
 }
 
 }  // namespace twim

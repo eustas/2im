@@ -21,6 +21,9 @@ class Cache;
 constexpr auto kVHF = SseVecTag<float>();
 static_assert(kVHF.N == 4, "Expected vector size is 4");
 
+constexpr auto kVHI32 = SseVecTag<int32_t>();
+static_assert(kVHI32.N == 4, "Expected vector size is 4");
+
 constexpr auto kVF = AvxVecTag<float>();
 static_assert(kVF.N == 8, "Expected vector size is 8");
 
@@ -205,12 +208,13 @@ void INLINE Stats::updateGeHorizontal(Cache* cache, int32_t d) {
     int32_t offset = row_offset[i];
     int32_t x0 = region_x0[i];
     int32_t x1 = region_x1[i];
-    int32_t xx = (y < dny) ? x1 : x0;
-    region_x[i] = offset + 4 * xx;
+    int32_t x = (y < dny) ? x1 : x0;
+    int32_t x_off = 4 * x + offset;
+    region_x[i] = x_off;
   }
 }
 
-void INLINE Stats::updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
+SIMD INLINE void Stats::updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   int32_t nx = SinCos::kSin[angle];
   int32_t ny = SinCos::kCos[angle];
   float dnx = (2 * d + nx) / (float)(2 * nx);
@@ -222,20 +226,26 @@ void INLINE Stats::updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   int32_t* RESTRICT region_x1 = stats_cache.x1->data();
   int32_t* RESTRICT region_x = stats_cache.x->data();
 
-  size_t count = stats_cache.count & ~(kStride - 1);
-  for (size_t i = 0; i < count; i++) {
-    float y = region_y[i];
-    int32_t offset = row_offset[i];
-    float xf = y * mnynx + dnx;  // FMA
-    int32_t xi = static_cast<int32_t>(xf);
-    int32_t x0 = region_x0[i];
-    int32_t x1 = region_x1[i];
-    int32_t xx = (x1 > xi) ? ((xi > x0) ? xi : x0) : x1;
-    region_x[i] = offset + 4 * xx;
+  const auto& vf = kVHF;
+  const auto& vi32 = kVHI32;
+  const auto k4 = set1(vi32, 4);
+  const auto dnx_ = set1(vf, dnx);
+  const auto mnynx_ = set1(vf, mnynx);
+  const size_t count = stats_cache.count;
+  for (size_t i = 0; i < count; i += kStride) {
+    const auto y = load(vf, region_y + i);
+    const auto offset = load(vi32, row_offset + i);
+    const auto xf = ::twim::add(vf, mul(vf, y, mnynx_), dnx_);
+    const auto xi = cast(vf, vi32, xf);
+    const auto x0 = load(vi32, region_x0 + i);
+    const auto x1 = load(vi32, region_x1 + i);
+    const auto x = min(vi32, x1, max(vi32, xi, x0));
+    const auto x_off = ::twim::add(vi32, mul(vi32, k4, x), offset);
+    store(x_off, vi32, region_x + i);
   }
 }
 
-void INLINE Stats::updateGe(Cache* cache, int angle, int d) {
+SIMD INLINE void Stats::updateGe(Cache* cache, int angle, int d) {
   if (angle == 0) {
     updateGeHorizontal(cache, d);
   } else {
