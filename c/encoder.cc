@@ -150,7 +150,7 @@ void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
                                  Stats* dst) {
   StatsCache& stats_cache = cache->stats_cache;
   size_t count = stats_cache.count;
-  const int32_t* RESTRICT rowOffset = stats_cache.row_offset->data();
+  const int32_t* RESTRICT row_offset = stats_cache.row_offset->data();
   const UberCache* uber = cache->uber;
   const float* RESTRICT sum = SQ ? uber->sum2->data() : uber->sum->data();
 
@@ -232,7 +232,7 @@ SIMD INLINE void Stats::updateGeGeneric(Cache* cache, int32_t angle, int32_t d) 
   const auto dnx_ = set1(vf, dnx);
   const auto mnynx_ = set1(vf, mnynx);
   const size_t count = stats_cache.count;
-  for (size_t i = 0; i < count; i += kStride) {
+  for (size_t i = 0; i < count; i += vf.N) {
     const auto y = load(vf, region_y + i);
     const auto offset = load(vi32, row_offset + i);
     const auto xf = ::twim::add(vf, mul(vf, y, mnynx_), dnx_);
