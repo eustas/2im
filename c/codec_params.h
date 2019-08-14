@@ -42,7 +42,7 @@ class CodecParams {
   }
 
   static constexpr int32_t dequantizeColor(int32_t v, int32_t q) {
-    return (255 * v + q - 2) / (q - 1);
+    return 255 * v / (q - 1);
   }
 
  private:

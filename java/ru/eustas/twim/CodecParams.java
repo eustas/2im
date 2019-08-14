@@ -25,7 +25,8 @@ class CodecParams {
   }
 
   static int dequantizeColor(int v, int q) {
-    return (255 * v + q - 2) / (q - 1);
+    int vMax = q - 1;
+    return 255 * v / vMax;
   }
 
   private static final int SCALE_STEP_FACTOR = 40;

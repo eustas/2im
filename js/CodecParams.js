@@ -120,7 +120,7 @@ export let getLevel = (region) => {
  * @param{number} q
  * @return{number}
  */
-export let dequantizeColor = (v, q) => ((255 * v + q - 2) / (q - 1)) | 0;
+export let dequantizeColor = (v, q) => (255 * v / (q - 1)) | 0;
 
 /** @const @type{number} */
 export let MAX_CODE = MAX_PARTITION_CODE * MAX_COLOR_CODE;

@@ -429,7 +429,7 @@ public class Encoder {
           // sum((vi - v)^2) = sum(vi^2 - 2 * vi * v + v^2) = n * v^2 + sum(vi^2) - 2 * v * sum(vi)
           int q = cp.colorQuant;
           int d = 255 * stats.pixelCount;
-          int v = (2 *  (q - 1) * stats.rgb[c] + d) / (2 * d);
+          int v = (2 * (q - 1) * stats.rgb[c] + d) / (2 * d);
           int vq = CodecParams.dequantizeColor(v, q);
           sqe[c] += stats.pixelCount * vq * vq + stats.rgb2[c] - 2 * vq * stats.rgb[c];
         }

@@ -86,7 +86,7 @@ class StatsCache {
         x1(allocVector(kVI32, capacity)),
         x(allocVector(kVI32, capacity)) {}
 
-  template <bool SQ, bool ABS>
+  template <bool ABS>
   static void sum(Cache* cache, int32_t* RESTRICT region_x, Stats* dst);
 
   void prepare(Cache* cache, Vector<int32_t>* region);
@@ -99,24 +99,23 @@ class UberCache {
   const size_t stride;
   /* Cumulative sums. Extra column with total sum. */
   Owned<Vector<float>> sum;
-  Owned<Vector<float>> sum2;
+
+  float rgb2[3] = {0.0f};
 
   UberCache(const Image& src)
       : width(src.width),
         height(src.height),
         stride(4 * (src.width + 1)),
-        sum(allocVector(kVHF, stride * src.height)),
-        sum2(allocVector(kVHF, stride * src.height)) {
+        sum(allocVector(kVHF, stride * src.height)) {
     float* RESTRICT sum = this->sum->data();
-    float* RESTRICT sum2 = this->sum2->data();
     for (size_t y = 0; y < src.height; ++y) {
+      float row_rgb2[3] = {0.0f};
       size_t src_row_offset = y * src.width;
       const uint8_t* RESTRICT r_row = src.r.data() + src_row_offset;
       const uint8_t* RESTRICT g_row = src.g.data() + src_row_offset;
       const uint8_t* RESTRICT b_row = src.b.data() + src_row_offset;
       size_t dstRowOffset = y * stride;
       for (size_t i = 0; i < 4; ++i) sum[dstRowOffset + i] = 0.0f;
-      for (size_t i = 0; i < 4; ++i) sum2[dstRowOffset + i] = 0.0f;
       for (size_t x = 0; x < src.width; ++x) {
         size_t dstOffset = dstRowOffset + 4 * x;
         float r = r_row[x];
@@ -126,11 +125,11 @@ class UberCache {
         sum[dstOffset + 5] = sum[dstOffset + 1] + g;
         sum[dstOffset + 6] = sum[dstOffset + 2] + b;
         sum[dstOffset + 7] = sum[dstOffset + 3] + 1.0f;
-        sum2[dstOffset + 4] = sum2[dstOffset + 0] + r * r;
-        sum2[dstOffset + 5] = sum2[dstOffset + 1] + g * g;
-        sum2[dstOffset + 6] = sum2[dstOffset + 2] + b * b;
-        sum2[dstOffset + 7] = sum2[dstOffset + 3] + 1.0f;
+        row_rgb2[0] += r * r;
+        row_rgb2[1] += g * g;
+        row_rgb2[2] += b * b;
       }
+      for (size_t c = 0; c < 3; ++c) rgb2[c] += row_rgb2[c];
     }
   }
 };
@@ -145,21 +144,20 @@ class Cache {
   Cache(const UberCache& uber) : uber(&uber), stats_cache(uber.height) {}
 };
 
-template <bool SQ, bool ABS>
+template <bool ABS>
 void INLINE SIMD StatsCache::sum(Cache* cache, int32_t* RESTRICT region_x,
                                  Stats* dst) {
   StatsCache& stats_cache = cache->stats_cache;
   size_t count = stats_cache.count;
   const int32_t* RESTRICT row_offset = stats_cache.row_offset->data();
-  const UberCache* uber = cache->uber;
-  const float* RESTRICT sum = SQ ? uber->sum2->data() : uber->sum->data();
+  const float* RESTRICT sum = cache->uber->sum->data();
 
   constexpr auto vhf = SseVecTag<float>();
   auto tmp = zero(vhf);
   for (size_t i = 0; i < count; i += kStride) {
     for (size_t j = 0; j < kStride; ++j) {
       int32_t offset =
-          ABS ? region_x[i + j] : (rowOffset[i + j] + 4 * region_x[i + j]);
+          ABS ? region_x[i + j] : (row_offset[i + j] + 4 * region_x[i + j]);
       tmp = add(vhf, tmp, load(vhf, sum + offset));
     }
   }
@@ -214,7 +212,8 @@ void INLINE Stats::updateGeHorizontal(Cache* cache, int32_t d) {
   }
 }
 
-SIMD INLINE void Stats::updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
+SIMD INLINE void Stats::updateGeGeneric(Cache* cache, int32_t angle,
+                                        int32_t d) {
   int32_t nx = SinCos::kSin[angle];
   int32_t ny = SinCos::kCos[angle];
   float dnx = (2 * d + nx) / (float)(2 * nx);
@@ -331,22 +330,6 @@ class Fragment {
   explicit Fragment(Owned<Vector<int32_t>>&& region)
       : region(std::move(region)) {}
 
-  SIMD void updateSqStats(Cache* cache) {
-    if (!left_child.get()) {
-      StatsCache& stats_cache = cache->stats_cache;
-      stats_cache.prepare(cache, region.get());
-      StatsCache::sum<true, false>(cache, stats_cache.x1->data(),
-                                   &stats_cache.plus);
-      StatsCache::sum<true, false>(cache, stats_cache.x0->data(),
-                                   &stats_cache.minus);
-      stats2.sub(stats_cache.plus, stats_cache.minus);
-    } else {
-      left_child->updateSqStats(cache);
-      right_child->updateSqStats(cache);
-      stats2.add(left_child->stats2, right_child->stats2);
-    }
-  }
-
   void INLINE encode(RangeEncoder* dst, const CodecParams& cp, bool is_leaf,
                      std::vector<Fragment*>* children) {
     if (is_leaf) {
@@ -367,27 +350,6 @@ class Fragment {
     children->push_back(right_child.get());
   }
 
-  float INLINE simulateEncode(CodecParams cp, bool is_leaf,
-                              std::vector<Fragment*>* children) {
-    float result = 0.0f;
-    if (is_leaf) {
-      for (size_t c = 0; c < 3; ++c) {
-        int32_t q = cp.color_quant;
-        int32_t d = 255 * stats.pixelCount();
-        int32_t v = (2 * (q - 1) * stats.rgb(c) + d) / (2 * d);
-        int32_t vq = CodecParams::dequantizeColor(v, q);
-        // sum((vi - v)^2) == sum(vi^2 - 2 * vi * v + v^2)
-        //                 == n * v^2 + sum(vi^2) - 2 * v * sum(vi)
-        result += stats.pixelCount() * vq * vq + stats2.rgb(c) -
-                  2 * vq * stats.rgb(c);
-      }
-    } else {
-      children->push_back(left_child.get());
-      children->push_back(right_child.get());
-    }
-    return result;
-  }
-
   void SIMD INLINE findBestSubdivision(Cache* cache, CodecParams cp) {
     Vector<int32_t>& region = *this->region.get();
     Stats& stats = this->stats;
@@ -400,10 +362,8 @@ class Fragment {
     float best_score = -1.0f;
     StatsCache& stats_cache = cache->stats_cache;
     stats_cache.prepare(cache, &region);
-    StatsCache::sum<false, false>(cache, stats_cache.x1->data(),
-                                  &stats_cache.plus);
-    StatsCache::sum<false, false>(cache, stats_cache.x0->data(),
-                                  &stats_cache.minus);
+    StatsCache::sum<false>(cache, stats_cache.x1->data(), &stats_cache.plus);
+    StatsCache::sum<false>(cache, stats_cache.x0->data(), &stats_cache.minus);
     stats.sub(stats_cache.plus, stats_cache.minus);
 
     // Find subdivision
@@ -416,8 +376,7 @@ class Fragment {
       for (int32_t line = 0; line < num_lines; ++line) {
         cache_stats[line + 1].updateGe(cache, angle,
                                        distance_range.distance(line));
-        StatsCache::sum<false, true>(cache, stats_cache.x->data(),
-                                     &stats_cache.minus);
+        StatsCache::sum<true>(cache, stats_cache.x->data(), &stats_cache.minus);
         cache_stats[line + 1].sub(stats_cache.plus, stats_cache.minus);
       }
       cache_stats[num_lines + 1].copy(stats);
@@ -548,22 +507,54 @@ static INLINE std::unordered_set<Fragment*> subpartition(
   return non_leaf;
 }
 
-static float INLINE simulateEncode(int32_t target_size,
-                                   std::vector<Fragment*>& partition,
-                                   const CodecParams& cp) {
+SIMD NOINLINE static float simulateEncode(int32_t target_size,
+                                          std::vector<Fragment*>& partition,
+                                          const CodecParams& cp) {
   std::unordered_set<Fragment*> non_leaf =
       subpartition(target_size, partition, cp);
-  std::vector<Fragment*> queue;
-  queue.reserve(2 * non_leaf.size() + 1);
-  queue.push_back(partition[0]);
-
-  float result = 0.0f;
-  size_t encoded = 0;
-  while (encoded < queue.size()) {
-    Fragment* node = queue[encoded++];
-    result +=
-        node->simulateEncode(cp, non_leaf.find(node) == non_leaf.end(), &queue);
+  size_t leaf_count = non_leaf.size() + 1;
+  Owned<Vector<float>> storage = allocVector(kVHF, 4 * leaf_count);
+  float* RESTRICT stats = storage->data();
+  size_t n = 0;
+  for (Fragment* node : non_leaf) {
+    Fragment* left = node->left_child.get();
+    if (non_leaf.find(left) == non_leaf.end()) {
+      store(load(kVHF, left->stats.values), kVHF, stats + 4 * n);
+      n++;
+    }
+    Fragment* right = node->right_child.get();
+    if (non_leaf.find(right) == non_leaf.end()) {
+      store(load(kVHF, right->stats.values), kVHF, stats + 4 * n);
+      n++;
+    }
   }
+
+  // sum((vi - v)^2) == sum(vi^2 - 2 * vi * v + v^2)
+  //                 == n * v^2 + sum(vi^2) - 2 * v * sum(vi)
+
+  int32_t v_max = cp.color_quant - 1;
+  const auto quant = set1(kVHF, v_max / 255.0f);
+  const auto dequant = set1(kVHF, 255.0f / v_max);
+  const auto k2 = set1(kVHF, 2.0f);
+  auto result_rgbx = zero(kVHF);
+  for (size_t i = 0; i < n; ++i) {
+    const auto rgbc = load(kVHF, stats + 4 * i);
+    // a0 a1 a2 a3 $ a0 a1 a2 a3 -> a3 a3 a3 a3
+    const auto pixel_count = _mm_shuffle_ps(rgbc, rgbc, 0xFF);
+    const auto rgb_avg = div(kVHF, rgbc, pixel_count);
+    const auto v_scaled = mul(kVHF, quant, rgb_avg);
+    const auto v = round(kVHF, v_scaled);
+    const auto v_dequant = mul(kVHF, v, dequant);
+    const auto t0 = mul(kVHF, rgb_avg, k2);
+    const auto t1 = mul(kVHF, pixel_count, v_dequant);
+    const auto t2 = ::twim::sub(kVHF, v_dequant, t0);
+    const auto t3 = mul(kVHF, t1, t2);
+    result_rgbx = add(kVHF, result_rgbx, t3);
+  }
+  ALIGNED_16 float result_rgb[4];
+  store(result_rgbx, kVHF, result_rgb);
+  float result = result_rgbx[0] + result_rgbx[1] + result_rgbx[2];
+  // result += SUM(rgb2)
   return result;
 }
 
@@ -604,7 +595,6 @@ class SimulationTask {
     Fragment root = makeRoot(uber->width, uber->height);
     std::vector<Fragment*> partition =
         buildPartition(&root, target_size, cp, &cache);
-    root.updateSqStats(&cache);
     for (int32_t color_code = 0; color_code < CodecParams::kMaxColorCode;
          ++color_code) {
       cp.setColorCode(color_code);
@@ -659,6 +649,7 @@ std::vector<uint8_t> Encoder::encode(const Image& src, int32_t target_size) {
       best_sqe = task.best_sqe;
     }
   }
+  best_sqe += uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2];
   SimulationTask& best_task = tasks[best_task_index];
   best_task.cp.setColorCode(best_task.best_color_code);
   Fragment root = makeRoot(width, height);

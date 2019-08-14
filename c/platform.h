@@ -326,6 +326,12 @@ SIMD INLINE __m128i bit_and(const Desc<int32_t, 4>& /* tag */, const __m128i a,
   return _mm_and_si128(a, b);
 }
 
+// round
+
+SIMD INLINE __m128 round(const Desc<float, 4>& /* tag */, const __m128 a) {
+  return _mm_round_ps(a, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+}
+
 }  // namespace twim
 
 #endif  // TWIM_PLATFORM
