@@ -10,7 +10,13 @@ namespace twim {
 
 void CodecParams::setColorCode(int32_t code) {
   color_code = code;
-  color_quant = makeColorQuant(code);
+  if (code < kNumColorQuantOptions) {
+    color_quant = makeColorQuant(code);
+    palette_size = 0;
+  } else {
+    color_quant = 0;
+    palette_size = code - kNumColorQuantOptions + 1;
+  }
 }
 
 /*constexpr*/ CodecParams::Params CodecParams::splitCode(int32_t code) {

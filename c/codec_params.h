@@ -35,7 +35,11 @@ class CodecParams {
   std::string toString() const;
 
   static constexpr const int32_t kMaxLineLimit = 63;
-  static constexpr const int32_t kMaxColorCode = 17;
+
+  static constexpr const int32_t kNumColorQuantOptions = 17;
+  static constexpr const int32_t kMaxColorPaletteSize = 32;
+  static constexpr const int32_t kMaxColorCode =
+      kNumColorQuantOptions + kMaxColorPaletteSize;
 
   static constexpr int32_t makeColorQuant(int32_t code) {
     return 1 + ((4 + (code & 3)) << (code >> 2));
@@ -67,6 +71,7 @@ class CodecParams {
   const int32_t width;
   const int32_t height;
   int32_t color_quant;
+  int32_t palette_size;
   int32_t line_limit = kMaxLineLimit;
   int32_t angle_bits[kMaxLevel];
   static constexpr const int32_t kMaxPartitionCode =

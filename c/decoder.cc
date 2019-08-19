@@ -14,14 +14,18 @@ namespace twim {
 
 namespace {
 
-int32_t readColor(RangeDecoder* src, const CodecParams& cp) {
-  int32_t argb = 0xFF;  // alpha = 1
-  for (size_t c = 0; c < 3; ++c) {
-    int32_t q = cp.color_quant;
-    argb = (argb << 8) |
-           CodecParams::dequantizeColor(RangeDecoder::readNumber(src, q), q);
+int32_t readColor(RangeDecoder* src, const CodecParams& cp, int32_t* palette) {
+  if (cp.palette_size == 0) {
+    int32_t argb = 0xFF;  // alpha = 1
+    for (size_t c = 0; c < 3; ++c) {
+      int32_t q = cp.color_quant;
+      argb = (argb << 8) |
+            CodecParams::dequantizeColor(RangeDecoder::readNumber(src, q), q);
+    }
+    return argb;
+  } else {
+    return palette[RangeDecoder::readNumber(src, cp.palette_size)];
   }
-  return argb;
 }
 
 class Fragment {
@@ -34,11 +38,11 @@ class Fragment {
 
   Fragment(Owned<Vector<int32_t>> region) : region(std::move(region)) {}
 
-  bool parse(RangeDecoder* src, const CodecParams& cp,
+  bool parse(RangeDecoder* src, const CodecParams& cp, int32_t* palette,
              std::vector<Fragment*>* children, DistanceRange* distanceRange) {
     type = RangeDecoder::readNumber(src, NodeType::COUNT);
     if (type == NodeType::FILL) {
-      color = readColor(src, cp);
+      color = readColor(src, cp, palette);
       return true;
     }
 
@@ -110,6 +114,15 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   int32_t width = cp.width;
   int32_t height = cp.height;
 
+  std::vector<int32_t> palette;
+  for (size_t j = 0; j < cp.palette_size; ++j) {
+    int32_t argb = 0xFF;  // alpha = 1
+    for (size_t c = 0; c < 3; ++c) {
+      argb = (argb << 8) | RangeDecoder::readNumber(&src, 256);
+    }
+    palette.push_back(argb);
+  }
+
   constexpr const auto vi32 = AvxVecTag<int32_t>();
   int32_t step = vecSize(vi32, height);
   auto root_region = allocVector(vi32, 3 * step);
@@ -132,7 +145,8 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   while (cursor < children.size()) {
     size_t checkpoint = children.size();
     for (; cursor < checkpoint; ++cursor) {
-      bool ok = children[cursor]->parse(&src, cp, &children, &distance_range);
+      bool ok = children[cursor]->parse(&src, cp, palette.data(), &children,
+                                        &distance_range);
       if (!ok) {
         return result;
       }

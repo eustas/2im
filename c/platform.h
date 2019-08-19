@@ -249,12 +249,12 @@ SIMD INLINE __m128i mul(const Desc<int32_t, 4>& /* tag */, const __m128i a,
 // mul_add
 
 SIMD INLINE __m256 mul_add(const Desc<float, 8>& /* tag */, const __m256 a,
-                       const __m256 b, const __m256 c) {
+                           const __m256 b, const __m256 c) {
   return _mm256_fmadd_ps(a, b, c);
 }
 
 SIMD INLINE __m128 mul_add(const Desc<float, 4>& vf, const __m128 a,
-                       const __m128 b, const __m128 c) {
+                           const __m128 b, const __m128 c) {
   return add(vf, mul(vf, a, b), c);
 }
 
@@ -273,7 +273,7 @@ SIMD INLINE __m128i cast(const Desc<float, 4>& /* from */,
 // max
 
 SIMD INLINE __m256 max(const Desc<float, 8>& /* tag */, const __m256 a,
-                        const __m256 b) {
+                       const __m256 b) {
   return _mm256_max_ps(a, b);
 }
 
@@ -283,7 +283,7 @@ SIMD INLINE __m256i max(const Desc<int32_t, 8>& /* tag */, const __m256i a,
 }
 
 SIMD INLINE __m128 max(const Desc<float, 4>& /* tag */, const __m128 a,
-                        const __m128 b) {
+                       const __m128 b) {
   return _mm_max_ps(a, b);
 }
 
@@ -295,7 +295,7 @@ SIMD INLINE __m128i max(const Desc<int32_t, 4>& /* tag */, const __m128i a,
 // min
 
 SIMD INLINE __m256 min(const Desc<float, 8>& /* tag */, const __m256 a,
-                        const __m256 b) {
+                       const __m256 b) {
   return _mm256_min_ps(a, b);
 }
 
@@ -305,7 +305,7 @@ SIMD INLINE __m256i min(const Desc<int32_t, 8>& /* tag */, const __m256i a,
 }
 
 SIMD INLINE __m128 min(const Desc<float, 4>& /* tag */, const __m128 a,
-                        const __m128 b) {
+                       const __m128 b) {
   return _mm_min_ps(a, b);
 }
 
@@ -317,12 +317,12 @@ SIMD INLINE __m128i min(const Desc<int32_t, 4>& /* tag */, const __m128i a,
 // and
 
 SIMD INLINE __m256i bit_and(const Desc<int32_t, 8>& /* tag */, const __m256i a,
-                        const __m256i b) {
+                            const __m256i b) {
   return _mm256_and_si256(a, b);
 }
 
 SIMD INLINE __m128i bit_and(const Desc<int32_t, 4>& /* tag */, const __m128i a,
-                        const __m128i b) {
+                            const __m128i b) {
   return _mm_and_si128(a, b);
 }
 
@@ -330,6 +330,31 @@ SIMD INLINE __m128i bit_and(const Desc<int32_t, 4>& /* tag */, const __m128i a,
 
 SIMD INLINE __m128 round(const Desc<float, 4>& /* tag */, const __m128 a) {
   return _mm_round_ps(a, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+}
+
+// hadd
+
+// a1 a2 a3 a4 $ b1 b2 b3 b4 -> a1+a2 a3+a4 b1+b2 b3+b4
+SIMD INLINE __m128 hadd(const Desc<float, 4>& /* tag */, const __m128 a,
+                        const __m128 b) {
+  return _mm_hadd_ps(a, b);
+}
+
+// blend
+
+// a1 a2 a3 a4 $ b1 b2 b3 b4 -> a1?b1 a2?b2 a3?b3 a4?b4
+template<int Selector>
+SIMD INLINE __m128 blend(const Desc<float, 4>& /* tag */, const __m128 a,
+                        const __m128 b) {
+  return _mm_blend_ps(a, b, Selector);
+}
+
+// broadcast
+
+// a0 a1 a2 a3 $ a0 a1 a2 a3 -> ai ai ai ai
+template<int Lane>
+SIMD INLINE __m128 broadcast(const Desc<float, 4>& /* tag */, const __m128 a) {
+  return _mm_shuffle_ps(a, a, Lane * 0x55);
 }
 
 }  // namespace twim
