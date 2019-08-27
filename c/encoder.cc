@@ -4,7 +4,6 @@
 #include <future>
 #include <list>
 #include <queue>
-#include <unordered_set>
 #include <vector>
 
 #include "codec_params.h"
@@ -312,7 +311,7 @@ SIMD INLINE static void chooseColor(const __m128 rgb0,
                                     float* RESTRICT distance2) {
   const size_t m = palette_size;
   size_t best_j = 0;
-  float best_d2 = 1e20f;
+  float best_d2 = 1e35f;
   for (size_t j = 0; j < m; ++j) {
     const auto center = load(kVHF, palette + 4 * j);
     const auto d = sub(kVHF, rgb0, center);
@@ -340,6 +339,7 @@ class Fragment {
   Stats stats2;
 
   // Subdivision.
+  int32_t ordinal = 0x7FFFFFFF;
   int32_t level;
   int32_t best_angle_code;
   int32_t best_line;
@@ -355,9 +355,9 @@ class Fragment {
   explicit Fragment(Owned<Vector<int32_t>>&& region)
       : region(std::move(region)) {}
 
-  SIMD INLINE void encode(RangeEncoder* dst, const CodecParams& cp,
-                          bool is_leaf, const float* RESTRICT palette,
-                          std::vector<Fragment*>* children) {
+  SIMD NOINLINE void encode(RangeEncoder* dst, const CodecParams& cp,
+                            bool is_leaf, const float* RESTRICT palette,
+                            std::vector<Fragment*>* children) {
     if (is_leaf) {
       RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
       if (cp.palette_size == 0) {
@@ -515,6 +515,7 @@ static SIMD NOINLINE std::vector<Fragment*> buildPartition(
     if (candidate->best_score < 0.0 || candidate->best_cost < 0.0) break;
     if (tax + candidate->best_cost <= budget) {
       budget -= tax + candidate->best_cost;
+      candidate->ordinal = result.size();
       result.push_back(candidate);
       candidate->left_child->findBestSubdivision(cache, cp);
       queue.push(candidate->left_child.get());
@@ -525,9 +526,10 @@ static SIMD NOINLINE std::vector<Fragment*> buildPartition(
   return result;
 }
 
-static INLINE std::unordered_set<Fragment*> subpartition(
-    int32_t target_size, const std::vector<Fragment*>& partition,
-    CodecParams cp) {
+/* Returns the index of the first leaf node in partition. */
+static INLINE size_t subpartition(int32_t target_size,
+                                  const std::vector<Fragment*>& partition,
+                                  CodecParams cp) {
   float node_tax = bitCost(NodeType::COUNT);
   float image_tax =
       bitCost(CodecParams::kTax) + sizeCost(cp.width) + sizeCost(cp.height);
@@ -538,15 +540,15 @@ static INLINE std::unordered_set<Fragment*> subpartition(
     image_tax += cp.palette_size * 3.0f * 8.0f;
   }
   float budget = 8.0f * target_size - image_tax + node_tax;
-  std::unordered_set<Fragment*> non_leaf;
-  for (Fragment* node : partition) {
+  size_t i;
+  for (i = 0; i < partition.size(); ++i) {
+    Fragment* node = partition[i];
     if (node->best_cost < 0.0f) break;
     float cost = node->best_cost + node_tax;
     if (budget < cost) break;
     budget -= cost;
-    non_leaf.insert(node);
   }
-  return non_leaf;
+  return i;
 }
 
 /*
@@ -554,25 +556,30 @@ static INLINE std::unordered_set<Fragment*> subpartition(
  *
  * Chosen by fair dice roll. Guaranteed to be random.
  */
-static float kRandom[32] = {
-    0.55504773267218396851f, 0.83299568274066558276f, 0.64448438185073722184f,
-    0.43663194418143139691f, 0.80970239740206257840f, 0.10537268526545910588f,
-    0.98626474114253523905f, 0.83973493527906950682f, 0.55440999814730491342f,
-    0.33965926891779852481f, 0.98479776264194559727f, 0.40029053103990471687f,
-    0.62813243148094340914f, 0.72756076331407233120f, 0.65084391493438084429f,
-    0.51067172635329741124f, 0.05681828658130913165f, 0.13398779673238737750f,
-    0.75327065055804921563f, 0.46805889515717980803f, 0.96333991168889207388f,
-    0.03443682898685339384f, 0.27226401588487848670f, 0.04125207422171361924f,
-    0.48573744672513593644f, 0.50489352547463064358f, 0.55173853522734785615f,
-    0.65739567731927076366f, 0.84164389012143610912f, 0.16281674266072072195f,
-    0.22504535889769974551f, 0.81581392953415788491f};
+static float kRandom[64] = {
+    0.196761043301f, 0.735187971367f, 0.240889315713f, 0.322607869281f,
+    0.042645685482f, 0.100931237742f, 0.436030039105f, 0.949386184145f,
+    0.391385426476f, 0.693787004045f, 0.957348258524f, 0.401165324581f,
+    0.200612435526f, 0.774156296613f, 0.702329904898f, 0.794307087431f,
+    0.913297998115f, 0.418554329021f, 0.305256297017f, 0.447050968372f,
+    0.275901615626f, 0.423281943403f, 0.222083232637f, 0.259557717968f,
+    0.134780340092f, 0.624659579778f, 0.459554804245f, 0.629270576873f,
+    0.728531198516f, 0.270863443275f, 0.730693946899f, 0.958482839910f,
+    0.597229071250f, 0.020570415805f, 0.876483717523f, 0.734546837759f,
+    0.548824137588f, 0.628979430442f, 0.813059781398f, 0.145038174534f,
+    0.174453058546f, 0.195531684379f, 0.127489363209f, 0.878269052109f,
+    0.990909412408f, 0.109277869329f, 0.295625366456f, 0.247012273577f,
+    0.508121083167f, 0.875779718247f, 0.863389034205f, 0.663539415689f,
+    0.069178093049f, 0.859564180486f, 0.560775815455f, 0.039552534504f,
+    0.989061239776f, 0.815374917179f, 0.951061519055f, 0.211362121050f,
+    0.255234747636f, 0.047947586972f, 0.520984579718f, 0.399461090480f};
 
 SIMD INLINE static void makePalette(float* RESTRICT storage, size_t num_patches,
                                     size_t palette_size) {
   const size_t n = num_patches;
   const size_t m = palette_size;
-  float* RESTRICT stats = storage;
-  float* RESTRICT centers = stats + 4 * n;
+  const float* RESTRICT stats = storage;
+  float* RESTRICT centers = storage + 4 * n;
   float* RESTRICT centers_acc = centers + 4 * m;
   float* RESTRICT weights = centers_acc + 4 * m;
   const auto k0 = zero(kVHF);
@@ -584,10 +591,11 @@ SIMD INLINE static void makePalette(float* RESTRICT storage, size_t num_patches,
     for (i = 0; i < n; ++i) total += stats[4 * i + 3];
     float target = total * kRandom[0];
     float partial = 0.0f;
-    for (i = 0; i < n - 1; ++i) {
+    for (i = 0; i < n; ++i) {
       partial += stats[4 * i + 3];
       if (partial >= target) break;
     }
+    i = std::max(i, n - 1);
     const auto rgbc = load(kVHF, stats + 4 * i);
     const auto rgb0 = blend<0x8>(kVHF, rgbc, k0);
     store(rgb0, kVHF, centers);
@@ -601,7 +609,7 @@ SIMD INLINE static void makePalette(float* RESTRICT storage, size_t num_patches,
     for (i = 0; i < n; ++i) {
       const auto rgbc = load(kVHF, stats + 4 * i);
       const auto rgb0 = blend<0x8>(kVHF, rgbc, k0);
-      float best_distance = 1e20f;
+      float best_distance = 1e35f;
       for (size_t k = 0; k < j; ++k) {
         const auto center = load(kVHF, centers + 4 * k);
         const auto d = sub(kVHF, rgb0, center);
@@ -618,16 +626,17 @@ SIMD INLINE static void makePalette(float* RESTRICT storage, size_t num_patches,
     }
     float target = total * kRandom[j];
     float partial = 0;
-    for (i = 0; i < n - 1; ++i) {
+    for (i = 0; i < n; ++i) {
       partial += weights[i];
       if (partial >= target) break;
     }
+    i = std::max(i, n - 1);
     const auto rgbc = load(kVHF, stats + 4 * i);
     const auto rgb0 = blend<0x8>(kVHF, rgbc, k0);
     store(rgb0, kVHF, centers + 4 * j);
   }
 
-  float last_score = 1e20f;
+  float last_score = 1e35f;
   while (true) {
     for (size_t j = 0; j < m; ++j) store(k0, kVHF, centers_acc + 4 * j);
     float score = 0.0f;
@@ -664,19 +673,20 @@ SIMD INLINE static void makePalette(float* RESTRICT storage, size_t num_patches,
 }
 
 SIMD NOINLINE static Owned<Vector<float>> gatherPatchesAndBuildPalette(
-    const std::unordered_set<Fragment*>& non_leaf, const size_t palette_size) {
-  size_t n = non_leaf.size() + 1;
+    const std::vector<Fragment*>& partition, size_t num_non_leaf,
+    size_t palette_size) {
+  size_t n = num_non_leaf + 1;
   size_t m = palette_size;
   size_t stats_size = 4 * n;
   size_t palette_space = 4 * m;
-  size_t extra_space = 4 * m + n;
+  size_t extra_space = 4 * m + ((m > 0) ? n : 0);
   Owned<Vector<float>> result =
       allocVector(kVHF, stats_size + palette_space + extra_space);
   float* RESTRICT stats = result->data();
 
   size_t pos = 0;
-  const auto maybe_add_leaf = [non_leaf, stats, &pos](Fragment* leaf) {
-    if (non_leaf.find(leaf) != non_leaf.end()) return;
+  const auto maybe_add_leaf = [num_non_leaf, stats, &pos](Fragment* leaf) {
+    if (leaf->ordinal < num_non_leaf) return;
     const auto sum_rgb1 = load(kVHF, leaf->stats.values);
     const auto pixel_count = broadcast<3>(kVHF, sum_rgb1);
     const auto rgb1 = div(kVHF, sum_rgb1, pixel_count);
@@ -684,13 +694,14 @@ SIMD NOINLINE static Owned<Vector<float>> gatherPatchesAndBuildPalette(
     store(rgbc, kVHF, stats + 4 * pos++);
   };
 
-  for (Fragment* node : non_leaf) {
+  for (size_t i = 0; i < num_non_leaf; ++i) {
+    Fragment* node = partition[i];
     maybe_add_leaf(node->left_child.get());
     maybe_add_leaf(node->right_child.get());
   }
 
   result->len = n;
-  makePalette(result->data(), n, m);
+  if (m > 0) makePalette(result->data(), n, m);
 
   return result;
 }
@@ -698,11 +709,14 @@ SIMD NOINLINE static Owned<Vector<float>> gatherPatchesAndBuildPalette(
 SIMD NOINLINE static float simulateEncode(int32_t target_size,
                                           std::vector<Fragment*>& partition,
                                           const CodecParams& cp) {
-  std::unordered_set<Fragment*> non_leaf =
-      subpartition(target_size, partition, cp);
+  size_t num_non_leaf = subpartition(target_size, partition, cp);
+  if (num_non_leaf <= 1) {
+    // Let's deal with flat image separately.
+    return 1e35f;
+  }
   const size_t m = cp.palette_size;
   Owned<Vector<float>> patches_and_palette =
-      gatherPatchesAndBuildPalette(non_leaf, m);
+      gatherPatchesAndBuildPalette(partition, num_non_leaf, m);
   size_t n = patches_and_palette->len;
   float* RESTRICT stats = patches_and_palette->data();
   float* RESTRICT colors = stats + 4 * n;
@@ -724,7 +738,7 @@ SIMD NOINLINE static float simulateEncode(int32_t target_size,
     for (size_t i = 0; i < n; ++i) {
       const auto rgbc = load(kVHF, stats + 4 * i);
       const auto pixel_count = broadcast<3>(kVHF, rgbc);
-      const auto color = get_color(rgbc);
+      const auto color = round(kVHF, get_color(rgbc));
       const auto t0 = mul(kVHF, rgbc, k2);
       const auto t1 = mul(kVHF, pixel_count, color);
       const auto t2 = ::twim::sub(kVHF, color, t0);
@@ -763,11 +777,10 @@ SIMD NOINLINE static float simulateEncode(int32_t target_size,
 static std::vector<uint8_t> doEncode(int32_t target_size,
                                      const std::vector<Fragment*>& partition,
                                      const CodecParams& cp) {
-  std::unordered_set<Fragment*> non_leaf =
-      subpartition(target_size, partition, cp);
+  size_t num_non_leaf = subpartition(target_size, partition, cp);
   const size_t m = cp.palette_size;
   Owned<Vector<float>> patches_and_palette =
-      gatherPatchesAndBuildPalette(non_leaf, m);
+      gatherPatchesAndBuildPalette(partition, num_non_leaf, m);
   size_t n = patches_and_palette->len;
   const float* RESTRICT palette = patches_and_palette->data() + 4 * n;
 
@@ -788,7 +801,7 @@ static std::vector<uint8_t> doEncode(int32_t target_size,
   size_t encoded = 0;
   while (encoded < queue.size()) {
     Fragment* node = queue[encoded++];
-    bool is_leaf = non_leaf.find(node) == non_leaf.end();
+    bool is_leaf = (node->ordinal >= num_non_leaf);
     node->encode(&dst, cp, is_leaf, palette, &queue);
   }
 
@@ -800,7 +813,7 @@ class SimulationTask {
   const int32_t target_size;
   const UberCache* uber;
   CodecParams cp;
-  float best_sqe = 1e20f;
+  float best_sqe = 1e35f;
   int32_t best_color_code = -1;
 
   SimulationTask(int32_t target_size, const UberCache* uber)
@@ -813,6 +826,7 @@ class SimulationTask {
         buildPartition(&root, target_size, cp, &cache);
     for (int32_t color_code = 0; color_code < CodecParams::kMaxColorCode;
          ++color_code) {
+      // if (color_code != 1) continue;
       cp.setColorCode(color_code);
       float sqe = simulateEncode(target_size, partition, cp);
       if (sqe < best_sqe) {
@@ -824,61 +838,79 @@ class SimulationTask {
   }
 };
 
+class TaskExecutor {
+ public:
+  TaskExecutor(size_t max_tasks) { tasks.reserve(max_tasks); }
+
+  void run() {
+    while (true) {
+      size_t my_task = next_task++;
+      if (my_task >= tasks.size()) return;
+      tasks[my_task].run();
+    }
+  }
+
+  std::atomic<size_t> next_task{0};
+  std::vector<SimulationTask> tasks;
+};
+
 }  // namespace
 
 std::vector<uint8_t> Encoder::encode(const Image& src, int32_t target_size) {
   int32_t width = src.width;
   int32_t height = src.height;
   if (width < 8 || height < 8) {
-    fprintf(stderr, "image is too small (%d x %d)", width, height);
+    fprintf(stderr, "image is too small (%d x %d)\n", width, height);
     return {};
   }
   UberCache uber(src);
-  std::vector<SimulationTask> tasks;
   size_t max_tasks =
       CodecParams::kMaxLineLimit * CodecParams::kMaxPartitionCode;
-  tasks.reserve(max_tasks);
-  std::vector<std::future<void>> futures;
-  futures.reserve(max_tasks);
+  TaskExecutor executor(max_tasks);
+  std::vector<SimulationTask>* tasks = &executor.tasks;
   for (int32_t line_limit = 0; line_limit < CodecParams::kMaxLineLimit;
        ++line_limit) {
     for (int32_t partition_code = 0;
          partition_code < CodecParams::kMaxPartitionCode; ++partition_code) {
-      // if (line_limit != 17) continue;
+      // if (line_limit != 0) continue;
       // if (partition_code != 0) continue;
-      tasks.emplace_back(target_size, &uber);
-      SimulationTask& task = tasks.back();
+      tasks->emplace_back(target_size, &uber);
+      SimulationTask& task = tasks->back();
       task.cp.setPartitionCode(partition_code);
       task.cp.line_limit = line_limit + 1;
-      futures.push_back(
-          std::async(std::launch::async, &SimulationTask::run, &task));
     }
   }
-  auto t0 = now();
+
+  std::vector<std::future<void>> futures;
+  size_t num_cores = 12;  // TODO: get from sys.
+  futures.reserve(num_cores);
+  for (size_t i = 0; i < num_cores; ++i) {
+    futures.push_back(
+        std::async(std::launch::async, &TaskExecutor::run, &executor));
+  }
+  for (size_t i = 0; i < num_cores; ++i) futures[i].get();
+
   size_t best_task_index = 0;
-  float best_sqe = 1e20f;
-  for (size_t task_index = 0; task_index < tasks.size(); ++task_index) {
-    futures[task_index].get();
-    const SimulationTask& task = tasks[task_index];
+  float best_sqe = 1e35f;
+  for (size_t task_index = 0; task_index < tasks->size(); ++task_index) {
+    const SimulationTask& task = tasks->at(task_index);
     if (task.best_sqe < best_sqe) {
       best_task_index = task_index;
       best_sqe = task.best_sqe;
     }
   }
   best_sqe += uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2];
-  SimulationTask& best_task = tasks[best_task_index];
+  SimulationTask& best_task = tasks->at(best_task_index);
   best_task.cp.setColorCode(best_task.best_color_code);
   Fragment root = makeRoot(width, height);
   Cache cache(uber);
   std::vector<Fragment*> partition =
       buildPartition(&root, target_size, best_task.cp, &cache);
   std::vector<uint8_t> result = doEncode(target_size, partition, best_task.cp);
-  auto t1 = now();
 
   std::string best_cp = best_task.cp.toString();
-  fprintf(stdout, "time: %.3fs, size: %zu, cp: [%s], error: %.3f\n",
-          duration(t0, t1), result.size(), best_cp.c_str(),
-          std::sqrt(best_sqe / (width * height)));
+  fprintf(stdout, "size: %zu, cp: [%s], error: %.3f\n", result.size(),
+          best_cp.c_str(), std::sqrt(best_sqe / (width * height)));
   return result;
 }
 

@@ -7,10 +7,29 @@
 
 namespace twim {
 
+bool parseInt(char* str, int min, int max, int* result) {
+  int val = 0;
+  size_t len = 0;
+  while (true) {
+    char c = str[len++];
+    if (c == 0) break;
+    if ((c >= '0') && (c <= '9')) {
+      int d = c - '0';
+      if ((len == 0) && (d == 0)) return false;
+      val = 10 * val + d;
+      if (val > max) return false;
+    }
+  }
+  if (val < min) return false;
+  *result = val;
+  return true;
+}
+
 int main (int argc, char* argv[]) {
   bool encode = false;
   bool roundtrip = false;
-  int32_t target_size = 128;
+  bool append_size = false;
+  int32_t target_size = 200;
 
   for (int i = 1; i < argc; ++i) {
     if (argv[i] == nullptr) {
@@ -20,23 +39,29 @@ int main (int argc, char* argv[]) {
       if (argv[i][1] == 'e') {
         encode = true;
         continue;
-      }
-      if (argv[i][1] == 'd') {
+      } else if (argv[i][1] == 'd') {
         encode = false;
         continue;
-      }
-      if (argv[i][1] == 'r') {
+      } else if (argv[i][1] == 'r') {
         roundtrip = true;
         continue;
+      } else if (argv[i][1] == 't') {
+        if (parseInt(&argv[i][2], 8, 16384, &target_size)) continue;
+      } else if (argv[i][1] == 's') {
+        append_size = true;
+        continue;
       }
-      fprintf(stderr, "Unknown option: %s\n", argv[i]);
+      fprintf(stderr, "Unknown / invalid option: %s\n", argv[i]);
       exit(EXIT_FAILURE);
     }
     std::string path(argv[i]);
     if (encode) {
       const Image src = Io::readPng(path);
-      path = path + ".2im";
       auto data = Encoder::encode(src, target_size);
+      if (append_size) {
+        path = path + "." + std::to_string(data.size());
+      }
+      path = path + ".2im";
       Io::writeFile(path, data);
     }
     if (!encode || roundtrip) {
