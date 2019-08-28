@@ -575,7 +575,8 @@ public class Encoder {
       try {
         cache = cachePool.take();
         List<Fragment> partition = buildPartition(targetSize, cp, cache);
-        for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_CODE; ++colorCode) {
+        // Palette (..CodecParams.MAX_COLOR_CODE) is not supported yet.
+        for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_QUANT_OPTIONS; ++colorCode) {
           cp.setColorCode(colorCode);
           double sqe = simulateEncode(targetSize, partition, cp);
           if (sqe < bestSqe) {

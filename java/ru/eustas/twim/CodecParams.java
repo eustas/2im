@@ -17,7 +17,9 @@ class CodecParams {
   static final int MAX_LINE_LIMIT = 63;
 
   static final int MAX_PARTITION_CODE = MAX_F1 * MAX_F2 * MAX_F3 * MAX_F4;
-  static final int MAX_COLOR_CODE = 17;
+  static final int MAX_COLOR_QUANT_OPTIONS = 17;
+  static final int MAX_COLOR_PALETTE_SIZE = 32;
+  static final int MAX_COLOR_CODE = MAX_COLOR_QUANT_OPTIONS + MAX_COLOR_PALETTE_SIZE;
   static final int TAX = MAX_PARTITION_CODE * MAX_LINE_LIMIT * MAX_COLOR_CODE;
 
   static int makeColorQuant(int code) {
@@ -40,6 +42,7 @@ class CodecParams {
   private final int[] levelScale = new int[MAX_LEVEL];
   final int[] angleBits = new int[MAX_LEVEL];
   int colorQuant;
+  int paletteSize;
 
   // Actually, that is image params...
   final int width;
@@ -60,7 +63,13 @@ class CodecParams {
 
   void setColorCode(int code) {
     colorCode = code;
-    colorQuant = makeColorQuant(code);
+    if (colorCode < MAX_COLOR_QUANT_OPTIONS) {
+      colorQuant = makeColorQuant(code);
+      paletteSize = 0;
+    } else {
+      colorQuant = 0;
+      paletteSize = colorCode - MAX_COLOR_QUANT_OPTIONS + 1;
+    }
   }
 
   private int[] splitCode(int code) {

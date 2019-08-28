@@ -9,13 +9,17 @@ import static ru.eustas.twim.RangeDecoder.readNumber;
 
 public class Decoder {
 
-  private static int readColor(RangeDecoder src, CodecParams cp) {
-    int argb = 0xFF;  // alpha = 1
-    for (int c = 0; c < 3; ++c) {
-      int q = cp.colorQuant;
-      argb = (argb << 8) | CodecParams.dequantizeColor(readNumber(src, q), q);
+  private static int readColor(RangeDecoder src, CodecParams cp, int[] palette) {
+    if (cp.paletteSize == 0) {
+      int argb = 0xFF;  // alpha = 1
+      for (int c = 0; c < 3; ++c) {
+        int q = cp.colorQuant;
+        argb = (argb << 8) | CodecParams.dequantizeColor(readNumber(src, q), q);
+      }
+      return argb;
+    } else {
+      return palette[readNumber(src, cp.paletteSize)];
     }
-    return argb;
   }
 
   private static class Fragment {
@@ -29,11 +33,11 @@ public class Decoder {
       this.region = region;
     }
 
-    void parse(RangeDecoder src, CodecParams cp, List<Fragment> children, DistanceRange distanceRange) {
+    void parse(RangeDecoder src, CodecParams cp, int[] palette, List<Fragment> children, DistanceRange distanceRange) {
       type = readNumber(src, CodecParams.NODE_TYPE_COUNT);
 
       if (type == NODE_FILL) {
-        color = readColor(src, cp);
+        color = readColor(src, cp, palette);
         return;
       }
 
@@ -94,8 +98,16 @@ public class Decoder {
   static BufferedImage decode(byte[] encoded) {
     RangeDecoder src = new RangeDecoder(encoded);
     CodecParams cp = CodecParams.read(src);
+    int[] palette = new int[cp.paletteSize];
     int width = cp.width;
     int height = cp.height;
+    for (int j = 0; j < cp.paletteSize; ++j) {
+      int argb = 0xFF;  // alpha = 1
+      for (int c = 0; c < 3; ++c) {
+        argb = (argb << 8) | readNumber(src, 256);
+      }
+      palette[j] = argb;
+    }
 
     int step = Region.vectorFriendlySize(height);
     int[] rootRegion = new int[step * 3 + 1];
@@ -115,7 +127,7 @@ public class Decoder {
     while (cursor < children.size()) {
       int checkpoint = children.size();
       for (; cursor < checkpoint; ++cursor) {
-        children.get(cursor).parse(src, cp, children, distanceRange);
+        children.get(cursor).parse(src, cp, palette, children, distanceRange);
       }
     }
 
