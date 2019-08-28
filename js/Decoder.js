@@ -15,14 +15,28 @@ import * as SinCos from './SinCos.js';
 let readColor = (q) => CodecParams.dequantizeColor(readNumber(q), q);
 
 /**
+ * @param{number} q
  * @return{!Array<number>}
  */
-let parseColor = () => [
-  readColor(CodecParams.getColorQuant()),
-  readColor(CodecParams.getColorQuant()),
-  readColor(CodecParams.getColorQuant()),
+let parseColor = (q) => [
+  readColor(q),
+  readColor(q),
+  readColor(q),
   b8 - 1
 ];
+
+let /** @type{?Array<!Array<number>>} */ _palette;
+
+/**
+ * @return{!Array<number>}
+ */
+let getColor = () => {
+  if (_palette.length) {
+    return _palette[readNumber(_palette.length)];
+  } else {
+    return parseColor(CodecParams.getColorQuant());
+  }
+};
 
 /**
  * @param{!Int32Array} region
@@ -35,7 +49,7 @@ let parse = (region, children, width, rgba) => {
   let /** @type{number} */ type = readNumber(CodecParams.NODE_TYPE_COUNT);
 
   if (type == CodecParams.NODE_FILL) {
-    let /** @type{!Array<number>} */ color = parseColor();
+    let /** @type{!Array<number>} */ color = getColor();
     forEachScan(region, (y, x0, x1) => {
       for (let /** @type{number} */ x = x0; x < x1; ++x) {
         rgba.set(color, (y * width + x) * 4);
@@ -70,6 +84,10 @@ let parse = (region, children, width, rgba) => {
 export let decode = (encoded) => {
   RangeDecoder.init(encoded);
   CodecParams.read();
+  _palette = [];
+  for (let /** @type{number} */ j = 0; j < CodecParams.getPaletteSize(); ++j) {
+    _palette.push(parseColor(b8));
+  }
 
   let /** @type{!Int32Array} */ rootRegion = newInt32Array(getHeight() * 3 + 1);
   rootRegion[last(rootRegion)] = getHeight();

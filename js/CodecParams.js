@@ -11,7 +11,9 @@ let /** @type{number} */ MAX_F4 = 5;
 let /** @type{number} */ MAX_LINE_LIMIT = 63;
 
 let /** @type{number} */ MAX_PARTITION_CODE = MAX_F1 * MAX_F2 * MAX_F3 * MAX_F4;
-let /** @type{number} */ MAX_COLOR_CODE = 17;
+let /** @type{number} */ MAX_COLOR_QUANT_OPTIONS = 17;
+let /** @type{number} */ MAX_COLOR_PALETTE_SIZE = 32;
+let /** @type{number} */ MAX_COLOR_CODE = MAX_COLOR_QUANT_OPTIONS + MAX_COLOR_PALETTE_SIZE;
 
 /**
  * @param{number} code
@@ -28,6 +30,8 @@ let _width;
 let _height;
 /** @type{number} */
 let _colorQuant;
+/** @type{number} */
+let _paletteSize;
 /** @type{number} */
 let lineLimit;
 /** @const @type{!Int32Array} */
@@ -60,6 +64,11 @@ export let getColorQuant = () => _colorQuant;
 /**
  * @return{number}
  */
+export let getPaletteSize = () => _paletteSize;
+
+/**
+ * @return{number}
+ */
 export let getLineQuant = () => SinCos.SCALE;
 
 /** @return{void} */
@@ -83,7 +92,9 @@ export let read = () => {
   for (let /** @type{number} */ i = 0; i < MAX_LEVEL; ++i) {
     angleBits[i] = math.max(bits - i - (((i * f4) / 2) | 0), 0);
   }
-  _colorQuant = makeColorQuant(readNumber(MAX_COLOR_CODE));
+  let /** @type{number} */ colorCode = readNumber(MAX_COLOR_CODE);
+  _colorQuant = makeColorQuant(colorCode);
+  _paletteSize = colorCode - MAX_COLOR_QUANT_OPTIONS + 1;
 };
 
 /**
