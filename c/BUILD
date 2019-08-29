@@ -179,4 +179,5 @@ cc_binary(
         ":io",
         ":platform",
     ],
+    linkopts = ["-pthread"],
 )

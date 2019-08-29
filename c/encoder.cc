@@ -734,7 +734,7 @@ SIMD NOINLINE static float simulateEncode(int32_t target_size,
   auto result_rgbx = k0;
   typedef std::function<__m128(__m128)> ColorTransformer;
   auto accumulate_score = [&result_rgbx, stats, n,
-                           &k2](const ColorTransformer& get_color) {
+                           &k2](const ColorTransformer& get_color) SIMD {
     for (size_t i = 0; i < n; ++i) {
       const auto rgbc = load(kVHF, stats + 4 * i);
       const auto pixel_count = broadcast<3>(kVHF, rgbc);
@@ -750,14 +750,14 @@ SIMD NOINLINE static float simulateEncode(int32_t target_size,
     int32_t v_max = cp.color_quant - 1;
     const auto quant = set1(kVHF, v_max / 255.0f);
     const auto dequant = set1(kVHF, 255.0f / v_max);
-    auto quantizer = [&quant, &dequant](__m128 rgbc) {
+    auto quantizer = [&quant, &dequant](__m128 rgbc) SIMD {
       const auto v_scaled = mul(kVHF, quant, rgbc);
       const auto v = round(kVHF, v_scaled);
       return mul(kVHF, v, dequant);
     };
     accumulate_score(quantizer);
   } else {
-    auto color_matcher = [colors, m, &k0](__m128 rgbc) {
+    auto color_matcher = [colors, m, &k0](__m128 rgbc) SIMD {
       size_t index;
       float dummy;
       chooseColor(blend<0x8>(kVHF, rgbc, k0), colors, m, &index, &dummy);
