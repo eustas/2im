@@ -10,19 +10,39 @@ namespace twim {
 
 template <size_t N>
 void Set(Vector<int32_t>* to, const std::array<int32_t, N>& from) {
-  std::copy(from.cbegin(), from.cend(), to->data());
-  to->len = N / 3;
+  size_t count = N / 3;
+  size_t step = to->capacity / 3;
+  int32_t* RESTRICT y = to->data();
+  int32_t* RESTRICT x0 = y + step;
+  int32_t* RESTRICT x1 = x0 + step;
+  for (size_t i = 0; i < count; i++) {
+    y[i] = from.cbegin()[3 * i];
+    x0[i] = from.cbegin()[3 * i + 1];
+    x1[i] = from.cbegin()[3 * i + 2];
+  }
+  to->len = count;
 }
 
 template <size_t N>
-void ExpectEq(const std::array<int32_t, N>& expected, Vector<int32_t>* actual) {
-  EXPECT_EQ(N / 3, actual->len);
-  EXPECT_TRUE(0 == memcmp(expected.data(), actual->data(), N * sizeof(int)));
+void ExpectEq(const std::array<int32_t, N>& expected,
+              const Vector<int32_t>* actual) {
+  size_t count = N / 3;
+  size_t step = actual->capacity / 3;
+  const int32_t* RESTRICT y = actual->data();
+  const int32_t* RESTRICT x0 = y + step;
+  const int32_t* RESTRICT x1 = x0 + step;
+  EXPECT_EQ(count, actual->len);
+  for (size_t i = 0; i < count; ++i) {
+    EXPECT_EQ(expected.data()[3 * i], y[i]);
+    EXPECT_EQ(expected.data()[3 * i + 1], x0[i]);
+    EXPECT_EQ(expected.data()[3 * i + 2], x1[i]);
+  }
 }
 
 TEST(RegionTest, HorizontalSplit) {
   constexpr const auto vi32 = AvxVecTag<int32_t>();
-  auto region = allocVector(vi32, 3);
+  int32_t step1 = vecSize(vi32, 1);
+  auto region = allocVector(vi32, 3 * step1);
   Set<3>(region.get(), {0, 0, 4});
 
   int32_t angle = SinCos::kMaxAngle / 2;
@@ -30,8 +50,8 @@ TEST(RegionTest, HorizontalSplit) {
   DistanceRange distanceRange;
   distanceRange.update(*region.get(), angle, cp);
   EXPECT_EQ(3, distanceRange.num_lines);
-  auto left = allocVector(vi32, 3);
-  auto right = allocVector(vi32, 3);
+  auto left = allocVector(vi32, 3 * step1);
+  auto right = allocVector(vi32, 3 * step1);
 
   // 1/3
   Region::splitLine(*region.get(), angle, distanceRange.distance(0), left.get(),
@@ -54,8 +74,12 @@ TEST(RegionTest, HorizontalSplit) {
 
 TEST(RegionTest, VerticalSplit) {
   constexpr const auto vi32 = AvxVecTag<int32_t>();
-  auto region = allocVector(vi32, 12);
-  Set<12>(region.get(), {0, 1, 2, 3, 0, 0, 0, 0, 1, 1, 1, 1});
+  int32_t step1 = vecSize(vi32, 1);
+  int32_t step2 = vecSize(vi32, 2);
+  int32_t step3 = vecSize(vi32, 3);
+  int32_t step4 = vecSize(vi32, 4);
+  auto region = allocVector(vi32, 3 * step4);
+  Set<12>(region.get(), {0, 0, 1, /**/ 1, 0, 1, /**/ 2, 0, 1, /**/ 3, 0, 1});
   int32_t angle = 0;
   CodecParams cp(4, 4);
   cp.line_limit = 63;
@@ -64,28 +88,28 @@ TEST(RegionTest, VerticalSplit) {
   EXPECT_EQ(3, distanceRange.num_lines);
 
   // 1/3
-  auto left = allocVector(vi32, 9);
-  auto right = allocVector(vi32, 3);
+  auto left = allocVector(vi32, 3 * step3);
+  auto right = allocVector(vi32, 3 * step1);
   Region::splitLine(*region.get(), angle, distanceRange.distance(0), left.get(),
                     right.get());
-  ExpectEq<9>({1, 2, 3, 0, 0, 0, 1, 1, 1}, left.get());
+  ExpectEq<9>({1, 0, 1, /**/ 2, 0, 1, /**/ 3, 0, 1}, left.get());
   ExpectEq<3>({0, 0, 1}, right.get());
 
   // 2/3
-  left = allocVector(vi32, 6);
-  right = allocVector(vi32, 6);
+  left = allocVector(vi32, 3 * step2);
+  right = allocVector(vi32, 3 * step2);
   Region::splitLine(*region.get(), angle, distanceRange.distance(1), left.get(),
                     right.get());
-  ExpectEq<6>({2, 3, 0, 0, 1, 1}, left.get());
-  ExpectEq<6>({0, 1, 0, 0, 1, 1}, right.get());
+  ExpectEq<6>({2, 0, 1, /**/ 3, 0, 1}, left.get());
+  ExpectEq<6>({0, 0, 1, /**/ 1, 0, 1}, right.get());
 
   // 3/3
-  left = allocVector(vi32, 3);
-  right = allocVector(vi32, 9);
+  left = allocVector(vi32, 3 * step1);
+  right = allocVector(vi32, 3 * step3);
   Region::splitLine(*region.get(), angle, distanceRange.distance(2), left.get(),
                     right.get());
   ExpectEq<3>({3, 0, 1}, left.get());
-  ExpectEq<9>({0, 1, 2, 0, 0, 0, 1, 1, 1}, right.get());
+  ExpectEq<9>({0, 0, 1, /**/ 1, 0, 1, /**/ 2, 0, 1}, right.get());
 }
 
 }  // namespace twim
