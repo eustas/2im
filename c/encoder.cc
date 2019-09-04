@@ -18,6 +18,9 @@ namespace {
 
 class Cache;
 
+constexpr auto kVHD = SseVecTag<double>();
+static_assert(kVHD.N == 2, "Expected vector size is 2");
+
 constexpr auto kVHF = SseVecTag<float>();
 static_assert(kVHF.N == 4, "Expected vector size is 4");
 
@@ -26,6 +29,9 @@ static_assert(kVHI32.N == 4, "Expected vector size is 4");
 
 constexpr auto kVF = AvxVecTag<float>();
 static_assert(kVF.N == 8, "Expected vector size is 8");
+
+constexpr auto kVD = AvxVecTag<double>();
+static_assert(kVD.N == 4, "Expected vector size is 4");
 
 constexpr auto kVI32 = AvxVecTag<int32_t>();
 static_assert(kVI32.N == 8, "Expected vector size is 8");
