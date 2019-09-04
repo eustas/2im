@@ -247,6 +247,11 @@ SIMD INLINE __m256d sub(const Desc<double, 4>& /* tag */, const __m256d a,
   return _mm256_sub_pd(a, b);
 }
 
+SIMD INLINE __m256 sub(const Desc<float, 8>& /* tag */, const __m256 a,
+                        const __m256 b) {
+  return _mm256_sub_ps(a, b);
+}
+
 SIMD INLINE __m128i sub(const Desc<int32_t, 4>& /* tag */, const __m128i a,
                         const __m128i b) {
   return _mm_sub_epi32(a, b);
