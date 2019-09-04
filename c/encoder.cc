@@ -264,14 +264,17 @@ static SIMD INLINE float score(const Stats& whole, const Stats& left,
                                const Stats& right) {
   if ((left.pixelCount() <= 0.0f) || (right.pixelCount() <= 0.0f)) return 0.0f;
 
+  const auto k1 = set1(kVHF, 1.0f);
+  const auto pc = _mm_set_ps(1.0f, right.pixelCount(), left.pixelCount(),whole.pixelCount());
+  const auto inv_pc = div(kVHF, k1, pc);
+
   const auto k2 = set1(kVHF, 2.0f);
   const auto whole_values = load(kVHF, whole.values);
-  const auto whole_pixel_count = set1(kVHF, whole.pixelCount());
-  const auto whole_average = div(kVHF, whole_values, whole_pixel_count);
+  const auto whole_average = mul(kVHF, whole_values, broadcast<0>(kVHF, inv_pc));
 
   const auto left_values = load(kVHF, left.values);
   const auto left_pixel_count = set1(kVHF, left.pixelCount());
-  const auto left_average = div(kVHF, left_values, left_pixel_count);
+  const auto left_average = mul(kVHF, left_values, broadcast<1>(kVHF, inv_pc));
   const auto left_plus = add(kVHF, whole_average, left_average);
   const auto left_minus = sub(kVHF, whole_average, left_average);
   const auto left_a = mul(kVHF, left_pixel_count, left_plus);
@@ -280,7 +283,7 @@ static SIMD INLINE float score(const Stats& whole, const Stats& left,
 
   const auto right_values = load(kVHF, right.values);
   const auto right_pixel_count = set1(kVHF, right.pixelCount());
-  const auto right_average = div(kVHF, right_values, right_pixel_count);
+  const auto right_average = mul(kVHF, right_values, broadcast<2>(kVHF, inv_pc));
   const auto right_plus = add(kVHF, whole_average, right_average);
   const auto right_minus = sub(kVHF, whole_average, right_average);
   const auto right_a = mul(kVHF, right_pixel_count, right_plus);
