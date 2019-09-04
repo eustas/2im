@@ -46,18 +46,12 @@ class Stats {
   INLINE float rgb(size_t c) const { return values[c]; }
   INLINE float pixelCount() const { return values[3]; }
 
-  SIMD INLINE void zero() { store(::twim::zero(kVHF), kVHF, values); }
+  SIMD INLINE void reset() { store(zero(kVHF), kVHF, values); }
 
-  SIMD INLINE void add(const Stats& a, const Stats& b) {
-    const auto av = load(kVHF, a.values);
-    const auto bv = load(kVHF, b.values);
-    store(::twim::add(kVHF, av, bv), kVHF, values);
-  }
-
-  SIMD INLINE void sub(const Stats& plus, const Stats& minus) {
+  SIMD INLINE void diff(const Stats& plus, const Stats& minus) {
     const auto p = load(kVHF, plus.values);
     const auto m = load(kVHF, minus.values);
-    store(::twim::sub(kVHF, p, m), kVHF, values);
+    store(sub(kVHF, p, m), kVHF, values);
   }
 
   SIMD INLINE void copy(const Stats& other) {
@@ -240,12 +234,12 @@ SIMD INLINE void Stats::updateGeGeneric(Cache* cache, int32_t angle,
   for (size_t i = 0; i < count; i += vf.N) {
     const auto y = load(vf, region_y + i);
     const auto offset = load(vi32, row_offset + i);
-    const auto xf = ::twim::add(vf, mul(vf, y, mnynx_), dnx_);
+    const auto xf = add(vf, mul(vf, y, mnynx_), dnx_);
     const auto xi = cast(vf, vi32, xf);
     const auto x0 = load(vi32, region_x0 + i);
     const auto x1 = load(vi32, region_x1 + i);
     const auto x = min(vi32, x1, max(vi32, xi, x0));
-    const auto x_off = ::twim::add(vi32, mul(vi32, k4, x), offset);
+    const auto x_off = add(vi32, mul(vi32, k4, x), offset);
     store(x_off, vi32, region_x + i);
   }
 }
@@ -256,6 +250,14 @@ SIMD INLINE void Stats::updateGe(Cache* cache, int angle, int d) {
   } else {
     updateGeGeneric(cache, angle, d);
   }
+}
+
+static SIMD INLINE float reduce(const __m128 a_b_c_d) {
+  const auto b_b_d_d = _mm_movehdup_ps(a_b_c_d);
+  const auto ab_x_cd_x = _mm_add_ps(a_b_c_d, b_b_d_d);
+  const auto cd_x_x_x = _mm_movehl_ps(b_b_d_d, ab_x_cd_x);
+  const auto abcd_x_x_x = _mm_add_ss(ab_x_cd_x, cd_x_x_x);
+  return _mm_cvtss_f32(abcd_x_x_x);
 }
 
 static SIMD INLINE float score(const Stats& whole, const Stats& left,
@@ -285,14 +287,7 @@ static SIMD INLINE float score(const Stats& whole, const Stats& left,
   const auto right_b = mul(kVHF, k2, right_values);
   const auto right_sum = mul(kVHF, right_minus, sub(kVHF, right_a, right_b));
 
-  auto sum = hadd(kVHF, left_sum, right_sum);
-  sum = hadd(kVHF, sum, sum);
-  sum = hadd(kVHF, sum, sum);
-
-  float result;
-  _mm_store_ss(&result, sum);
-
-  return result;
+  return reduce(add(kVHF, left_sum, right_sum));
 }
 
 static float bitCost(int32_t range) {
@@ -321,14 +316,10 @@ SIMD INLINE static void chooseColor(const __m128 rgb0,
   for (size_t j = 0; j < m; ++j) {
     const auto center = load(kVHF, palette + 4 * j);
     const auto d = sub(kVHF, rgb0, center);
-    auto d2 = mul(kVHF, d, d);
-    d2 = hadd(kVHF, d2, d2);
-    d2 = hadd(kVHF, d2, d2);
-    float d2_value;
-    _mm_store_ss(&d2_value, d2);
-    if (d2_value < best_d2) {
+    float d2 = reduce(mul(kVHF, d, d));
+    if (d2 < best_d2) {
       best_j = j;
-      best_d2 = d2_value;
+      best_d2 = d2;
     }
   }
   *index = best_j;
@@ -408,7 +399,7 @@ class Fragment {
     stats_cache.prepare(cache, &region);
     StatsCache::sum<false>(cache, stats_cache.x1->data(), &stats_cache.plus);
     StatsCache::sum<false>(cache, stats_cache.x0->data(), &stats_cache.minus);
-    stats.sub(stats_cache.plus, stats_cache.minus);
+    stats.diff(stats_cache.plus, stats_cache.minus);
 
     // Find subdivision
     for (int32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
@@ -416,12 +407,12 @@ class Fragment {
       DistanceRange distance_range;
       distance_range.update(region, angle, cp);
       int32_t num_lines = distance_range.num_lines;
-      cache_stats[0].zero();
+      cache_stats[0].reset();
       for (int32_t line = 0; line < num_lines; ++line) {
         cache_stats[line + 1].updateGe(cache, angle,
                                        distance_range.distance(line));
         StatsCache::sum<true>(cache, stats_cache.x->data(), &stats_cache.minus);
-        cache_stats[line + 1].sub(stats_cache.plus, stats_cache.minus);
+        cache_stats[line + 1].diff(stats_cache.plus, stats_cache.minus);
       }
       cache_stats[num_lines + 1].copy(stats);
 
@@ -430,17 +421,17 @@ class Fragment {
         constexpr const float kLocalWeight = 0.0f;
         if (kLocalWeight > 0.0f) {
           Stats band;
-          band.sub(cache_stats[line + 2], cache_stats[line]);
+          band.diff(cache_stats[line + 2], cache_stats[line]);
           Stats left;
-          left.sub(band, cache_stats[line + 1]);
+          left.diff(band, cache_stats[line + 1]);
           Stats right;
-          right.sub(band, left);
+          right.diff(band, left);
           full_score += kLocalWeight * (score(band, left, right));
         }
 
         {
           Stats right;
-          right.sub(stats, cache_stats[line + 1]);
+          right.diff(stats, cache_stats[line + 1]);
           full_score += score(stats, cache_stats[line + 1], right);
         }
 
@@ -619,11 +610,7 @@ SIMD INLINE static void makePalette(float* RESTRICT storage, size_t num_patches,
       for (size_t k = 0; k < j; ++k) {
         const auto center = load(kVHF, centers + 4 * k);
         const auto d = sub(kVHF, rgb0, center);
-        auto d2 = mul(kVHF, d, d);
-        d2 = hadd(kVHF, d2, d2);
-        d2 = hadd(kVHF, d2, d2);
-        float distance;
-        _mm_store_ss(&distance, d2);
+        float distance = reduce(mul(kVHF, d, d));
         if (distance < best_distance) best_distance = distance;
       }
       float weight = best_distance * stats[4 * i + 3];
@@ -747,7 +734,7 @@ SIMD NOINLINE static float simulateEncode(int32_t target_size,
       const auto color = round(kVHF, get_color(rgbc));
       const auto t0 = mul(kVHF, rgbc, k2);
       const auto t1 = mul(kVHF, pixel_count, color);
-      const auto t2 = ::twim::sub(kVHF, color, t0);
+      const auto t2 = sub(kVHF, color, t0);
       const auto t3 = mul(kVHF, t1, t2);
       result_rgbx = add(kVHF, result_rgbx, t3);
     }
@@ -773,11 +760,7 @@ SIMD NOINLINE static float simulateEncode(int32_t target_size,
   }
 
   const auto result_rgb0 = blend<0x8>(kVHF, result_rgbx, zero(kVHF));
-  auto result_sum = hadd(kVHF, result_rgb0, result_rgb0);
-  result_sum = hadd(kVHF, result_sum, result_sum);
-  float result;
-  _mm_store_ss(&result, result_sum);
-  return result;
+  return reduce(result_rgb0);
 }
 
 static std::vector<uint8_t> doEncode(int32_t target_size,
