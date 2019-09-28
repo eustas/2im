@@ -15,6 +15,8 @@
 
 namespace twim {
 
+using namespace ::twim::internal;
+
 namespace {
 
 constexpr auto kVHD = SseVecTag<double>();
@@ -194,209 +196,6 @@ SIMD INLINE static void chooseColor(const __m128 rgb0,
   *index = best_j;
   *distance2 = best_d2;
 }
-
-}  // namespace
-
-Cache::Cache(const UberCache& uber)
-    : uber(&uber),
-      row_offset(allocVector(kVI32, uber.height)),
-      y(allocVector(kVF, uber.height)),
-      x0(allocVector(kVI32, uber.height)),
-      x1(allocVector(kVI32, uber.height)),
-      x(allocVector(kVI32, uber.height)) {}
-
-template <bool ABS>
-void NOINLINE SIMD Cache::sum(int32_t* RESTRICT region_x, Stats* dst) {
-  size_t count = this->count;
-  const int32_t* RESTRICT row_offset = this->row_offset->data();
-  const float* RESTRICT sum = this->uber->sum->data();
-
-  constexpr auto vhf = SseVecTag<float>();
-  auto tmp = zero(vhf);
-  for (size_t i = 0; i < count; i += kStride) {
-    for (size_t j = 0; j < kStride; ++j) {
-      int32_t offset =
-          ABS ? region_x[i + j] : (row_offset[i + j] + 4 * region_x[i + j]);
-      tmp = add(vhf, tmp, load(vhf, sum + offset));
-    }
-  }
-  store(tmp, vhf, dst->values);
-}
-
-void INLINE SIMD Cache::prepare(Vector<int32_t>* region) {
-  size_t count = region->len;
-  size_t step = region->capacity / 3;
-  size_t sum_stride = this->uber->stride;
-  int32_t* RESTRICT data = region->data();
-  float* RESTRICT y = this->y->data();
-  int32_t* RESTRICT x0 = this->x0->data();
-  int32_t* RESTRICT x1 = this->x1->data();
-  int32_t* RESTRICT row_offset = this->row_offset->data();
-  for (size_t i = 0; i < count; ++i) {
-    int32_t row = data[i];
-    y[i] = row;
-    x0[i] = data[step + i];
-    x1[i] = data[2 * step + i];
-    row_offset[i] = row * sum_stride;
-  }
-  while ((count & (kStride - 1)) != 0) {
-    y[count] = 0;
-    x0[count] = 0;
-    x1[count] = 0;
-    row_offset[count] = 0;
-    count++;
-  }
-  this->count = count;
-}
-
-UberCache::UberCache(const Image& src)
-    : width(src.width),
-      height(src.height),
-      stride(4 * (src.width + 1)),
-      sum(allocVector(kVHF, stride * src.height)) {
-  float* RESTRICT sum = this->sum->data();
-  for (size_t y = 0; y < src.height; ++y) {
-    float row_rgb2[3] = {0.0f};
-    size_t src_row_offset = y * src.width;
-    const uint8_t* RESTRICT r_row = src.r.data() + src_row_offset;
-    const uint8_t* RESTRICT g_row = src.g.data() + src_row_offset;
-    const uint8_t* RESTRICT b_row = src.b.data() + src_row_offset;
-    size_t dstRowOffset = y * stride;
-    for (size_t i = 0; i < 4; ++i) sum[dstRowOffset + i] = 0.0f;
-    for (size_t x = 0; x < src.width; ++x) {
-      size_t dstOffset = dstRowOffset + 4 * x;
-      float r = r_row[x];
-      float g = g_row[x];
-      float b = b_row[x];
-      sum[dstOffset + 4] = sum[dstOffset + 0] + r;
-      sum[dstOffset + 5] = sum[dstOffset + 1] + g;
-      sum[dstOffset + 6] = sum[dstOffset + 2] + b;
-      sum[dstOffset + 7] = sum[dstOffset + 3] + 1.0f;
-      row_rgb2[0] += r * r;
-      row_rgb2[1] += g * g;
-      row_rgb2[2] += b * b;
-    }
-    for (size_t c = 0; c < 3; ++c) rgb2[c] += row_rgb2[c];
-  }
-}
-
-Fragment::Fragment(Owned<Vector<int32_t>>&& region)
-    : region(std::move(region)) {}
-
-SIMD NOINLINE void Fragment::encode(RangeEncoder* dst, const CodecParams& cp,
-                                    bool is_leaf, const float* RESTRICT palette,
-                                    std::vector<Fragment*>* children) {
-  if (is_leaf) {
-    RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
-    if (cp.palette_size == 0) {
-      float quant = (cp.color_quant - 1) / 255.0f;
-      for (size_t c = 0; c < 3; ++c) {
-        int32_t v = static_cast<int32_t>(
-            quant * rgb(stats, c) / pixelCount(stats) + 0.5f);
-        RangeEncoder::writeNumber(dst, cp.color_quant, v);
-      }
-    } else {
-      size_t index;
-      float dummy;
-      const auto sum_rgbc = load(kVHF, stats.values);
-      const auto pixel_count = broadcast<3>(kVHF, sum_rgbc);
-      const auto rgb1 = div(kVHF, sum_rgbc, pixel_count);
-      // It is not necessary, but let's be consistent.
-      const auto rgb0 = blend<0x8>(kVHF, rgb1, zero(kVHF));
-      chooseColor(rgb0, palette, cp.palette_size, &index, &dummy);
-      RangeEncoder::writeNumber(dst, cp.palette_size, index);
-    }
-    return;
-  }
-  RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::HALF_PLANE);
-  int32_t maxAngle = 1 << cp.angle_bits[level];
-  RangeEncoder::writeNumber(dst, maxAngle, best_angle_code);
-  RangeEncoder::writeNumber(dst, best_num_lines, best_line);
-  children->push_back(left_child.get());
-  children->push_back(right_child.get());
-}
-
-void SIMD NOINLINE Fragment::findBestSubdivision(Cache* cache, CodecParams cp) {
-  Vector<int32_t>& region = *this->region.get();
-  Stats& stats = this->stats;
-  Stats* cache_stats = cache->stats;
-  int32_t level = cp.getLevel(region);
-  int32_t angle_max = 1 << cp.angle_bits[level];
-  int32_t angle_mult = (SinCos::kMaxAngle / angle_max);
-  int32_t best_angle_code = 0;
-  int32_t best_line = 0;
-  float best_score = -1.0f;
-  cache->prepare(&region);
-  cache->sum<false>(cache->x1->data(), &cache->plus);
-  cache->sum<false>(cache->x0->data(), &cache->minus);
-  diff(&stats, cache->plus, cache->minus);
-
-  // Find subdivision
-  for (int32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
-    int32_t angle = angle_code * angle_mult;
-    DistanceRange distance_range;
-    distance_range.update(region, angle, cp);
-    int32_t num_lines = distance_range.num_lines;
-    reset(&cache_stats[0]);
-    for (int32_t line = 0; line < num_lines; ++line) {
-      updateGe(cache, angle, distance_range.distance(line));
-      cache->sum<true>(cache->x->data(), &cache->minus);
-      diff(&cache_stats[line + 1], cache->plus, cache->minus);
-    }
-    copy(&cache_stats[num_lines + 1], stats);
-
-    for (int32_t line = 0; line < num_lines; ++line) {
-      float full_score = 0.0f;
-      constexpr const float kLocalWeight = 0.0f;
-      if (kLocalWeight > 0.0f) {
-        Stats band;
-        diff(&band, cache_stats[line + 2], cache_stats[line]);
-        Stats left;
-        diff(&left, band, cache_stats[line + 1]);
-        Stats right;
-        diff(&right, band, left);
-        full_score += kLocalWeight * (score(band, left, right));
-      }
-
-      {
-        Stats right;
-        diff(&right, stats, cache_stats[line + 1]);
-        full_score += score(stats, cache_stats[line + 1], right);
-      }
-
-      if (full_score > best_score) {
-        best_angle_code = angle_code;
-        best_line = line;
-        best_score = full_score;
-      }
-    }
-  }
-
-  this->level = level;
-  this->best_score = best_score;
-
-  if (best_score < 0.0f) {
-    this->best_cost = -1.0f;
-  } else {
-    DistanceRange distance_range;
-    distance_range.update(region, best_angle_code * angle_mult, cp);
-    int32_t child_step = vecSize(kVI32, region.len);
-    this->left_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
-    this->right_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
-    Region::splitLine(region, best_angle_code * angle_mult,
-                      distance_range.distance(best_line),
-                      this->left_child->region.get(),
-                      this->right_child->region.get());
-
-    this->best_angle_code = best_angle_code;
-    this->best_num_lines = distance_range.num_lines;
-    this->best_line = best_line;
-    this->best_cost =
-        bitCost(NodeType::COUNT * angle_max * distance_range.num_lines);
-  }
-}
-
-namespace {
 
 struct FragmentComparator {
   bool operator()(const Fragment* left, const Fragment* right) const {
@@ -715,7 +514,206 @@ class TaskExecutor {
 
 }  // namespace
 
-namespace Encoder {
+namespace internal {
+
+Cache::Cache(const UberCache& uber)
+    : uber(&uber),
+      row_offset(allocVector(kVI32, uber.height)),
+      y(allocVector(kVF, uber.height)),
+      x0(allocVector(kVI32, uber.height)),
+      x1(allocVector(kVI32, uber.height)),
+      x(allocVector(kVI32, uber.height)) {}
+
+template <bool ABS>
+void NOINLINE SIMD Cache::sum(int32_t* RESTRICT region_x, Stats* dst) {
+  size_t count = this->count;
+  const int32_t* RESTRICT row_offset = this->row_offset->data();
+  const float* RESTRICT sum = this->uber->sum->data();
+
+  constexpr auto vhf = SseVecTag<float>();
+  auto tmp = zero(vhf);
+  for (size_t i = 0; i < count; i += kStride) {
+    for (size_t j = 0; j < kStride; ++j) {
+      int32_t offset =
+          ABS ? region_x[i + j] : (row_offset[i + j] + 4 * region_x[i + j]);
+      tmp = add(vhf, tmp, load(vhf, sum + offset));
+    }
+  }
+  store(tmp, vhf, dst->values);
+}
+
+void INLINE SIMD Cache::prepare(Vector<int32_t>* region) {
+  size_t count = region->len;
+  size_t step = region->capacity / 3;
+  size_t sum_stride = this->uber->stride;
+  int32_t* RESTRICT data = region->data();
+  float* RESTRICT y = this->y->data();
+  int32_t* RESTRICT x0 = this->x0->data();
+  int32_t* RESTRICT x1 = this->x1->data();
+  int32_t* RESTRICT row_offset = this->row_offset->data();
+  for (size_t i = 0; i < count; ++i) {
+    int32_t row = data[i];
+    y[i] = row;
+    x0[i] = data[step + i];
+    x1[i] = data[2 * step + i];
+    row_offset[i] = row * sum_stride;
+  }
+  while ((count & (kStride - 1)) != 0) {
+    y[count] = 0;
+    x0[count] = 0;
+    x1[count] = 0;
+    row_offset[count] = 0;
+    count++;
+  }
+  this->count = count;
+}
+
+UberCache::UberCache(const Image& src)
+    : width(src.width),
+      height(src.height),
+      stride(4 * (src.width + 1)),
+      sum(allocVector(kVHF, stride * src.height)) {
+  float* RESTRICT sum = this->sum->data();
+  for (size_t y = 0; y < src.height; ++y) {
+    float row_rgb2[3] = {0.0f};
+    size_t src_row_offset = y * src.width;
+    const uint8_t* RESTRICT r_row = src.r.data() + src_row_offset;
+    const uint8_t* RESTRICT g_row = src.g.data() + src_row_offset;
+    const uint8_t* RESTRICT b_row = src.b.data() + src_row_offset;
+    size_t dstRowOffset = y * stride;
+    for (size_t i = 0; i < 4; ++i) sum[dstRowOffset + i] = 0.0f;
+    for (size_t x = 0; x < src.width; ++x) {
+      size_t dstOffset = dstRowOffset + 4 * x;
+      float r = r_row[x];
+      float g = g_row[x];
+      float b = b_row[x];
+      sum[dstOffset + 4] = sum[dstOffset + 0] + r;
+      sum[dstOffset + 5] = sum[dstOffset + 1] + g;
+      sum[dstOffset + 6] = sum[dstOffset + 2] + b;
+      sum[dstOffset + 7] = sum[dstOffset + 3] + 1.0f;
+      row_rgb2[0] += r * r;
+      row_rgb2[1] += g * g;
+      row_rgb2[2] += b * b;
+    }
+    for (size_t c = 0; c < 3; ++c) rgb2[c] += row_rgb2[c];
+  }
+}
+
+Fragment::Fragment(Owned<Vector<int32_t>>&& region)
+    : region(std::move(region)) {}
+
+SIMD NOINLINE void Fragment::encode(RangeEncoder* dst, const CodecParams& cp,
+                                    bool is_leaf, const float* RESTRICT palette,
+                                    std::vector<Fragment*>* children) {
+  if (is_leaf) {
+    RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
+    if (cp.palette_size == 0) {
+      float quant = (cp.color_quant - 1) / 255.0f;
+      for (size_t c = 0; c < 3; ++c) {
+        int32_t v = static_cast<int32_t>(
+            quant * rgb(stats, c) / pixelCount(stats) + 0.5f);
+        RangeEncoder::writeNumber(dst, cp.color_quant, v);
+      }
+    } else {
+      size_t index;
+      float dummy;
+      const auto sum_rgbc = load(kVHF, stats.values);
+      const auto pixel_count = broadcast<3>(kVHF, sum_rgbc);
+      const auto rgb1 = div(kVHF, sum_rgbc, pixel_count);
+      // It is not necessary, but let's be consistent.
+      const auto rgb0 = blend<0x8>(kVHF, rgb1, zero(kVHF));
+      chooseColor(rgb0, palette, cp.palette_size, &index, &dummy);
+      RangeEncoder::writeNumber(dst, cp.palette_size, index);
+    }
+    return;
+  }
+  RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::HALF_PLANE);
+  int32_t maxAngle = 1 << cp.angle_bits[level];
+  RangeEncoder::writeNumber(dst, maxAngle, best_angle_code);
+  RangeEncoder::writeNumber(dst, best_num_lines, best_line);
+  children->push_back(left_child.get());
+  children->push_back(right_child.get());
+}
+
+void SIMD NOINLINE Fragment::findBestSubdivision(Cache* cache, CodecParams cp) {
+  Vector<int32_t>& region = *this->region.get();
+  Stats& stats = this->stats;
+  Stats* cache_stats = cache->stats;
+  int32_t level = cp.getLevel(region);
+  int32_t angle_max = 1 << cp.angle_bits[level];
+  int32_t angle_mult = (SinCos::kMaxAngle / angle_max);
+  int32_t best_angle_code = 0;
+  int32_t best_line = 0;
+  float best_score = -1.0f;
+  cache->prepare(&region);
+  cache->sum<false>(cache->x1->data(), &cache->plus);
+  cache->sum<false>(cache->x0->data(), &cache->minus);
+  diff(&stats, cache->plus, cache->minus);
+
+  // Find subdivision
+  for (int32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
+    int32_t angle = angle_code * angle_mult;
+    DistanceRange distance_range;
+    distance_range.update(region, angle, cp);
+    int32_t num_lines = distance_range.num_lines;
+    reset(&cache_stats[0]);
+    for (int32_t line = 0; line < num_lines; ++line) {
+      updateGe(cache, angle, distance_range.distance(line));
+      cache->sum<true>(cache->x->data(), &cache->minus);
+      diff(&cache_stats[line + 1], cache->plus, cache->minus);
+    }
+    copy(&cache_stats[num_lines + 1], stats);
+
+    for (int32_t line = 0; line < num_lines; ++line) {
+      float full_score = 0.0f;
+      constexpr const float kLocalWeight = 0.0f;
+      if (kLocalWeight > 0.0f) {
+        Stats band;
+        diff(&band, cache_stats[line + 2], cache_stats[line]);
+        Stats left;
+        diff(&left, band, cache_stats[line + 1]);
+        Stats right;
+        diff(&right, band, left);
+        full_score += kLocalWeight * (score(band, left, right));
+      }
+
+      {
+        Stats right;
+        diff(&right, stats, cache_stats[line + 1]);
+        full_score += score(stats, cache_stats[line + 1], right);
+      }
+
+      if (full_score > best_score) {
+        best_angle_code = angle_code;
+        best_line = line;
+        best_score = full_score;
+      }
+    }
+  }
+
+  this->level = level;
+  this->best_score = best_score;
+
+  if (best_score < 0.0f) {
+    this->best_cost = -1.0f;
+  } else {
+    DistanceRange distance_range;
+    distance_range.update(region, best_angle_code * angle_mult, cp);
+    int32_t child_step = vecSize(kVI32, region.len);
+    this->left_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
+    this->right_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
+    Region::splitLine(region, best_angle_code * angle_mult,
+                      distance_range.distance(best_line),
+                      this->left_child->region.get(),
+                      this->right_child->region.get());
+
+    this->best_angle_code = best_angle_code;
+    this->best_num_lines = distance_range.num_lines;
+    this->best_line = best_line;
+    this->best_cost =
+        bitCost(NodeType::COUNT * angle_max * distance_range.num_lines);
+  }
+}
 
 std::vector<uint8_t> doEncode(size_t num_non_leaf,
                               const std::vector<Fragment*>* partition,
@@ -747,6 +745,45 @@ std::vector<uint8_t> doEncode(size_t num_non_leaf,
 
   return dst.finish();
 }
+
+Partition::Partition(const UberCache& uber, const CodecParams& cp,
+                     size_t target_size)
+    : cache(uber),
+      root(makeRoot(uber.width, uber.height)),
+      partition(buildPartition(&root, target_size, cp, &cache)) {}
+
+const std::vector<Fragment*>* Partition::getPartition() const {
+  return &partition;
+}
+
+/* Returns the index of the first leaf node in partition. */
+size_t Partition::subpartition(const CodecParams& cp,
+                               size_t target_size) const {
+  const std::vector<Fragment*>* partition = getPartition();
+  float node_tax = bitCost(NodeType::COUNT);
+  float image_tax =
+      bitCost(CodecParams::kTax) + sizeCost(cp.width) + sizeCost(cp.height);
+  if (cp.palette_size == 0) {
+    node_tax += 3.0f * bitCost(cp.color_quant);
+  } else {
+    node_tax += bitCost(cp.palette_size);
+    image_tax += cp.palette_size * 3.0f * 8.0f;
+  }
+  float budget = 8.0f * target_size - image_tax + node_tax;
+  size_t i;
+  for (i = 0; i < partition->size(); ++i) {
+    Fragment* node = partition->at(i);
+    if (node->best_cost < 0.0f) break;
+    float cost = node->best_cost + node_tax;
+    if (budget < cost) break;
+    budget -= cost;
+  }
+  return i;
+}
+
+}  // namespace internal
+
+namespace Encoder {
 
 std::vector<uint8_t> encode(const Image& src, int32_t target_size) {
   int32_t width = src.width;
@@ -812,40 +849,5 @@ std::vector<uint8_t> encode(const Image& src, int32_t target_size) {
 }
 
 }  // namespace Encoder
-
-Partition::Partition(const UberCache& uber, const CodecParams& cp,
-                     size_t target_size)
-    : cache(uber),
-      root(makeRoot(uber.width, uber.height)),
-      partition(buildPartition(&root, target_size, cp, &cache)) {}
-
-const std::vector<Fragment*>* Partition::getPartition() const {
-  return &partition;
-}
-
-/* Returns the index of the first leaf node in partition. */
-size_t Partition::subpartition(const CodecParams& cp,
-                               size_t target_size) const {
-  const std::vector<Fragment*>* partition = getPartition();
-  float node_tax = bitCost(NodeType::COUNT);
-  float image_tax =
-      bitCost(CodecParams::kTax) + sizeCost(cp.width) + sizeCost(cp.height);
-  if (cp.palette_size == 0) {
-    node_tax += 3.0f * bitCost(cp.color_quant);
-  } else {
-    node_tax += bitCost(cp.palette_size);
-    image_tax += cp.palette_size * 3.0f * 8.0f;
-  }
-  float budget = 8.0f * target_size - image_tax + node_tax;
-  size_t i;
-  for (i = 0; i < partition->size(); ++i) {
-    Fragment* node = partition->at(i);
-    if (node->best_cost < 0.0f) break;
-    float cost = node->best_cost + node_tax;
-    if (budget < cost) break;
-    budget -= cost;
-  }
-  return i;
-}
 
 }  // namespace twim

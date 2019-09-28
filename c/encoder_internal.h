@@ -9,6 +9,8 @@
 
 namespace twim {
 
+namespace internal {
+
 struct Stats {
   /* sum_r, sum_g, sum_b, pixel_count */
   ALIGNED_16 float values[4];
@@ -97,14 +99,12 @@ class Partition {
   std::vector<Fragment*> partition;
 };
 
-namespace Encoder {
-
 std::vector<uint8_t> doEncode(size_t num_non_leaf,
                               const std::vector<Fragment*>* partition,
                               const CodecParams& cp,
                               const float* RESTRICT palette);
 
-}  // namespace Encoder
+}  // namespace internal
 
 }  // namespace twim
 
