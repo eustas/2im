@@ -14,7 +14,9 @@ class SinCos {
   static constexpr const int32_t kMaxAngle = 1 << kMaxAngleBits;
 
   static const std::array<int32_t, kMaxAngle> kSin;
+  static const std::array<double, kMaxAngle> kInvSin;
   static const std::array<int32_t, kMaxAngle> kCos;
+  static const std::array<float, kMaxAngle> kMinusCot;
 };
 
 }  // namespace twim

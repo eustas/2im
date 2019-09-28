@@ -103,7 +103,10 @@ cc_library(
 cc_library(
     name = "encoder",
     srcs = ["encoder.cc"],
-    hdrs = ["encoder.h"],
+    hdrs = [
+        "encoder.h",
+        "encoder_internal.h",
+    ],
     deps = [
         ":codec_params",
         ":distance_range",
