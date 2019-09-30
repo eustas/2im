@@ -4,11 +4,11 @@
 #include <sstream>
 
 #include "platform.h"
-#include "sincos.h"
+#include "sin_cos.h"
 
 namespace twim {
 
-void CodecParams::setColorCode(int32_t code) {
+void CodecParams::setColorCode(uint32_t code) {
   color_code = code;
   if (code < kNumColorQuantOptions) {
     color_quant = makeColorQuant(code);
@@ -19,7 +19,7 @@ void CodecParams::setColorCode(int32_t code) {
   }
 }
 
-/*constexpr*/ CodecParams::Params CodecParams::splitCode(int32_t code) {
+/*constexpr*/ CodecParams::Params CodecParams::splitCode(uint32_t code) {
   Params result = {0, 0, 0, 0};
   result[0] = code % kMaxF1;
   code = code / kMaxF1;
@@ -31,17 +31,17 @@ void CodecParams::setColorCode(int32_t code) {
   return result;
 }
 
-void CodecParams::setPartitionCode(int32_t code) {
+void CodecParams::setPartitionCode(uint32_t code) {
   setPartitionParams(splitCode(code));
 }
 
 void CodecParams::setPartitionParams(Params params) {
   this->params = params;
-  int32_t f1 = params[0];
-  int32_t f2 = params[1] + 2;
-  int32_t f3 = (int32_t)std::pow(10, 3 - params[2] / 5.0);
-  int32_t f4 = params[3];
-  int32_t scale = (width * width + height * height) * f2 * f2;
+  uint32_t f1 = params[0];
+  uint32_t f2 = params[1] + 2;
+  uint32_t f3 = static_cast<uint32_t>(std::pow(10, 3 - params[2] / 5.0));
+  uint32_t f4 = params[3];
+  uint32_t scale = (width * width + height * height) * f2 * f2;
   for (size_t i = 0; i < kMaxLevel; ++i) {
     levelScale[i] = scale / kBaseScaleFactor;
     scale = (scale * kScaleStepFactor) / f3;
@@ -49,7 +49,8 @@ void CodecParams::setPartitionParams(Params params) {
 
   int32_t bits = SinCos::kMaxAngleBits - f1;
   for (int32_t i = 0; i < kMaxLevel; ++i) {
-    angle_bits[i] = std::max(bits - i - (i * f4) / 2, 0);
+    int32_t level_bits = bits - i - (i * f4) / 2;
+    angle_bits[i] = level_bits > 0 ? (static_cast<uint32_t>(level_bits)) : 0;
   }
 }
 
@@ -61,8 +62,8 @@ std::string CodecParams::toString() const {
 }
 
 CodecParams CodecParams::read(RangeDecoder* src) {
-  int32_t width = RangeDecoder::readSize(src);
-  int32_t height = RangeDecoder::readSize(src);
+  uint32_t width = RangeDecoder::readSize(src);
+  uint32_t height = RangeDecoder::readSize(src);
   CodecParams cp(width, height);
   Params params = {RangeDecoder::readNumber(src, kMaxF1),
                    RangeDecoder::readNumber(src, kMaxF2),
@@ -85,11 +86,11 @@ void CodecParams::write(RangeEncoder* dst) const {
   RangeEncoder::writeNumber(dst, kMaxColorCode, color_code);
 }
 
-int32_t CodecParams::getLevel(const Vector<int32_t>& region) const {
+uint32_t CodecParams::getLevel(const Vector<int32_t>& region) const {
   size_t count = region.len;
   size_t step = region.capacity / 3;
   if (count == 0) {
-    return -1;
+    return kInvalid;
   }
 
   const int32_t* RESTRICT y = region.data();
@@ -111,7 +112,7 @@ int32_t CodecParams::getLevel(const Vector<int32_t>& region) const {
   int32_t dx = max_x - min_x;
   int32_t dy = max_y + 1 - min_y;
   int32_t d = dx * dx + dy * dy;
-  for (int32_t i = 0; i < kMaxLevel; ++i) {
+  for (uint32_t i = 0; i < kMaxLevel; ++i) {
     if (d >= levelScale[i]) {
       return i;
     }

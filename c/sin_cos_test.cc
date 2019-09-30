@@ -1,4 +1,4 @@
-#include "sincos.h"
+#include "sin_cos.h"
 
 #include "crc64.h"
 #include "gtest/gtest.h"

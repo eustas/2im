@@ -1,6 +1,5 @@
 #include "range_encoder.h"
 
-#include "platform.h"
 #include "range_code.h"
 
 namespace twim {
@@ -11,16 +10,16 @@ struct Decoder {
   const uint8_t* data;
   size_t data_length;
   size_t offset = 0;
-  int64_t code = 0;
-  int64_t low = 0;
-  int64_t range = RangeCode::kValueMask;
+  uint64_t code = 0;
+  uint64_t low = 0;
+  uint64_t range = RangeCode::kValueMask;
 
-  Decoder(const std::vector<uint8_t>& data)
+  explicit Decoder(const std::vector<uint8_t>& data)
       : data(data.data()), data_length(data.size()) {}
 
   bool INLINE decodeRange(Triplet t) {
     range /= t.total_range;
-    int32_t count = (int32_t)((code - low) / range);
+    uint32_t count = static_cast<uint32_t>((code - low) / range);
     if ((count < t.bottom) || (count >= t.top)) {
       return false;
     }
@@ -33,7 +32,7 @@ struct Decoder {
         }
         range = -low & RangeCode::kRangeLimitMask;
       }
-      int64_t nibble = (offset < data_length) ? (data[offset++] & 0xFF) : 0;
+      uint64_t nibble = (offset < data_length) ? (data[offset++] & 0xFFu) : 0;
       code =
           ((code << RangeCode::kNibbleBits) & RangeCode::kValueMask) | nibble;
       range = (range << RangeCode::kNibbleBits) & RangeCode::kValueMask;
@@ -45,33 +44,32 @@ struct Decoder {
 
 }  // namespace
 
-void RangeEncoder::writeNumber(RangeEncoder* dst, int32_t max, int32_t value) {
-  if (max == 1) {
-    return;
-  }
+void RangeEncoder::writeNumber(RangeEncoder* dst, uint32_t max,
+                               uint32_t value) {
+  if (max == 1) return;
   dst->encodeRange({value, value + 1, max});
 }
 
-void RangeEncoder::writeSize(RangeEncoder* dst, int32_t value) {
+void RangeEncoder::writeSize(RangeEncoder* dst, uint32_t value) {
   value -= 8;
-  int32_t chunks = 2;
-  while (value > (1 << (chunks * 3))) {
-    value -= (1 << (chunks * 3));
+  uint32_t chunks = 2;
+  while (value > (1u << (chunks * 3))) {
+    value -= (1u << (chunks * 3));
     chunks++;
   }
-  for (int32_t i = 0; i < chunks; ++i) {
+  for (uint32_t i = 0; i < chunks; ++i) {
     if (i > 1) {
       writeNumber(dst, 2, 1);
     }
-    writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7);
+    writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7u);
   }
   writeNumber(dst, 2, 0);
 }
 
 std::vector<uint8_t> RangeEncoder::encode() {
   std::vector<uint8_t> out;
-  int64_t low = 0;
-  int64_t range = RangeCode::kValueMask;
+  uint64_t low = 0;
+  uint64_t range = RangeCode::kValueMask;
   for (const Triplet& t : triplets) {
     range /= t.total_range;
     low += t.bottom * range;
@@ -104,7 +102,7 @@ std::vector<uint8_t> RangeEncoder::optimize(std::vector<uint8_t> data) {
   Decoder current(data);
   for (size_t i = 0; i < RangeCode::kNumNibbles; ++i) {
     current.code = (current.code << RangeCode::kNibbleBits) |
-                   (current.data[current.offset++] & 0xFF);
+                   (current.data[current.offset++] & 0xFFu);
   }
   current.range = RangeCode::kValueMask;
   Decoder good = current;

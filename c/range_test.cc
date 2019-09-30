@@ -5,7 +5,7 @@
 namespace twim {
 
 TEST(RangeTest, Golden) {
-  int32_t triplets[] = {
+  uint32_t triplets[] = {
       8002,  29338, 61815, 11202, 13541, 15183, 7458,  11303, 38428, 29856,
       31071, 31915, 1589,  32595, 53464, 7672,  8537,  9070,  26967, 46483,
       63228, 5223,  8472,  14582, 23664, 26995, 27935, 37769, 41292, 48104,
@@ -359,7 +359,7 @@ TEST(RangeTest, Golden) {
 
 TEST(RangeTest, Optimizer) {
   RangeEncoder encoder;
-  for (int32_t i = 42; i < 48; ++i) encoder.encodeRange({i, i + 1, 256});
+  for (uint32_t i = 42; i < 48; ++i) encoder.encodeRange({i, i + 1, 256});
   encoder.encodeRange({1, 2, 257});
   const auto data = encoder.finish();
 

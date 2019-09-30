@@ -25,13 +25,13 @@ class Crc64 {
    * ...).
    */
   static INLINE uint64_t update(uint64_t crc, uint8_t next) {
-    uint64_t c = (crc ^ next) & 0xFF;
+    uint64_t c = (crc ^ next) & 0xFFu;
     for (size_t i = 0; i < 8; ++i) {
-      bool b = ((c & 1) == 1);
-      uint64_t d = c >> 1;
+      bool b = ((c & 1u) == 1);
+      uint64_t d = c >> 1u;
       c = b ? (kCrc64Poly ^ d) : d;
     }
-    return c ^ (crc >> 8);
+    return c ^ (crc >> 8u);
   }
 
   static INLINE uint64_t init() { return (uint64_t)(-1); }
@@ -42,8 +42,8 @@ class Crc64 {
     static char hex[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
                            '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
     for (size_t i = 0; i < 16; ++i) {
-      result[15 - i] = hex[crc & 0xF];
-      crc >>= 4;
+      result[15 - i] = hex[crc & 0xFu];
+      crc >>= 4u;
     }
     return result;
   }

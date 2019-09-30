@@ -28,6 +28,9 @@
 #define ALIGNED_32 alignas(32)
 
 namespace twim {
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "portability-simd-intrinsics"
+#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 
 namespace {
 
@@ -80,15 +83,15 @@ template <typename T>
 using SseVecTag = Desc<T, 16 / sizeof(T)>;
 
 template <typename T, size_t N>
-static size_t vecSize(const Desc<T, N>& /* tag */, size_t capacity) {
-  return (capacity + N - 1) & ~(N - 1);
+static uint32_t vecSize(const Desc<T, N>& /* tag */, uint32_t capacity) {
+  return static_cast<uint32_t>((capacity + N - 1) & ~(N - 1));
 }
 
 template <typename T, size_t N>
-Owned<Vector<T>> allocVector(const Desc<T, N>& tag, size_t capacity) {
+Owned<Vector<T>> allocVector(const Desc<T, N>& tag, uint32_t capacity) {
   using V = Vector<T>;
-  const size_t vector_capacity = vecSize(tag, capacity);
-  const size_t size = sizeof(V) + vector_capacity * sizeof(T);
+  const uint32_t vector_capacity = vecSize(tag, capacity);
+  const uint32_t size = sizeof(V) + vector_capacity * sizeof(T);
   constexpr const size_t alignment = N * sizeof(T);
   uintptr_t memory = reinterpret_cast<uintptr_t>(malloc(size + alignment));
   uintptr_t aligned_memory =
@@ -248,7 +251,7 @@ SIMD INLINE __m256d sub(const Desc<double, 4>& /* tag */, const __m256d a,
 }
 
 SIMD INLINE __m256 sub(const Desc<float, 8>& /* tag */, const __m256 a,
-                        const __m256 b) {
+                       const __m256 b) {
   return _mm256_sub_ps(a, b);
 }
 
@@ -428,6 +431,7 @@ SIMD INLINE __m128 broadcast(const Desc<float, 4>& /* tag */, const __m128 a) {
   return _mm_shuffle_ps(a, a, Lane * 0x55);
 }
 
+#pragma clang diagnostic pop
 }  // namespace twim
 
 #endif  // TWIM_PLATFORM

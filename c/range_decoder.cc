@@ -1,29 +1,26 @@
 #include "range_decoder.h"
 
-#include <vector>
-
-#include "platform.h"
 #include "range_code.h"
 
 namespace twim {
 
-int32_t RangeDecoder::readNumber(RangeDecoder* src, int32_t max) {
+uint32_t RangeDecoder::readNumber(RangeDecoder* src, uint32_t max) {
   if (max < 2) {
     return 0;
   }
-  int32_t result = src->currentCount(max);
+  uint32_t result = src->currentCount(max);
   src->removeRange(result, result + 1);
   return result;
 }
 
-int32_t RangeDecoder::readSize(RangeDecoder* src) {
-  int32_t plus = -1;
-  int32_t bits = 0;
-  while ((plus <= 0) || (readNumber(src, 2) == 1)) {
-    plus = (plus + 1) << 3;
-    int32_t extra = readNumber(src, 8);
-    bits = (bits << 3) + extra;
-  }
+uint32_t RangeDecoder::readSize(RangeDecoder* src) {
+  uint32_t plus = 0;
+  uint32_t bits = readNumber(src, 8);
+  do {
+    plus = (plus + 1) << 3u;
+    uint32_t extra = readNumber(src, 8);
+    bits = (bits << 3u) + extra;
+  } while ((readNumber(src, 2) == 1));
   return bits + plus;
 }
 
@@ -39,11 +36,11 @@ RangeDecoder::RangeDecoder(std::vector<uint8_t>&& data)
   }
 }
 
-uint8_t RangeDecoder::readNibble() {
+uint32_t RangeDecoder::readNibble() {
   return (offset < data.size()) ? (data[offset++] & RangeCode::kNibbleMask) : 0;
 }
 
-void RangeDecoder::removeRange(int32_t bottom, int32_t top) {
+void RangeDecoder::removeRange(uint32_t bottom, uint32_t top) {
   low += bottom * range;
   range *= top - bottom;
   while (true) {
@@ -60,11 +57,11 @@ void RangeDecoder::removeRange(int32_t bottom, int32_t top) {
   }
 }
 
-int32_t RangeDecoder::currentCount(int32_t totalRange) {
+uint32_t RangeDecoder::currentCount(uint32_t totalRange) {
   range /= totalRange;
-  int32_t result = (int32_t)((code - low) / range);
+  uint32_t result = (uint32_t)((code - low) / range);
   // corrupted input
-  if (result < 0 || result > totalRange) {
+  if (result > totalRange) {
     healthy = false;
     return 0;
   }

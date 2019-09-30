@@ -8,19 +8,20 @@
 #include "platform.h"
 #include "range_decoder.h"
 #include "region.h"
-#include "sincos.h"
+#include "sin_cos.h"
 
 namespace twim {
 
 namespace {
 
-int32_t readColor(RangeDecoder* src, const CodecParams& cp, int32_t* palette) {
+uint32_t readColor(RangeDecoder* src, const CodecParams& cp,
+                   const uint32_t* palette) {
   if (cp.palette_size == 0) {
-    int32_t argb = 0xFF;  // alpha = 1
+    uint32_t argb = 0xFF;  // alpha = 1
     for (size_t c = 0; c < 3; ++c) {
-      int32_t q = cp.color_quant;
-      argb = (argb << 8) |
-            CodecParams::dequantizeColor(RangeDecoder::readNumber(src, q), q);
+      uint32_t q = cp.color_quant;
+      argb = (argb << 8u) |
+             CodecParams::dequantizeColor(RangeDecoder::readNumber(src, q), q);
     }
     return argb;
   } else {
@@ -31,14 +32,15 @@ int32_t readColor(RangeDecoder* src, const CodecParams& cp, int32_t* palette) {
 class Fragment {
  public:
   int32_t type = NodeType::FILL;
-  int32_t color;
+  uint32_t color = 0;
   Owned<Vector<int32_t>> region;
   std::unique_ptr<Fragment> left_child;
   std::unique_ptr<Fragment> right_child;
 
-  Fragment(Owned<Vector<int32_t>> region) : region(std::move(region)) {}
+  explicit Fragment(Owned<Vector<int32_t>> region)
+      : region(std::move(region)) {}
 
-  bool parse(RangeDecoder* src, const CodecParams& cp, int32_t* palette,
+  bool parse(RangeDecoder* src, const CodecParams& cp, uint32_t* palette,
              std::vector<Fragment*>* children, DistanceRange* distanceRange) {
     type = RangeDecoder::readNumber(src, NodeType::COUNT);
     if (type == NodeType::FILL) {
@@ -46,22 +48,22 @@ class Fragment {
       return true;
     }
 
-    int32_t level = cp.getLevel(*region.get());
-    if (level < 0) return false;  // corrupted input
+    uint32_t level = cp.getLevel(*region.get());
+    if (level == CodecParams::kInvalid) return false;  // corrupted input
 
     if (type != NodeType::HALF_PLANE) return false;
 
-    int32_t angleMax = 1 << cp.angle_bits[level];
-    int32_t angleMult = (SinCos::kMaxAngle / angleMax);
-    int32_t angleCode = RangeDecoder::readNumber(src, angleMax);
-    int32_t angle = angleCode * angleMult;
+    uint32_t angleMax = 1u << cp.angle_bits[level];
+    uint32_t angleMult = (SinCos::kMaxAngle / angleMax);
+    uint32_t angleCode = RangeDecoder::readNumber(src, angleMax);
+    uint32_t angle = angleCode * angleMult;
     distanceRange->update(*region.get(), angle, cp);
-    if (distanceRange->num_lines < 0) return false;
-    int32_t line = RangeDecoder::readNumber(src, distanceRange->num_lines);
+    if (distanceRange->num_lines == DistanceRange::kInvalid) return false;
+    uint32_t line = RangeDecoder::readNumber(src, distanceRange->num_lines);
 
     constexpr const auto vi32 = AvxVecTag<int32_t>();
     // Cutting with half-planes does not increase the number of scans.
-    int32_t step = vecSize(vi32, region->len);
+    uint32_t step = vecSize(vi32, region->len);
     auto inner = allocVector(vi32, 3 * step);
     auto outer = allocVector(vi32, 3 * step);
     Region::splitLine(*region.get(), angle, distanceRange->distance(line),
@@ -81,9 +83,9 @@ class Fragment {
       uint8_t* RESTRICT b = out->b.data();
       size_t step = region->capacity / 3;
       size_t count = region->len;
-      uint8_t cr = color & 0xFF;
-      uint8_t cg = (color >> 8) & 0xFF;
-      uint8_t cb = (color >> 16) & 0xFF;
+      uint8_t cr = static_cast<uint8_t>(color & 0xFFu);
+      uint8_t cg = static_cast<uint8_t>((color >> 8u) & 0xFFu);
+      uint8_t cb = static_cast<uint8_t>((color >> 16u) & 0xFFu);
       const int32_t* RESTRICT vy = region->data();
       const int32_t* RESTRICT vx0 = vy + step;
       const int32_t* RESTRICT vx1 = vx0 + step;
@@ -107,29 +109,29 @@ class Fragment {
 }  // namespace
 
 Image Decoder::decode(std::vector<uint8_t>&& encoded) {
-  Image result;
+  Image result = Image();
 
   RangeDecoder src(std::move(encoded));
   CodecParams cp = CodecParams::read(&src);
-  int32_t width = cp.width;
-  int32_t height = cp.height;
+  uint32_t width = cp.width;
+  uint32_t height = cp.height;
 
-  std::vector<int32_t> palette;
+  std::vector<uint32_t> palette;
   for (size_t j = 0; j < cp.palette_size; ++j) {
-    int32_t argb = 0xFF;  // alpha = 1
+    uint32_t argb = 0xFFu;  // alpha = 1
     for (size_t c = 0; c < 3; ++c) {
-      argb = (argb << 8) | RangeDecoder::readNumber(&src, 256);
+      argb = (argb << 8u) | RangeDecoder::readNumber(&src, 256);
     }
     palette.push_back(argb);
   }
 
   constexpr const auto vi32 = AvxVecTag<int32_t>();
-  int32_t step = vecSize(vi32, height);
+  uint32_t step = vecSize(vi32, height);
   auto root_region = allocVector(vi32, 3 * step);
   int32_t* RESTRICT y = root_region->data();
   int32_t* RESTRICT x0 = y + step;
   int32_t* RESTRICT x1 = x0 + step;
-  for (int32_t i = 0; i < height; ++i) {
+  for (uint32_t i = 0; i < height; ++i) {
     y[i] = i;
     x0[i] = 0;
     x1[i] = width;

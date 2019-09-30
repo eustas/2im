@@ -10,8 +10,8 @@
 namespace twim {
 
 struct Image {
-  size_t width = 0;
-  size_t height = 0;
+  uint32_t width = 0;
+  uint32_t height = 0;
   std::vector<uint8_t> r;
   std::vector<uint8_t> g;
   std::vector<uint8_t> b;

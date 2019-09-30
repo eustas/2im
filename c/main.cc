@@ -7,8 +7,8 @@
 
 namespace twim {
 
-bool parseInt(char* str, int min, int max, int* result) {
-  int val = 0;
+bool parseInt(const char* str, uint32_t min, uint32_t max, uint32_t* result) {
+  uint32_t val = 0;
   size_t len = 0;
   while (true) {
     char c = str[len++];
@@ -25,11 +25,11 @@ bool parseInt(char* str, int min, int max, int* result) {
   return true;
 }
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   bool encode = false;
   bool roundtrip = false;
   bool append_size = false;
-  int32_t target_size = 200;
+  uint32_t target_size = 200;
 
   for (int i = 1; i < argc; ++i) {
     if (argv[i] == nullptr) {
@@ -59,14 +59,14 @@ int main (int argc, char* argv[]) {
       const Image src = Io::readPng(path);
       auto data = Encoder::encode(src, target_size);
       if (append_size) {
-        path = path + "." + std::to_string(data.size());
+        path += "." + std::to_string(data.size());
       }
-      path = path + ".2im";
+      path += ".2im";
       Io::writeFile(path, data);
     }
     if (!encode || roundtrip) {
       auto data = Io::readFile(path);
-      if (data.size() == 0) {
+      if (data.empty()) {
         fprintf(stderr, "Failed to read [%s].\n", path.c_str());
         continue;
       }
@@ -86,8 +86,6 @@ int main (int argc, char* argv[]) {
   return 0;
 }
 
-}  // namespace
+}  // namespace twim
 
-int main (int argc, char* argv[]) {
-  return twim::main(argc, argv);
-}
+int main(int argc, char* argv[]) { return twim::main(argc, argv); }

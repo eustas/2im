@@ -4,7 +4,7 @@
 #include "distance_range.h"
 #include "gtest/gtest.h"
 #include "platform.h"
-#include "sincos.h"
+#include "sin_cos.h"
 
 namespace twim {
 

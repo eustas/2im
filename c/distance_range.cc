@@ -4,7 +4,7 @@
 #include <limits>
 
 #include "platform.h"
-#include "sincos.h"
+#include "sin_cos.h"
 
 namespace twim {
 
@@ -12,7 +12,7 @@ void DistanceRange::update(const Vector<int32_t>& region, int32_t angle,
                            const CodecParams& cp) {
   if (region.len == 0) {
     // Exception!
-    num_lines = -1;
+    num_lines = kInvalid;
     return;
   }
   const size_t count = region.len;
@@ -32,8 +32,10 @@ void DistanceRange::update(const Vector<int32_t>& region, int32_t angle,
     mi = std::min(mi, d0);
     ma = std::max(ma, d1);
   }
-  min = mi;
-  max = ma;
+  // TODO(eustas): Check >= 0
+  min = static_cast<uint32_t>(mi);
+  // TODO(eustas): Check >= 0
+  max = static_cast<uint32_t>(ma);
 
   line_quant = cp.getLineQuant();
   while (true) {

@@ -1,7 +1,6 @@
 #ifndef TWIM_RANGE_DECODER
 #define TWIM_RANGE_DECODER
 
-#include <string>
 #include <vector>
 
 #include "platform.h"
@@ -10,20 +9,20 @@ namespace twim {
 
 class RangeDecoder {
  public:
-  RangeDecoder(std::vector<uint8_t>&& data);
-  void removeRange(int32_t bottom, int32_t top);
-  int32_t currentCount(int32_t totalRange);
+  explicit RangeDecoder(std::vector<uint8_t>&& data);
+  void removeRange(uint32_t bottom, uint32_t top);
+  uint32_t currentCount(uint32_t totalRange);
 
-  static int32_t readNumber(RangeDecoder* src, int32_t max);
-  static int32_t readSize(RangeDecoder* src);
+  static uint32_t readNumber(RangeDecoder* src, uint32_t max);
+  static uint32_t readSize(RangeDecoder* src);
 
  private:
-  uint8_t readNibble();
+  uint32_t readNibble();
 
   std::vector<uint8_t> data;
-  int64_t low;
-  int64_t range;
-  int64_t code;
+  uint64_t low;
+  uint64_t range;
+  uint64_t code;
   size_t offset;
   // TODO(eustas): add getter?
   bool healthy;

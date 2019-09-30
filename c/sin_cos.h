@@ -1,5 +1,5 @@
-#ifndef TWIM_SINCOS
-#define TWIM_SINCOS
+#ifndef TWIM_SIN_COS
+#define TWIM_SIN_COS
 
 #include <array>
 
@@ -9,9 +9,9 @@ namespace twim {
 
 class SinCos {
  public:
-  static constexpr const int32_t kOne = 1 << 18;
-  static constexpr const int32_t kMaxAngleBits = 9;
-  static constexpr const int32_t kMaxAngle = 1 << kMaxAngleBits;
+  static constexpr const int32_t kOne = 1u << 18u;
+  static constexpr const uint32_t kMaxAngleBits = 9u;
+  static constexpr const int32_t kMaxAngle = 1u << kMaxAngleBits;
 
   static const std::array<int32_t, kMaxAngle> kSin;
   static const std::array<double, kMaxAngle> kInvSin;
@@ -21,4 +21,4 @@ class SinCos {
 
 }  // namespace twim
 
-#endif  // TWIM_SINCOS
+#endif  // TWIM_SIN_COS

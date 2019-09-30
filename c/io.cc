@@ -3,11 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
-#include <string>
-#include <vector>
 
-#include "image.h"
-#include "platform.h"
 #include "png.h"
 
 namespace twim {
@@ -102,12 +98,12 @@ void pngWriteStream(png_structp png_ptr, png_bytep in, png_size_t count) {
   stream->data->insert(stream->data->end(), in, in + count);
 }
 
-void pngFlushStream(png_structp png_ptr) {}
+void pngFlushStream(png_structp) {}
 
 static const uint8_t kPngHdr[8] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'};
 
 Image Io::readPng(const std::string& path) {
-  Image result;
+  Image result = Image();
 
   auto data = readFile(path);
   if (data.size() < 8) return result;
@@ -118,19 +114,22 @@ Image Io::readPng(const std::string& path) {
   auto png = createPngStruct(/* read */ true);
   if (!png) return result;
 
-  if (setjmp(png_jmpbuf(png->png_ptr)) != 0) {
-    // Burn in hell, authors of linpng API.
+  if (setjmp(png_jmpbuf(png->png_ptr)) != 0) {  // NOLINT(cert-err52-cpp)
+    // Burn in hell, authors of libpng API.
     return result;
   }
 
   png_set_read_fn(png->png_ptr, &input, pngReadStream);
-  constexpr const uint32_t kTransforms = PNG_TRANSFORM_STRIP_ALPHA |
+  constexpr const uint32_t kTransforms =
+      PNG_TRANSFORM_STRIP_ALPHA |  // NOLINT(hicpp-signed-bitwise)
       PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND | PNG_TRANSFORM_STRIP_16;
   png_read_png(png->png_ptr, png->info_ptr, kTransforms, nullptr);
 
   const png_bytep* row_pointers = png_get_rows(png->png_ptr, png->info_ptr);
-  const size_t width = png_get_image_width(png->png_ptr, png->info_ptr);
-  const size_t height = png_get_image_height(png->png_ptr, png->info_ptr);
+  const uint32_t width =
+      static_cast<uint32_t>(png_get_image_width(png->png_ptr, png->info_ptr));
+  const uint32_t height =
+      static_cast<uint32_t>(png_get_image_height(png->png_ptr, png->info_ptr));
   const int32_t components = png_get_channels(png->png_ptr, png->info_ptr);
 
   // Only RGB is supported.
@@ -167,8 +166,8 @@ bool Io::writePng(const std::string& path, const Image& img) {
   const size_t width = img.width;
   std::vector<png_byte> row(width * 3);
 
-  if (setjmp(png_jmpbuf(png->png_ptr)) != 0) {
-    // Burn in hell, authors of linpng API.
+  if (setjmp(png_jmpbuf(png->png_ptr)) != 0) {  // NOLINT(cert-err52-cpp)
+    // Burn in hell, authors of libpng API.
     return false;
   }
 

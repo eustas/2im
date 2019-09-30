@@ -9,9 +9,9 @@
 namespace twim {
 
 struct Triplet {
-  int32_t bottom;
-  int32_t top;
-  int32_t total_range;
+  uint32_t bottom;
+  uint32_t top;
+  uint32_t total_range;
 };
 
 class RangeEncoder {
@@ -20,9 +20,9 @@ class RangeEncoder {
 
   std::vector<uint8_t> finish() { return optimize(encode()); }
 
-  static void writeNumber(RangeEncoder* dst, int32_t max, int32_t value);
+  static void writeNumber(RangeEncoder* dst, uint32_t max, uint32_t value);
 
-  static void writeSize(RangeEncoder* dst, int32_t value);
+  static void writeSize(RangeEncoder* dst, uint32_t value);
 
  private:
   std::vector<uint8_t> encode();

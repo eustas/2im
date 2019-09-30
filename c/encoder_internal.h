@@ -18,15 +18,15 @@ struct Stats {
 
 class UberCache {
  public:
-  const size_t width;
-  const size_t height;
-  const size_t stride;
+  const uint32_t width;
+  const uint32_t height;
+  const uint32_t stride;
   /* Cumulative sums. Extra column with total sum. */
   Owned<Vector<float>> sum;
 
   float rgb2[3] = {0.0f};
 
-  UberCache(const Image& src);
+  explicit UberCache(const Image& src);
 };
 
 class Cache {
@@ -36,17 +36,17 @@ class Cache {
   Stats minus;
   Stats stats[CodecParams::kMaxLineLimit + 3];
 
-  int32_t count;
+  uint32_t count;
   Owned<Vector<int32_t>> row_offset;
   Owned<Vector<float>> y;
   Owned<Vector<int32_t>> x0;
   Owned<Vector<int32_t>> x1;
   Owned<Vector<int32_t>> x;
 
-  Cache(const UberCache& uber);
+  explicit Cache(const UberCache& uber);
 
   template <bool ABS>
-  void NOINLINE SIMD sum(int32_t* RESTRICT region_x, Stats* dst);
+  void NOINLINE SIMD sum(const int32_t* RESTRICT region_x, Stats* dst);
 
   void INLINE SIMD prepare(Vector<int32_t>* region);
 };
@@ -61,12 +61,12 @@ class Fragment {
   Stats stats2;
 
   // Subdivision.
-  int32_t ordinal = 0x7FFFFFFF;
+  uint32_t ordinal = 0x7FFFFFFF;
   int32_t level;
-  int32_t best_angle_code;
-  int32_t best_line;
+  uint32_t best_angle_code;
+  uint32_t best_line;
   float best_score;
-  int32_t best_num_lines;
+  uint32_t best_num_lines;
   float best_cost;
 
   Fragment(Fragment&&) = default;
@@ -91,7 +91,7 @@ class Partition {
 
   // CodecParams should be the same as passed to constructor; only color code
   // is allowed to be different.
-  size_t subpartition(const CodecParams& cp, size_t target_size) const;
+  uint32_t subpartition(const CodecParams& cp, uint32_t target_size) const;
 
  private:
   Cache cache;
@@ -99,7 +99,13 @@ class Partition {
   std::vector<Fragment*> partition;
 };
 
-std::vector<uint8_t> doEncode(size_t num_non_leaf,
+SIMD NOINLINE Owned<Vector<float>> gatherPatches(
+    const std::vector<Fragment*>* partition, uint32_t num_non_leaf);
+
+SIMD NOINLINE Owned<Vector<float>> buildPalette(
+    const Owned<Vector<float>>& patches, uint32_t palette_size);
+
+std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
                               const std::vector<Fragment*>* partition,
                               const CodecParams& cp,
                               const float* RESTRICT palette);

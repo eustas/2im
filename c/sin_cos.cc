@@ -1,8 +1,10 @@
-#include "sincos.h"
+#include "sin_cos.h"
 
 #include <cmath>
 
 namespace twim {
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "cert-err58-cpp"
 
 typedef std::array<int32_t, SinCos::kMaxAngle> LutI;
 typedef std::array<double, SinCos::kMaxAngle> LutD;
@@ -13,8 +15,8 @@ const double kPi = std::acos(-1);
 const LutI SinCos::kSin = []() -> LutI {
   LutI result;
   for (int32_t i = 0; i < SinCos::kMaxAngle; ++i) {
-    result[i] =
-        std::round(SinCos::kOne * std::sin((kPi * i) / SinCos::kMaxAngle));
+    result[i] = static_cast<int32_t>(
+        std::round(SinCos::kOne * std::sin((kPi * i) / SinCos::kMaxAngle)));
   }
   return result;
 }();
@@ -31,8 +33,8 @@ const LutD SinCos::kInvSin = []() -> LutD {
 const LutI SinCos::kCos = []() -> LutI {
   LutI result;
   for (int32_t i = 0; i < SinCos::kMaxAngle; ++i) {
-    result[i] =
-        std::round(SinCos::kOne * std::cos((kPi * i) / SinCos::kMaxAngle));
+    result[i] = static_cast<int32_t>(
+        std::round(SinCos::kOne * std::cos((kPi * i) / SinCos::kMaxAngle)));
   }
   return result;
 }();
@@ -45,4 +47,5 @@ const LutF SinCos::kMinusCot = []() -> LutF {
   return result;
 }();
 
+#pragma clang diagnostic pop
 }  // namespace twim

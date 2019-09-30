@@ -10,7 +10,7 @@ namespace twim {
 
 namespace Encoder {
 
-std::vector<uint8_t> encode(const Image& src, int32_t target_size);
+std::vector<uint8_t> encode(const Image& src, uint32_t target_size);
 
 }  // namespace Encoder
 

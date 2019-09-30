@@ -14,9 +14,9 @@ cc_library(
 )
 
 cc_library(
-    name = "sincos",
-    srcs = ["sincos.cc"],
-    hdrs = ["sincos.h"],
+    name = "sin_cos",
+    srcs = ["sin_cos.cc"],
+    hdrs = ["sin_cos.h"],
     deps = [":platform"],
 )
 
@@ -58,7 +58,7 @@ cc_library(
     hdrs = ["region.h"],
     deps = [
         ":platform",
-        ":sincos",
+        ":sin_cos",
     ],
 )
 
@@ -70,7 +70,7 @@ cc_library(
         ":range_decoder",
         ":range_encoder",
         ":platform",
-        ":sincos",
+        ":sin_cos",
     ],
 )
 
@@ -81,7 +81,7 @@ cc_library(
     deps = [
         ":codec_params",
         ":platform",
-        ":sincos",
+        ":sin_cos",
     ],
 )
 
@@ -96,7 +96,7 @@ cc_library(
         ":platform",
         ":range_decoder",
         ":region",
-        ":sincos",
+        ":sin_cos",
     ],
 )
 
@@ -157,18 +157,18 @@ cc_test(
         ":distance_range",
         ":platform",
         ":region",
-        ":sincos",
+        ":sin_cos",
         "@gtest//:main",
     ],
 )
 
 cc_test(
-    name = "sincos_test",
-    srcs = ["sincos_test.cc"],
+    name = "sin_cos_test",
+    srcs = ["sin_cos_test.cc"],
     copts = ["-Iexternal/gtest/include"],
     deps = [
         ":crc64",
-        ":sincos",
+        ":sin_cos",
         "@gtest//:main",
     ],
 )

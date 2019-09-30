@@ -1,7 +1,7 @@
 #include "region.h"
 
 #include "platform.h"
-#include "sincos.h"
+#include "sin_cos.h"
 
 namespace twim {
 
@@ -25,8 +25,8 @@ void Region::splitLine(const Vector<int32_t>& region, int32_t angle, int32_t d,
 
   int32_t nx = SinCos::kSin[angle];
   int32_t ny = SinCos::kCos[angle];
-  size_t l_count = 0;
-  size_t r_count = 0;
+  uint32_t l_count = 0;
+  uint32_t r_count = 0;
 
   if (nx == 0) {
     // nx = 0 -> ny = SinCos.SCALE -> y * ny ?? d
