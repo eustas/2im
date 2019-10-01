@@ -63,7 +63,7 @@ class CodecParams {
   static /*constexpr*/ Params splitCode(uint32_t code);
   void setPartitionParams(Params params);
 
-  int32_t levelScale[kMaxLevel] = {0};
+  uint32_t levelScale[kMaxLevel] = {0};
 
   Params params = Params();
   uint32_t color_code = 0;
@@ -75,7 +75,7 @@ class CodecParams {
   uint32_t palette_size = 0;
   uint32_t line_limit = kMaxLineLimit;
   uint32_t angle_bits[kMaxLevel] = {0};
-  static constexpr const int32_t kMaxPartitionCode =
+  static constexpr const uint32_t kMaxPartitionCode =
       kMaxF1 * kMaxF2 * kMaxF3 * kMaxF4;
   static constexpr const int32_t kTax =
       kMaxPartitionCode * kMaxLineLimit * kMaxColorCode;

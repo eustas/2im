@@ -3,8 +3,6 @@
 #include <cmath>
 
 namespace twim {
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "cert-err58-cpp"
 
 typedef std::array<int32_t, SinCos::kMaxAngle> LutI;
 typedef std::array<double, SinCos::kMaxAngle> LutD;
@@ -47,5 +45,4 @@ const LutF SinCos::kMinusCot = []() -> LutF {
   return result;
 }();
 
-#pragma clang diagnostic pop
 }  // namespace twim

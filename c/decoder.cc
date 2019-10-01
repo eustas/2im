@@ -41,7 +41,7 @@ class Fragment {
       : region(std::move(region)) {}
 
   bool parse(RangeDecoder* src, const CodecParams& cp, uint32_t* palette,
-             std::vector<Fragment*>* children, DistanceRange* distanceRange) {
+             std::vector<Fragment*>* children) {
     type = RangeDecoder::readNumber(src, NodeType::COUNT);
     if (type == NodeType::FILL) {
       color = readColor(src, cp, palette);
@@ -57,16 +57,17 @@ class Fragment {
     uint32_t angleMult = (SinCos::kMaxAngle / angleMax);
     uint32_t angleCode = RangeDecoder::readNumber(src, angleMax);
     uint32_t angle = angleCode * angleMult;
-    distanceRange->update(*region.get(), angle, cp);
-    if (distanceRange->num_lines == DistanceRange::kInvalid) return false;
-    uint32_t line = RangeDecoder::readNumber(src, distanceRange->num_lines);
+    DistanceRange distance_range;
+    distance_range.update(*region.get(), angle, cp);
+    if (distance_range.num_lines == DistanceRange::kInvalid) return false;
+    uint32_t line = RangeDecoder::readNumber(src, distance_range.num_lines);
 
     constexpr const auto vi32 = AvxVecTag<int32_t>();
     // Cutting with half-planes does not increase the number of scans.
     uint32_t step = vecSize(vi32, region->len);
     auto inner = allocVector(vi32, 3 * step);
     auto outer = allocVector(vi32, 3 * step);
-    Region::splitLine(*region.get(), angle, distanceRange->distance(line),
+    Region::splitLine(*region.get(), angle, distance_range.distance(line),
                       inner.get(), outer.get());
     left_child.reset(new Fragment(std::move(inner)));
     children->push_back(left_child.get());
@@ -142,13 +143,11 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   std::vector<Fragment*> children;
   children.push_back(&root);
 
-  DistanceRange distance_range;
   size_t cursor = 0;
   while (cursor < children.size()) {
     size_t checkpoint = children.size();
     for (; cursor < checkpoint; ++cursor) {
-      bool ok = children[cursor]->parse(&src, cp, palette.data(), &children,
-                                        &distance_range);
+      bool ok = children[cursor]->parse(&src, cp, palette.data(), &children);
       if (!ok) {
         return result;
       }

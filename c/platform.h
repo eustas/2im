@@ -28,9 +28,6 @@
 #define ALIGNED_32 alignas(32)
 
 namespace twim {
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "portability-simd-intrinsics"
-#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 
 namespace {
 
@@ -431,7 +428,16 @@ SIMD INLINE __m128 broadcast(const Desc<float, 4>& /* tag */, const __m128 a) {
   return _mm_shuffle_ps(a, a, Lane * 0x55);
 }
 
-#pragma clang diagnostic pop
+// reduce
+
+SIMD INLINE float reduce(const Desc<float, 4>& /* tag */, const __m128 a_b_c_d) {
+  const auto b_b_d_d = _mm_movehdup_ps(a_b_c_d);
+  const auto ab_x_cd_x = _mm_add_ps(a_b_c_d, b_b_d_d);
+  const auto cd_x_x_x = _mm_movehl_ps(b_b_d_d, ab_x_cd_x);
+  const auto abcd_x_x_x = _mm_add_ss(ab_x_cd_x, cd_x_x_x);
+  return _mm_cvtss_f32(abcd_x_x_x);
+}
+
 }  // namespace twim
 
 #endif  // TWIM_PLATFORM

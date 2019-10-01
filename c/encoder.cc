@@ -112,14 +112,6 @@ SIMD NOINLINE void updateGe(Cache* cache, int angle, int d) {
   }
 }
 
-SIMD INLINE float reduce(const __m128 a_b_c_d) {
-  const auto b_b_d_d = _mm_movehdup_ps(a_b_c_d);
-  const auto ab_x_cd_x = _mm_add_ps(a_b_c_d, b_b_d_d);
-  const auto cd_x_x_x = _mm_movehl_ps(b_b_d_d, ab_x_cd_x);
-  const auto abcd_x_x_x = _mm_add_ss(ab_x_cd_x, cd_x_x_x);
-  return _mm_cvtss_f32(abcd_x_x_x);
-}
-
 SIMD NOINLINE float score(const Stats& whole, const Stats& left,
                           const Stats& right) {
   if ((pixelCount(left) <= 0.0f) || (pixelCount(right) <= 0.0f)) return 0.0f;
@@ -153,7 +145,7 @@ SIMD NOINLINE float score(const Stats& whole, const Stats& left,
   const auto right_b = mul(kVHF, k2, right_values);
   const auto right_sum = mul(kVHF, right_minus, sub(kVHF, right_a, right_b));
 
-  return reduce(add(kVHF, left_sum, right_sum));
+  return reduce(kVHF, add(kVHF, left_sum, right_sum));
 }
 
 float bitCost(int32_t range) {
@@ -181,7 +173,7 @@ SIMD INLINE void chooseColor(const __m128 rgb0, const float* RESTRICT palette,
   for (uint32_t j = 0; j < m; ++j) {
     const auto center = load(kVHF, palette + 4 * j);
     const auto d = sub(kVHF, rgb0, center);
-    float d2 = reduce(mul(kVHF, d, d));
+    float d2 = reduce(kVHF, mul(kVHF, d, d));
     if (d2 < best_d2) {
       best_j = j;
       best_d2 = d2;
@@ -309,7 +301,7 @@ SIMD INLINE void makePalette(const float* stats, float* RESTRICT storage,
       for (size_t k = 0; k < j; ++k) {
         const auto center = load(kVHF, centers + 4 * k);
         const auto d = sub(kVHF, rgb0, center);
-        float distance = reduce(mul(kVHF, d, d));
+        float distance = reduce(kVHF, mul(kVHF, d, d));
         if (distance < best_distance) best_distance = distance;
       }
       float weight = best_distance * stats[4 * i + 3];
@@ -427,7 +419,7 @@ SIMD NOINLINE float simulateEncode(const Partition& partition_holder,
   }
 
   const auto result_rgb0 = blend<0x8>(kVHF, result_rgbx, zero(kVHF));
-  return reduce(result_rgb0);
+  return reduce(kVHF, result_rgb0);
 }
 
 class SimulationTask {
@@ -571,8 +563,7 @@ SIMD NOINLINE void Fragment::encode(RangeEncoder* dst, const CodecParams& cp,
     if (cp.palette_size == 0) {
       float quant = static_cast<float>(cp.color_quant - 1) / 255.0f;
       for (size_t c = 0; c < 3; ++c) {
-        uint32_t v = static_cast<uint32_t>(
-            quant * rgb(stats, c) / pixelCount(stats) + 0.5f);
+        uint32_t v = static_cast<uint32_t>(lroundf(quant * rgb(stats, c) / pixelCount(stats)));
         RangeEncoder::writeNumber(dst, cp.color_quant, v);
       }
     } else {
