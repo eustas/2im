@@ -8,8 +8,8 @@
 
 namespace twim {
 
-void DistanceRange::update(const Vector<int32_t>& region, int32_t angle,
-                           const CodecParams& cp) {
+DistanceRange::DistanceRange(const Vector<int32_t>& region, int32_t angle,
+                             const CodecParams& cp) {
   if (region.len == 0) {
     // Exception!
     num_lines = kInvalid;

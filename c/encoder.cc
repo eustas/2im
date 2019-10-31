@@ -1,4 +1,4 @@
-#include "encoder.h"
+//#include "encoder.h"
 
 #include <cmath>
 #include <future>
@@ -153,7 +153,7 @@ float bitCost(int32_t range) {
   return static_cast<float>(std::log(range) * kInvLog2);
 }
 
-int32_t sizeCost(int32_t value) {
+int32_t sizeCost(uint32_t value) {
   if (value < 8) return -1;
   value -= 8;
   uint32_t bits = 6;
@@ -606,8 +606,7 @@ void SIMD NOINLINE Fragment::findBestSubdivision(Cache* cache, CodecParams cp) {
   // Find subdivision
   for (uint32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
     int32_t angle = angle_code * angle_mult;
-    DistanceRange distance_range;
-    distance_range.update(region, angle, cp);
+    DistanceRange distance_range(region, angle, cp);
     uint32_t num_lines = distance_range.num_lines;
     reset(&cache_stats[0]);
     for (uint32_t line = 0; line < num_lines; ++line) {
@@ -650,8 +649,7 @@ void SIMD NOINLINE Fragment::findBestSubdivision(Cache* cache, CodecParams cp) {
   if (best_score < 0.0f) {
     this->best_cost = -1.0f;
   } else {
-    DistanceRange distance_range;
-    distance_range.update(region, best_angle_code * angle_mult, cp);
+    DistanceRange distance_range(region, best_angle_code * angle_mult, cp);
     uint32_t child_step = vecSize(kVI32, region.len);
     this->left_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
     this->right_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));

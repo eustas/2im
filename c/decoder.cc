@@ -57,8 +57,7 @@ class Fragment {
     uint32_t angleMult = (SinCos::kMaxAngle / angleMax);
     uint32_t angleCode = RangeDecoder::readNumber(src, angleMax);
     uint32_t angle = angleCode * angleMult;
-    DistanceRange distance_range;
-    distance_range.update(*region.get(), angle, cp);
+    DistanceRange distance_range(*region.get(), angle, cp);
     if (distance_range.num_lines == DistanceRange::kInvalid) return false;
     uint32_t line = RangeDecoder::readNumber(src, distance_range.num_lines);
 

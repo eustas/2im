@@ -9,6 +9,7 @@ cc_library(
 
 cc_library(
     name = "image",
+    srcs = ["image.cc"],
     hdrs = ["image.h"],
     deps = [":platform"],
 )

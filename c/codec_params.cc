@@ -48,7 +48,7 @@ void CodecParams::setPartitionParams(Params params) {
   }
 
   int32_t bits = SinCos::kMaxAngleBits - f1;
-  for (int32_t i = 0; i < kMaxLevel; ++i) {
+  for (uint32_t i = 0; i < kMaxLevel; ++i) {
     int32_t level_bits = bits - i - (i * f4) / 2;
     angle_bits[i] = level_bits > 0 ? (static_cast<uint32_t>(level_bits)) : 0;
   }
@@ -111,7 +111,7 @@ uint32_t CodecParams::getLevel(const Vector<int32_t>& region) const {
 
   int32_t dx = max_x - min_x;
   int32_t dy = max_y + 1 - min_y;
-  int32_t d = dx * dx + dy * dy;
+  uint32_t d = static_cast<uint32_t>(dx * dx + dy * dy);
   for (uint32_t i = 0; i < kMaxLevel; ++i) {
     if (d >= levelScale[i]) {
       return i;

@@ -15,6 +15,8 @@ struct Image {
   std::vector<uint8_t> r;
   std::vector<uint8_t> g;
   std::vector<uint8_t> b;
+
+  static Image fromRgba(const uint8_t* src, uint32_t width, uint32_t height);
 };
 
 }  // namespace twim

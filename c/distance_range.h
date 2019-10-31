@@ -8,8 +8,8 @@ namespace twim {
 
 class DistanceRange {
  public:
-  void update(const Vector<int32_t>& region, int32_t angle,
-              const CodecParams& cp);
+  DistanceRange(const Vector<int32_t>& region, int32_t angle,
+                const CodecParams& cp);
 
   uint32_t INLINE distance(uint32_t line) {
     if (num_lines > 1) {
