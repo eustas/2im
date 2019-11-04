@@ -2,6 +2,8 @@
 #include "range_decoder.h"
 #include "range_encoder.h"
 
+#include <cstring>  /* memcmp */
+
 namespace twim {
 
 TEST(RangeTest, Golden) {
@@ -350,8 +352,8 @@ TEST(RangeTest, Golden) {
   EXPECT_EQ(0, std::memcmp(expected, data.data(), sizeof(expected)));
 
   RangeDecoder decoder(std::move(data));
-  for (int32_t i = 0; i < triplets_size; i += 3) {
-    int32_t val = decoder.currentCount(triplets[i + 2]);
+  for (size_t i = 0; i < triplets_size; i += 3) {
+    uint32_t val = decoder.currentCount(triplets[i + 2]);
     EXPECT_TRUE((val >= triplets[i]) && (val < triplets[i + 1]));
     decoder.removeRange(triplets[i], triplets[i + 1]);
   }
