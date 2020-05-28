@@ -62,7 +62,7 @@ function onInput() {
   let ctx = document.getElementById('canvas').getContext('2d');
   ctx.clearRect(0, 0, 64, 64);
   let encoded = new Uint8Array(Array.from(atob(input.value)).map(s => s.codePointAt(0)));
-  ctx.putImageData(window.decode2im(encoded, 64, 64), 0, 0);
+  ctx.putImageData(window.decode2im(encoded), 0, 0);
 }
 function onCopyClick(id) {
   let src = document.getElementById(id);

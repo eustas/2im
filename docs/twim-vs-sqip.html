@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,900">
+<style>
+  body {font-family: "Lato", sans-serif}
+  canvas {display: block}
+  #images * {padding: 0; margin: 0}
+  #images td, #images th {border: solid 1px #000;}
+</style>
+</head>
+<body>
+
+<div class="w3-content" style="max-width:2000px;margin-top:46px">
+  <div class="w3-light-gray" id="twim"><div class="w3-container w3-content w3-center" style="max-width:920px">
+    <h2 class="w3-wide">2im vs SQIP</h2>
+    <p class="w3-justify">
+      Same images as on SQIP demo <a href="https://axe312ger.github.io/sqip/">page</a>. SQIP size is SVG size
+      compressed with Brotli. 2im images had same target size, but some are 1..5 bytes larger.
+    </p>
+    <table id="images" class="w3-table-all w3-centered">
+      <tr class="w3-blue">
+        <th>Thumbnail</th>
+        <th>SQIP primitive art</th>
+        <th>2im</th>
+      </tr>
+    </table>
+  </div></div>
+  <div class="w3-margin-bottom"></div>
+</div>
+
+
+<script type="text/javascript" src="twim.js"></script>
+<script type="text/javascript">
+let items = [
+  {name: "aaron-burden-unsplash", sqipSize: 1101},
+  {name: "anthony-esau-unsplash", sqipSize: 1108},
+  {name: "aron-visuals-unsplash", sqipSize: 1114},
+  {name: "beach", sqipSize: 1084},
+  {name: "charles-unsplash", sqipSize: 1092},
+  {name: "eric-marty-unsplash", sqipSize: 1131},
+  {name: "ian-dooley-unsplash", sqipSize: 1122},
+  {name: "meric-dagli-unsplash", sqipSize: 1118},
+  {name: "mona-lisa", sqipSize: 1105},
+  {name: "quino-al-unsplash", sqipSize: 1041},
+  {name: "shane-young-unsplash", sqipSize: 1114}
+];
+
+function appendElement(parent, type) {
+  let result = document.createElement(type);
+  parent.appendChild(result);
+  return result;
+}
+
+function appendText(parent, text) {
+  let p = document.createElement("p");
+  let b = appendElement(p, "b");
+  b.textContent = text;
+  parent.appendChild(p);
+}
+
+function onTwimLoad(td, xhr) {
+  let data = new Uint8Array(xhr.response);
+  let start = performance.now();
+  let imageData = window.decode2im(data);
+  let end = performance.now();
+
+  let canvas = appendElement(td, "canvas");
+  let div = appendElement(td, "div");
+  appendText(div, "Size: " + data.length + " bytes");
+  appendText(div, "Decoding time: " + Math.round(end - start) + " ms");
+  canvas.width = imageData.width;
+  canvas.height = imageData.height;
+  let ctx = canvas.getContext('2d');
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function loadTwim(td, url) {
+  let xhr = new XMLHttpRequest();
+  xhr.responseType = "arraybuffer";
+  xhr.onload = onTwimLoad.bind(null, td, xhr);
+  xhr.open("GET", url);
+  xhr.send(null);
+}
+
+function onLoad() {
+  let table = document.getElementById("images").tBodies[0];
+  for (let i = 0; i < items.length; ++i) {
+    let item = items[i];
+    let tr = document.createElement("tr");
+    let tdThumbnail = appendElement(tr, "td");
+    let imgThumbnail = appendElement(tdThumbnail, "img");
+    imgThumbnail.src = "sqip/" + item.name + ".png";
+    let tdSqip = appendElement(tr, "td");
+    let imgSqip = appendElement(tdSqip, "img");
+    let divSqip = appendElement(tdSqip, "div");
+    appendText(divSqip, "Size: " + item.sqipSize + " bytes");
+    imgSqip.src = "sqip/" + item.name + ".svg";
+    let tdTwim = appendElement(tr, "td");
+    loadTwim(tdTwim, "sqip/" + item.name + ".2im");
+    table.appendChild(tr);
+  }
+}
+window.addEventListener('load', onLoad);
+
+</script>
+</body>
+</html>
