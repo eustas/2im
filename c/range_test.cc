@@ -317,36 +317,29 @@ TEST(RangeTest, Golden) {
   auto data = encoder.finish();
 
   int8_t expected[] = {
-      102,  70,   -56,  -121, -17,  117,  17,   3,    -61,  97,   -97,  84,
-      -73,  -117, -71,  97,   24,   90,   5,    2,    -124, 60,   -127, -80,
-      86,   -126, -34,  4,    8,    88,   28,   97,   92,   28,   54,   -85,
-      -97,  -73,  -27,  -39,  -70,  -73,  -49,  18,   -16,  -27,  27,   -55,
-      109,  77,   -68,  -53,  -102, -25,  18,   -81,  -57,  82,   -71,  25,
-      97,   -54,  6,    -82,  110,  -91,  -107, 23,   30,   -94,  -112, -38,
-      108,  -113, -111, 109,  -103, -54,  69,   64,   -38,  16,   -84,  42,
-      -85,  -19,  64,   50,   76,   -22,  -107, 43,   16,   -100, 93,   90,
-      6,    108,  55,   25,   70,   -84,  -22,  -57,  -7,   19,   -58,  -23,
-      -90,  95,   22,   -59,  -78,  103,  -125, 113,  -9,   63,   92,   -30,
-      -29,  91,   -25,  -88,  71,   31,   111,  -104, 111,  -25,  -93,  113,
-      96,   -78,  86,   -112, 104,  83,   -96,  -106, 8,    -31,  51,   -18,
-      89,   65,   67,   2,    86,   -106, 64,   -76,  114,  67,   69,   59,
-      115,  73,   21,   91,   104,  89,   -70,  -100, -79,  -47,  -88,  10,
-      109,  58,   -119, 96,   61,   -58,  123,  67,   38,   -47,  119,  41,
-      -111, 27,   -33,  -66,  59,   114,  10,   124,  117,  95,   -48,  67,
-      18,   -26,  120,  82,   51,   -1,   90,   -45,  -110, -7,   -44,  86,
-      114,  4,    -60,  -118, 46,   -73,  75,   42,   -33,  109,  72,   -26,
-      111,  -70,  61,   60,   -45,  -52,  95,   -8,   -1,   -103, -19,  -36,
-      -78,  45,   -39,  103,  -50,  52,   21,   -61,  54,   41,   75,   -5,
-      86,   124,  95,   -1,   16,   0,    -49,  -35,  67,   1,    -2,   -95,
-      93,   80,   -17,  -56,  -110, 118,  116,  110,  101,  -50,  55,   -54,
-      -102, -39,  -66,  -33,  -69,  -24,  105,  -77,  79,   -125, -16,  13,
-      -10,  -112, 113,  110,  -23,  9,    -109, -59,  124,  -68,  -27,  75,
-      18,   9,    99,   107,  -105, 69,   -35,  -86,  102,  -10,  101,  32,
-      -51,  -78,  -103, -69,  -113, -99,  -9,   28,   44,   -88,  99,   46,
-      -76,  -98,  48,   110,  73,   48,   14,   21,   77,   16,   68,   3,
-      -42,  23,   -26,  -68,  0,    -33,  -80,  12,   64,   -21,  62,   22,
-      82,   -97,  -17,  61,   105,  -78,  10,   7,    35,   78,   -89,  -102,
-      50,   -75,  -1,   -27,  103,  -40,  -66,  15};
+      102, 70, -56, -121, -17, 117, 17, 3, -61, 97, -97, 84, -73, -117, -71, 97,
+      24, 90, 5, 2, -124, 60, -127, -80, 86, -126, -34, 4, -24, 29, 28, 100, 27,
+      46, -102, -83, 111, -61, 17, -110, -122, -7, -58, -15, 127, 53, 68, -99,
+      -18, 55, 126, -75, -18, 90, 48, 105, 113, 39, -122, 31, -2, -54, 106, 101,
+      109, -101, -122, -6, -31, -128, 89, -78, 85, -51, -60, -73, -41, -57, 22,
+      125, -12, 89, 111, -1, -8, -69, 40, -25, -95, -65, -115, 87, 83, -69, 74,
+      31, -59, -85, 50, -107, -1, 102, -36, -43, -81, 116, -86, -1, 127, 26, 9,
+      -68, 62, 21, 69, 73, 45, 127, -37, -114, -50, -68, 59, -115, 1, -74, 94,
+      56, 82, 3, -106, 122, 31, -22, 99, 77, 91, 49, -115, 71, -57, -7, -13, 98,
+      47, 118, -76, -65, 23, -121, -96, -127, 77, 91, 123, 109, -32, -65, 82,
+      -84, -88, 88, 99, 126, -98, -30, 57, 26, 48, -1, 106, -96, 53, 8, 93, 107,
+      -49, -26, -124, 8, 38, 2, -1, -88, -126, 30, 127, -109, -16, 66, 25, -89,
+      -57, 11, 11, 78, -24, 119, 67, -18, -6, -53, -12, -48, 97, -100, 124, 91,
+      111, -107, -12, 28, -69, 19, 9, -9, -81, -60, 14, 23, -99, -121, 105, 50,
+      -97, -100, 115, 103, 41, 16, 65, 117, -57, -39, -63, 107, -128, -122, -15,
+      9, -9, 125, -54, -76, -4, 14, -35, -47, -107, 108, 98, 41, -45, 64, 30,
+      123, -77, 7, -47, 5, -39, 86, -127, -105, 59, 69, -51, 73, -64, 94, -96,
+      42, -122, -14, 50, 24, 56, -45, -49, 46, 26, -98, -110, -96, -116, 43, 24,
+      121, -79, 99, 39, -4, 112, 56, 11, -121, -5, -90, 4, 34, 35, -23, -50, 70,
+      -83, -126, 43, 73, -38, 122, -97, 114, 47, 10, -69, 100, 34, -39, 126,
+      -115, -82, 116, 24, 62, 117, 9, -116, 15, -111, 116, 63, -22, -108, 56,
+      -6, 9, 20, -12, -101, 70, -24, 99, -98, 80, 86, 50, -115, -32, -10, -94,
+      -128, -62, -95, -31, -15, 121};
   const size_t expected_size = sizeof(expected) / sizeof(expected[0]);
   EXPECT_EQ(expected_size, data.size());
   EXPECT_EQ(0, std::memcmp(expected, data.data(), sizeof(expected)));
@@ -359,16 +352,71 @@ TEST(RangeTest, Golden) {
   }
 }
 
+static uint32_t Rng(uint32_t* state) {
+  uint64_t next = *state;
+  next = (next * 16807u) % 0x7fffffffu;
+  *state = static_cast<uint32_t>(next);
+  return *state;
+}
+
+void TestRandom(size_t num_rounds, size_t num_triplets, size_t seed) {
+  uint32_t rng = seed;
+  std::vector<uint32_t> triplets(num_triplets * 3);
+  for (size_t r = 0; r < num_rounds; ++r) {
+    RangeEncoder encoder;
+    for (size_t i = 0; i < num_triplets * 3; i += 3) {
+      uint32_t lo = Rng(&rng) % 7;
+      uint32_t span = 1 + Rng(&rng) % 5;
+      uint32_t hi = lo + span;
+      uint32_t total = hi + Rng(&rng) % 7;
+      encoder.encodeRange({lo, hi, total});
+      triplets[i] = lo;
+      triplets[i + 1] = hi;
+      triplets[i + 2] = total;
+    }
+    auto data = encoder.finish();
+
+    RangeDecoder decoder(std::move(data));
+    for (size_t i = 0; i < num_triplets * 3; i += 3) {
+      uint32_t val = decoder.currentCount(triplets[i + 2]);
+      ASSERT_TRUE((val >= triplets[i]) && (val < triplets[i + 1]));
+      decoder.removeRange(triplets[i], triplets[i + 1]);
+    }
+  }
+}
+
+TEST(RangeTest, Random10) { TestRandom(100000, 10, 42); }
+TEST(RangeTest, Random20) { TestRandom(100000, 20, 43); }
+TEST(RangeTest, Random30) { TestRandom(100000, 30, 44); }
+TEST(RangeTest, Random40) { TestRandom(100000, 40, 45); }
+TEST(RangeTest, Random50) { TestRandom(100000, 50, 46); }
+TEST(RangeTest, Random60) { TestRandom(100000, 60, 47); }
+TEST(RangeTest, Random70) { TestRandom(100000, 70, 48); }
+TEST(RangeTest, Random80) { TestRandom(100000, 80, 49); }
+TEST(RangeTest, Random90) { TestRandom(100000, 90, 50); }
+TEST(RangeTest, Random10000000) { TestRandom(1, 10000000, 51); }
+
 TEST(RangeTest, Optimizer) {
   RangeEncoder encoder;
-  for (uint32_t i = 42; i < 48; ++i) encoder.encodeRange({i, i + 1, 256});
-  encoder.encodeRange({1, 2, 257});
-  const auto data = encoder.finish();
+  const size_t kLength = 12;
+  for (uint32_t i = 42; i < 42 + kLength; ++i) {
+    encoder.encodeRange({i, i + 1, 256});
+  }
+  auto data = encoder.finish();
 
-  int8_t expected[] = {42, 43, 44, 45, 45, -39, -43};
+  int8_t expected[] = {42, 43, 44, 45, 45, -38, 4, 4, 4, 4, 4, 4};
   const size_t expected_size = sizeof(expected) / sizeof(expected[0]);
+  ASSERT_EQ(kLength, expected_size);
   EXPECT_EQ(expected_size, data.size());
   EXPECT_EQ(0, std::memcmp(expected, data.data(), sizeof(expected)));
+
+  RangeDecoder decoder(std::move(data));
+  for (size_t i = 42; i < 54; ++i) {
+    uint32_t val = decoder.currentCount(256);
+    EXPECT_EQ(i, val);
+    decoder.removeRange(i, i + 1);
+  }
 }
+
 
 }  // namespace twim

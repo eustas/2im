@@ -152,7 +152,7 @@ java_library(
         ":sin_cos",
         ":utf_decoder",
         ":utf_encoder",
-        "@junit_junit//jar",
+        "@maven//:junit_junit",
     ],
 )
 

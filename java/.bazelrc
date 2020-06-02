@@ -1,3 +1,0 @@
-build --javacopt="-source 9" --javacopt="-target 9"
-run --javabase=@bazel_tools//tools/jdk:remote_jdk
-test --javabase=@bazel_tools//tools/jdk:remote_jdk

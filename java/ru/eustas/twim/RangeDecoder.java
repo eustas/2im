@@ -53,10 +53,10 @@ final class RangeDecoder {
         if (range > RANGE_LIMIT_MASK) {
           break;
         }
-        range = -low & RANGE_LIMIT_MASK;
+        range = -low & VALUE_MASK;
       }
       code = ((code << NIBBLE_BITS) & VALUE_MASK) | readNibble();
-      range = (range << NIBBLE_BITS) & VALUE_MASK;
+      range = ((range << NIBBLE_BITS) & VALUE_MASK) | NIBBLE_MASK;
       low = (low << NIBBLE_BITS) & VALUE_MASK;
     }
   }

@@ -48,11 +48,11 @@ void RangeDecoder::removeRange(uint32_t bottom, uint32_t top) {
       if (range > RangeCode::kRangeLimitMask) {
         break;
       }
-      range = -low & RangeCode::kRangeLimitMask;
+      range = -low & RangeCode::kValueMask;
     }
     code = ((code << RangeCode::kNibbleBits) & RangeCode::kValueMask) |
            readNibble();
-    range = (range << RangeCode::kNibbleBits) & RangeCode::kValueMask;
+    range = ((range << RangeCode::kNibbleBits) & RangeCode::kValueMask) | RangeCode::kNibbleMask;
     low = (low << RangeCode::kNibbleBits) & RangeCode::kValueMask;
   }
 }

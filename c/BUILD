@@ -164,6 +164,7 @@ cc_test(
         ":range_encoder",
         "@gtest//:main",
     ],
+    shard_count = 10,
 )
 
 cc_test(

@@ -30,12 +30,12 @@ struct Decoder {
         if (range > RangeCode::kRangeLimitMask) {
           break;
         }
-        range = -low & RangeCode::kRangeLimitMask;
+        range = -low & RangeCode::kValueMask;
       }
       uint64_t nibble = (offset < data_length) ? (data[offset++] & 0xFFu) : 0;
       code =
           ((code << RangeCode::kNibbleBits) & RangeCode::kValueMask) | nibble;
-      range = (range << RangeCode::kNibbleBits) & RangeCode::kValueMask;
+      range = ((range << RangeCode::kNibbleBits) & RangeCode::kValueMask) | RangeCode::kNibbleMask;
       low = (low << RangeCode::kNibbleBits) & RangeCode::kValueMask;
     }
     return true;
@@ -79,10 +79,10 @@ std::vector<uint8_t> RangeEncoder::encode() {
         if (range > RangeCode::kRangeLimitMask) {
           break;
         }
-        range = -low & RangeCode::kRangeLimitMask;
+        range = -low & RangeCode::kValueMask;
       }
       out.emplace_back(low >> RangeCode::kHeadNibbleShift);
-      range = (range << RangeCode::kNibbleBits) & RangeCode::kValueMask;
+      range = ((range << RangeCode::kNibbleBits) & RangeCode::kValueMask) | RangeCode::kNibbleMask;
       low = (low << RangeCode::kNibbleBits) & RangeCode::kValueMask;
     }
   }
@@ -95,7 +95,7 @@ std::vector<uint8_t> RangeEncoder::encode() {
 
 std::vector<uint8_t> RangeEncoder::optimize(std::vector<uint8_t> data) {
   // KISS
-  if (data.size() <= RangeCode::kNumNibbles) {
+  if (data.size() <= 2 * RangeCode::kNumNibbles) {
     return data;
   }
 
@@ -111,7 +111,7 @@ std::vector<uint8_t> RangeEncoder::optimize(std::vector<uint8_t> data) {
   size_t i = 0;
   while (i < triplets_size) {
     current.decodeRange(triplets[i]);
-    if (current.offset + RangeCode::kNumNibbles > data.size()) {
+    if (current.offset + 2 * RangeCode::kNumNibbles > data.size()) {
       break;
     }
     good = current;

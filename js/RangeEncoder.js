@@ -58,12 +58,12 @@ class Decoder {
         if (this.range > 4294967295) {
           break;
         }
-        this.range = (281474976710656 - this.low) % 4294967296;
+        this.range = 281474976710656 - this.low;
       }
       let /** @type{number} */ nibble =
           (this.offset < this.dataLength) ? (this.data[this.offset++] | 0) : 0;
       this.code = ((this.code % 1099511627776) * 256) + nibble;
-      this.range = (this.range % 1099511627776) * 256;
+      this.range = (this.range % 1099511627776) * 256 + 255;
       this.low = (this.low % 1099511627776) * 256;
     }
     return true;
@@ -110,10 +110,10 @@ export class RangeEncoder {
           if (range > 4294967295) {
             break;
           }
-          range = (281474976710656 - low) % 4294967296;
+          range = 281474976710656 - low;
         }
         out.push(Math.floor(low / 1099511627776) & 255);
-        range = (range % 1099511627776) * 256;
+        range = (range % 1099511627776) * 256 + 255;
         low = (low % 1099511627776) * 256;
       }
     }
@@ -132,7 +132,7 @@ export class RangeEncoder {
   optimize(data) {
     let /** @type{number} */ dataLength = data.length;
     // KISS
-    if (dataLength <= 6) {
+    if (dataLength <= 12) {
       return data;
     }
 
@@ -150,7 +150,7 @@ export class RangeEncoder {
     while (i < tripletsSize) {
       current.decodeRange(
           this.triplets[i], this.triplets[i + 1], this.triplets[i + 2]);
-      if (current.offset + 6 > dataLength) {
+      if (current.offset + 12 > dataLength) {
         break;
       }
       good.copy(current);

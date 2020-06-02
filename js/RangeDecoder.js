@@ -47,10 +47,10 @@ export let removeRange = (bottom, top) => {
       if (_range >= b32) {
         break;
       }
-      _range = (b48 - _low) % b32;
+      _range = b48 - _low;
     }
     _code = ((_code % b40) * b8) + nextByte();
-    _range = (_range % b40) * b8;
+    _range = (_range % b40) * b8 + b8 - 1;
     _low = (_low % b40) * b8;
   }
 };

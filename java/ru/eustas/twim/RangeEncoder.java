@@ -1,16 +1,17 @@
 package ru.eustas.twim;
 
+import static ru.eustas.twim.RangeCode.HEAD_NIBBLE_SHIFT;
+import static ru.eustas.twim.RangeCode.HEAD_START;
+import static ru.eustas.twim.RangeCode.NIBBLE_BITS;
+import static ru.eustas.twim.RangeCode.NIBBLE_MASK;
+import static ru.eustas.twim.RangeCode.NUM_NIBBLES;
+import static ru.eustas.twim.RangeCode.RANGE_LIMIT_MASK;
+import static ru.eustas.twim.RangeCode.VALUE_MASK;
+
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static ru.eustas.twim.RangeCode.HEAD_NIBBLE_SHIFT;
-import static ru.eustas.twim.RangeCode.HEAD_START;
-import static ru.eustas.twim.RangeCode.NIBBLE_BITS;
-import static ru.eustas.twim.RangeCode.NUM_NIBBLES;
-import static ru.eustas.twim.RangeCode.RANGE_LIMIT_MASK;
-import static ru.eustas.twim.RangeCode.VALUE_MASK;
 
 final class RangeEncoder {
   private final List<Integer> triplets = new ArrayList<>();
@@ -59,10 +60,10 @@ final class RangeEncoder {
           if (range > RANGE_LIMIT_MASK) {
             break;
           }
-          range = -low & RANGE_LIMIT_MASK;
+          range = -low & VALUE_MASK;
         }
         out.write((int) (low >> HEAD_NIBBLE_SHIFT));
-        range = (range << NIBBLE_BITS) & VALUE_MASK;
+        range = ((range << NIBBLE_BITS) & VALUE_MASK) | NIBBLE_MASK;
         low = (low << NIBBLE_BITS) & VALUE_MASK;
       }
     }
@@ -106,11 +107,11 @@ final class RangeEncoder {
           if (range > RANGE_LIMIT_MASK) {
             break;
           }
-          range = -low & RANGE_LIMIT_MASK;
+          range = -low & VALUE_MASK;
         }
         long nibble = (offset < dataLength) ? (data[offset++] & 0xFF) : 0;
         code = ((code << NIBBLE_BITS) & VALUE_MASK) | nibble;
-        range = (range << NIBBLE_BITS) & VALUE_MASK;
+        range = ((range << NIBBLE_BITS) & VALUE_MASK) | NIBBLE_MASK;
         low = (low << NIBBLE_BITS) & VALUE_MASK;
       }
       return true;
@@ -119,7 +120,7 @@ final class RangeEncoder {
 
   private byte[] optimize(byte[] data) {
     // KISS
-    if (data.length <= NUM_NIBBLES) {
+    if (data.length <= 2 * NUM_NIBBLES) {
       return data;
     }
 
@@ -136,7 +137,7 @@ final class RangeEncoder {
     int i = 0;
     while (i < tripletsSize) {
       current.decodeRange(triplets.get(i), triplets.get(i + 1), triplets.get(i + 2));
-      if (current.offset + NUM_NIBBLES > data.length) {
+      if (current.offset + 2 * NUM_NIBBLES > data.length) {
         break;
       }
       good.copy(current);
