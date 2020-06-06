@@ -63,6 +63,9 @@ final class RangeDecoder {
 
   final int currentCount(int totalRange) {
     range /= totalRange;
+    if (range == 0) {
+      throw new IllegalArgumentException("corrupted input");
+    }
     int result = (int) ((code - low) / range);
     if (result < 0 || result > totalRange) {
       throw new IllegalArgumentException("corrupted input");

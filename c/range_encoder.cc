@@ -19,10 +19,9 @@ struct Decoder {
 
   bool INLINE decodeRange(Triplet t) {
     range /= t.total_range;
+    if (range == 0) return false;
     uint32_t count = static_cast<uint32_t>((code - low) / range);
-    if ((count < t.bottom) || (count >= t.top)) {
-      return false;
-    }
+    if ((count < t.bottom) || (count >= t.top)) return false;
     low += t.bottom * range;
     range *= t.top - t.bottom;
     while (true) {

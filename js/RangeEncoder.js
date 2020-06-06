@@ -45,10 +45,9 @@ class Decoder {
    */
   decodeRange(totalRange, bottom, top) {
     this.range = Math.floor(this.range / totalRange);
+    if (this.range == 0) return false;
     let /** @type{number} */ count = Math.floor((this.code - this.low) / this.range);
-    if ((count < bottom) || (count >= top)) {
-      return false;
-    }
+    if ((count < bottom) || (count >= top)) return false;
 
     this.low += bottom * this.range;
     this.range *= top - bottom;

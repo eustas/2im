@@ -61,6 +61,7 @@ export let removeRange = (bottom, top) => {
  */
 export let currentCount = (totalRange) => {
   _range = mathFloor(_range / totalRange);
+  assertFalse(_range == 0);
   let result = mathFloor((_code - _low) / _range);
   assertFalse(result < 0 || result >= totalRange);
   return result;

@@ -96,10 +96,9 @@ final class RangeEncoder {
 
     boolean decodeRange(int totalRange, int bottom, int top) {
       range /= totalRange;
+      if (range == 0) return false;
       int count = (int) ((code - low) / range);
-      if ((count < bottom) || (count >= top)) {
-        return false;
-      }
+      if ((count < bottom) || (count >= top)) return false;
       low += bottom * range;
       range *= top - bottom;
       while (true) {

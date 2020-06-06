@@ -59,6 +59,10 @@ void RangeDecoder::removeRange(uint32_t bottom, uint32_t top) {
 
 uint32_t RangeDecoder::currentCount(uint32_t totalRange) {
   range /= totalRange;
+  if (range == 0) {
+    healthy = false;
+    return 0;
+  }
   uint32_t result = (uint32_t)((code - low) / range);
   // corrupted input
   if (result > totalRange) {
