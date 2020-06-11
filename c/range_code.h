@@ -23,4 +23,4 @@ class RangeCode {
 
 }  // namespace twim
 
-#endif  // TWIM_RANGE_ENCODER
+#endif  // TWIM_RANGE_CODE

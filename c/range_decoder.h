@@ -10,14 +10,15 @@ namespace twim {
 class RangeDecoder {
  public:
   explicit RangeDecoder(std::vector<uint8_t>&& data);
-  void removeRange(uint32_t bottom, uint32_t top);
-  uint32_t currentCount(uint32_t totalRange);
 
   static uint32_t readNumber(RangeDecoder* src, uint32_t max);
-  static uint32_t readSize(RangeDecoder* src);
 
  private:
   uint32_t readNibble();
+
+  friend class RangeTestFriend;
+  void removeRange(uint32_t bottom, uint32_t top);
+  uint32_t currentCount(uint32_t totalRange);
 
   std::vector<uint8_t> data;
   uint64_t low;

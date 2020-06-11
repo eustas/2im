@@ -49,22 +49,6 @@ void RangeEncoder::writeNumber(RangeEncoder* dst, uint32_t max,
   dst->encodeRange({value, value + 1, max});
 }
 
-void RangeEncoder::writeSize(RangeEncoder* dst, uint32_t value) {
-  value -= 8;
-  uint32_t chunks = 2;
-  while (value > (1u << (chunks * 3))) {
-    value -= (1u << (chunks * 3));
-    chunks++;
-  }
-  for (uint32_t i = 0; i < chunks; ++i) {
-    if (i > 1) {
-      writeNumber(dst, 2, 1);
-    }
-    writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7u);
-  }
-  writeNumber(dst, 2, 0);
-}
-
 std::vector<uint8_t> RangeEncoder::encode() {
   std::vector<uint8_t> out;
   uint64_t low = 0;

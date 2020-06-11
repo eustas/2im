@@ -61,9 +61,21 @@ std::string CodecParams::toString() const {
   return out.str();
 }
 
+template <typename Decoder>
+uint32_t readSize(Decoder* src) {
+  uint32_t plus = 0;
+  uint32_t bits = Decoder::readNumber(src, 8);
+  do {
+    plus = (plus + 1) << 3u;
+    uint32_t extra = Decoder::readNumber(src, 8);
+    bits = (bits << 3u) + extra;
+  } while ((Decoder::readNumber(src, 2) == 1));
+  return bits + plus;
+}
+
 CodecParams CodecParams::read(RangeDecoder* src) {
-  uint32_t width = RangeDecoder::readSize(src);
-  uint32_t height = RangeDecoder::readSize(src);
+  uint32_t width = readSize(src);
+  uint32_t height = readSize(src);
   CodecParams cp(width, height);
   Params params = {RangeDecoder::readNumber(src, kMaxF1),
                    RangeDecoder::readNumber(src, kMaxF2),
@@ -75,9 +87,26 @@ CodecParams CodecParams::read(RangeDecoder* src) {
   return cp;
 }
 
+template <typename Encoder>
+void writeSize(Encoder* dst, uint32_t value) {
+  value -= 8;
+  uint32_t chunks = 2;
+  while (value > (1u << (chunks * 3))) {
+    value -= (1u << (chunks * 3));
+    chunks++;
+  }
+  for (uint32_t i = 0; i < chunks; ++i) {
+    if (i > 1) {
+      Encoder::writeNumber(dst, 2, 1);
+    }
+    Encoder::writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7u);
+  }
+  Encoder::writeNumber(dst, 2, 0);
+}
+
 void CodecParams::write(RangeEncoder* dst) const {
-  RangeEncoder::writeSize(dst, width);
-  RangeEncoder::writeSize(dst, height);
+  writeSize(dst, width);
+  writeSize(dst, height);
   RangeEncoder::writeNumber(dst, kMaxF1, params[0]);
   RangeEncoder::writeNumber(dst, kMaxF2, params[1]);
   RangeEncoder::writeNumber(dst, kMaxF3, params[2]);

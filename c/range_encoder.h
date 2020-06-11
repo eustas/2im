@@ -16,17 +16,16 @@ struct Triplet {
 
 class RangeEncoder {
  public:
-  void INLINE encodeRange(Triplet triplet) { triplets.emplace_back(triplet); }
-
   std::vector<uint8_t> finish() { return optimize(encode()); }
 
   static void writeNumber(RangeEncoder* dst, uint32_t max, uint32_t value);
 
-  static void writeSize(RangeEncoder* dst, uint32_t value);
-
  private:
   std::vector<uint8_t> encode();
   std::vector<uint8_t> optimize(std::vector<uint8_t> data);
+
+  friend class RangeTestFriend;
+  void INLINE encodeRange(Triplet triplet) { triplets.emplace_back(triplet); }
 
   std::vector<Triplet> triplets;
 };

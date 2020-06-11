@@ -6,6 +6,20 @@
 
 namespace twim {
 
+//  Friend-proxy; otherwise we would have to "friend" with every test case.
+class RangeTestFriend {
+ public:
+  static void encodeRange(RangeEncoder* dst, Triplet triplet) {
+    dst->encodeRange(triplet);
+  }
+  static uint32_t currentCount(RangeDecoder* src, uint32_t total) {
+    return src->currentCount(total);
+  }
+  static void removeRange(RangeDecoder* src, uint32_t bottom, uint32_t top) {
+    src->removeRange(bottom, top);
+  }
+};
+
 TEST(RangeTest, Golden) {
   uint32_t triplets[] = {
       8002,  29338, 61815, 11202, 13541, 15183, 7458,  11303, 38428, 29856,
@@ -312,7 +326,8 @@ TEST(RangeTest, Golden) {
   RangeEncoder encoder;
   const size_t triplets_size = sizeof(triplets) / sizeof(triplets[0]);
   for (size_t i = 0; i < triplets_size; i += 3) {
-    encoder.encodeRange({triplets[i], triplets[i + 1], triplets[i + 2]});
+    RangeTestFriend::encodeRange(&encoder,
+        {triplets[i], triplets[i + 1], triplets[i + 2]});
   }
   auto data = encoder.finish();
 
@@ -346,9 +361,9 @@ TEST(RangeTest, Golden) {
 
   RangeDecoder decoder(std::move(data));
   for (size_t i = 0; i < triplets_size; i += 3) {
-    uint32_t val = decoder.currentCount(triplets[i + 2]);
+    uint32_t val = RangeTestFriend::currentCount(&decoder, triplets[i + 2]);
     EXPECT_TRUE((val >= triplets[i]) && (val < triplets[i + 1]));
-    decoder.removeRange(triplets[i], triplets[i + 1]);
+    RangeTestFriend::removeRange(&decoder, triplets[i], triplets[i + 1]);
   }
 }
 
@@ -369,7 +384,7 @@ void TestRandom(size_t num_rounds, size_t num_triplets, size_t seed) {
       uint32_t span = 1 + Rng(&rng) % 5;
       uint32_t hi = lo + span;
       uint32_t total = hi + Rng(&rng) % 7;
-      encoder.encodeRange({lo, hi, total});
+      RangeTestFriend::encodeRange(&encoder, {lo, hi, total});
       triplets[i] = lo;
       triplets[i + 1] = hi;
       triplets[i + 2] = total;
@@ -378,9 +393,9 @@ void TestRandom(size_t num_rounds, size_t num_triplets, size_t seed) {
 
     RangeDecoder decoder(std::move(data));
     for (size_t i = 0; i < num_triplets * 3; i += 3) {
-      uint32_t val = decoder.currentCount(triplets[i + 2]);
+      uint32_t val = RangeTestFriend::currentCount(&decoder, triplets[i + 2]);
       ASSERT_TRUE((val >= triplets[i]) && (val < triplets[i + 1]));
-      decoder.removeRange(triplets[i], triplets[i + 1]);
+      RangeTestFriend::removeRange(&decoder, triplets[i], triplets[i + 1]);
     }
   }
 }
@@ -400,7 +415,7 @@ TEST(RangeTest, Optimizer) {
   RangeEncoder encoder;
   const size_t kLength = 12;
   for (uint32_t i = 42; i < 42 + kLength; ++i) {
-    encoder.encodeRange({i, i + 1, 256});
+    RangeTestFriend::encodeRange(&encoder, {i, i + 1, 256});
   }
   auto data = encoder.finish();
 
@@ -412,9 +427,9 @@ TEST(RangeTest, Optimizer) {
 
   RangeDecoder decoder(std::move(data));
   for (size_t i = 42; i < 54; ++i) {
-    uint32_t val = decoder.currentCount(256);
+    uint32_t val = RangeTestFriend::currentCount(&decoder, 256);
     EXPECT_EQ(i, val);
-    decoder.removeRange(i, i + 1);
+    RangeTestFriend::removeRange(&decoder, i, i + 1);
   }
 }
 

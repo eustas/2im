@@ -13,17 +13,6 @@ uint32_t RangeDecoder::readNumber(RangeDecoder* src, uint32_t max) {
   return result;
 }
 
-uint32_t RangeDecoder::readSize(RangeDecoder* src) {
-  uint32_t plus = 0;
-  uint32_t bits = readNumber(src, 8);
-  do {
-    plus = (plus + 1) << 3u;
-    uint32_t extra = readNumber(src, 8);
-    bits = (bits << 3u) + extra;
-  } while ((readNumber(src, 2) == 1));
-  return bits + plus;
-}
-
 RangeDecoder::RangeDecoder(std::vector<uint8_t>&& data)
     : data(std::move(data)),
       low(0),
