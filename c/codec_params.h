@@ -4,8 +4,6 @@
 #include <string>
 
 #include "platform.h"
-#include "range_decoder.h"
-#include "range_encoder.h"
 #include "sin_cos.h"
 
 namespace twim {
@@ -23,8 +21,12 @@ class NodeType {
 class CodecParams {
  public:
   CodecParams(uint32_t width, uint32_t height) : width(width), height(height) {}
-  static CodecParams read(RangeDecoder* src);
-  void write(RangeEncoder* dst) const;
+
+  template<typename EntropyDecoder>
+  static CodecParams read(EntropyDecoder* src);
+
+  template<typename EntropyEncoder>
+  void write(EntropyEncoder* dst) const;
 
   constexpr int32_t getLineQuant() const { return SinCos::kOne; }
 

@@ -65,6 +65,35 @@ cc_library(
 )
 
 cc_library(
+    name = "xrange_code",
+    hdrs = ["xrange_code.h"],
+    copts = DEFAULT_COPTS,
+    deps = [":platform"],
+)
+
+cc_library(
+    name = "xrange_decoder",
+    srcs = ["xrange_decoder.cc"],
+    hdrs = ["xrange_decoder.h"],
+    copts = DEFAULT_COPTS,
+    deps = [
+        ":platform",
+        ":xrange_code",
+    ],
+)
+
+cc_library(
+    name = "xrange_encoder",
+    srcs = ["xrange_encoder.cc"],
+    hdrs = ["xrange_encoder.h"],
+    copts = DEFAULT_COPTS,
+    deps = [
+        ":platform",
+        ":xrange_code",
+    ],
+)
+
+cc_library(
     name = "region",
     srcs = ["region.cc"],
     hdrs = ["region.h"],
@@ -82,8 +111,8 @@ cc_library(
     copts = DEFAULT_COPTS,
     deps = [
         ":platform",
-        ":range_decoder",
-        ":range_encoder",
+        ":xrange_decoder",
+        ":xrange_encoder",
         ":sin_cos",
     ],
 )
@@ -110,7 +139,7 @@ cc_library(
         ":distance_range",
         ":image",
         ":platform",
-        ":range_decoder",
+        ":xrange_decoder",
         ":region",
         ":sin_cos",
     ],
@@ -165,6 +194,18 @@ cc_test(
         "@gtest//:main",
     ],
     shard_count = 10,
+)
+
+cc_test(
+    name = "xrange_test",
+    srcs = ["xrange_test.cc"],
+    copts = TEST_COPTS,
+    deps = [
+        ":xrange_decoder",
+        ":xrange_encoder",
+        "@gtest//:main",
+    ],
+    shard_count = 5,
 )
 
 cc_test(

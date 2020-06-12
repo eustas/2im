@@ -12,6 +12,7 @@
 #include "image.h"
 #include "platform.h"
 #include "region.h"
+#include "xrange_encoder.h"
 
 namespace twim {
 
@@ -555,16 +556,18 @@ UberCache::UberCache(const Image& src)
 Fragment::Fragment(Owned<Vector<int32_t>>&& region)
     : region(std::move(region)) {}
 
-SIMD NOINLINE void Fragment::encode(RangeEncoder* dst, const CodecParams& cp,
+template<typename EntropyEncoder>
+SIMD NOINLINE void Fragment::encode(EntropyEncoder* dst, const CodecParams& cp,
                                     bool is_leaf, const float* RESTRICT palette,
                                     std::vector<Fragment*>* children) {
   if (is_leaf) {
-    RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
+    EntropyEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
     if (cp.palette_size == 0) {
       float quant = static_cast<float>(cp.color_quant - 1) / 255.0f;
       for (size_t c = 0; c < 3; ++c) {
-        uint32_t v = static_cast<uint32_t>(lroundf(quant * rgb(stats, c) / pixelCount(stats)));
-        RangeEncoder::writeNumber(dst, cp.color_quant, v);
+        uint32_t v = static_cast<uint32_t>(lroundf(
+            quant * rgb(stats, c) / pixelCount(stats)));
+        EntropyEncoder::writeNumber(dst, cp.color_quant, v);
       }
     } else {
       uint32_t index;
@@ -575,14 +578,14 @@ SIMD NOINLINE void Fragment::encode(RangeEncoder* dst, const CodecParams& cp,
       // It is not necessary, but let's be consistent.
       const auto rgb0 = blend<0x8>(kVHF, rgb1, zero(kVHF));
       chooseColor(rgb0, palette, cp.palette_size, &index, &dummy);
-      RangeEncoder::writeNumber(dst, cp.palette_size, index);
+      EntropyEncoder::writeNumber(dst, cp.palette_size, index);
     }
     return;
   }
-  RangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::HALF_PLANE);
+  EntropyEncoder::writeNumber(dst, NodeType::COUNT, NodeType::HALF_PLANE);
   uint32_t maxAngle = 1u << cp.angle_bits[level];
-  RangeEncoder::writeNumber(dst, maxAngle, best_angle_code);
-  RangeEncoder::writeNumber(dst, best_num_lines, best_line);
+  EntropyEncoder::writeNumber(dst, maxAngle, best_angle_code);
+  EntropyEncoder::writeNumber(dst, best_num_lines, best_line);
   children->push_back(left_child.get());
   children->push_back(right_child.get());
 }
@@ -666,6 +669,7 @@ void SIMD NOINLINE Fragment::findBestSubdivision(Cache* cache, CodecParams cp) {
   }
 }
 
+template<typename EntropyEncoder>
 std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
                               const std::vector<Fragment*>* partition,
                               const CodecParams& cp,
@@ -677,13 +681,13 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
   queue.reserve(n);
   queue.push_back(partition->at(0));
 
-  RangeEncoder dst;
+  EntropyEncoder dst;
   cp.write(&dst);
 
   for (uint32_t j = 0; j < m; ++j) {
     for (size_t c = 0; c < 3; ++c) {
       uint32_t clr = static_cast<uint32_t>(palette[4 * j + c]);
-      RangeEncoder::writeNumber(&dst, 256, clr);
+      EntropyEncoder::writeNumber(&dst, 256, clr);
     }
   }
 
@@ -779,6 +783,7 @@ SIMD NOINLINE Owned<Vector<float>> buildPalette(
 
 namespace Encoder {
 
+template <typename EntropyEncoder>
 std::vector<uint8_t> encode(const Image& src, uint32_t target_size) {
   int32_t width = src.width;
   int32_t height = src.height;
@@ -834,7 +839,8 @@ std::vector<uint8_t> encode(const Image& src, uint32_t target_size) {
   Owned<Vector<float>> patches = gatherPatches(partition, num_non_leaf);
   Owned<Vector<float>> palette = buildPalette(patches, cp.palette_size);
   float* RESTRICT colors = palette->data();
-  std::vector<uint8_t> result = doEncode(num_non_leaf, partition, cp, colors);
+  std::vector<uint8_t> result =
+      doEncode<EntropyEncoder>(num_non_leaf, partition, cp, colors);
   // << Encoder workflow
 
   std::string best_cp = best_task.cp.toString();
@@ -843,6 +849,9 @@ std::vector<uint8_t> encode(const Image& src, uint32_t target_size) {
           std::sqrt(best_sqe / static_cast<float>(width * height)));
   return result;
 }
+
+template
+std::vector<uint8_t> encode<XRangeEncoder>(const Image& src, uint32_t target_size);
 
 }  // namespace Encoder
 

@@ -8,6 +8,7 @@ namespace twim {
 
 class Decoder {
  public:
+  template<typename EntropyDecoder>
   static Image decode(std::vector<uint8_t>&& encoded);
 };
 

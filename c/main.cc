@@ -4,6 +4,8 @@
 #include "encoder.h"
 #include "io.h"
 #include "platform.h"
+#include "xrange_decoder.h"
+#include "xrange_encoder.h"
 
 namespace twim {
 
@@ -57,7 +59,7 @@ int main(int argc, char* argv[]) {
     std::string path(argv[i]);
     if (encode) {
       const Image src = Io::readPng(path);
-      auto data = Encoder::encode(src, target_size);
+      auto data = Encoder::encode<XRangeEncoder>(src, target_size);
       if (append_size) {
         path += "." + std::to_string(data.size());
       }
@@ -70,7 +72,7 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Failed to read [%s].\n", path.c_str());
         continue;
       }
-      Image decoded = Decoder::decode(std::move(data));
+      Image decoded = Decoder::decode<XRangeDecoder>(std::move(data));
       if (decoded.height == 0) {
         fprintf(stderr, "Corrupted image [%s].\n", path.c_str());
         continue;

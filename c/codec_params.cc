@@ -5,6 +5,8 @@
 
 #include "platform.h"
 #include "sin_cos.h"
+#include "xrange_decoder.h"
+#include "xrange_encoder.h"
 
 namespace twim {
 
@@ -61,34 +63,38 @@ std::string CodecParams::toString() const {
   return out.str();
 }
 
-template <typename Decoder>
-uint32_t readSize(Decoder* src) {
+template <typename EntropyDecoder>
+uint32_t readSize(EntropyDecoder* src) {
   uint32_t plus = 0;
-  uint32_t bits = Decoder::readNumber(src, 8);
+  uint32_t bits = EntropyDecoder::readNumber(src, 8);
   do {
     plus = (plus + 1) << 3u;
-    uint32_t extra = Decoder::readNumber(src, 8);
+    uint32_t extra = EntropyDecoder::readNumber(src, 8);
     bits = (bits << 3u) + extra;
-  } while ((Decoder::readNumber(src, 2) == 1));
+  } while ((EntropyDecoder::readNumber(src, 2) == 1));
   return bits + plus;
 }
 
-CodecParams CodecParams::read(RangeDecoder* src) {
+template <typename EntropyDecoder>
+CodecParams CodecParams::read(EntropyDecoder* src) {
   uint32_t width = readSize(src);
   uint32_t height = readSize(src);
   CodecParams cp(width, height);
-  Params params = {RangeDecoder::readNumber(src, kMaxF1),
-                   RangeDecoder::readNumber(src, kMaxF2),
-                   RangeDecoder::readNumber(src, kMaxF3),
-                   RangeDecoder::readNumber(src, kMaxF4)};
+  Params params = {EntropyDecoder::readNumber(src, kMaxF1),
+                   EntropyDecoder::readNumber(src, kMaxF2),
+                   EntropyDecoder::readNumber(src, kMaxF3),
+                   EntropyDecoder::readNumber(src, kMaxF4)};
   cp.setPartitionParams(params);
-  cp.line_limit = RangeDecoder::readNumber(src, kMaxLineLimit) + 1;
-  cp.setColorCode(RangeDecoder::readNumber(src, kMaxColorCode));
+  cp.line_limit = EntropyDecoder::readNumber(src, kMaxLineLimit) + 1;
+  cp.setColorCode(EntropyDecoder::readNumber(src, kMaxColorCode));
   return cp;
 }
 
-template <typename Encoder>
-void writeSize(Encoder* dst, uint32_t value) {
+template
+CodecParams CodecParams::read(XRangeDecoder* src);
+
+template <typename EntropyEncoder>
+void writeSize(EntropyEncoder* dst, uint32_t value) {
   value -= 8;
   uint32_t chunks = 2;
   while (value > (1u << (chunks * 3))) {
@@ -97,23 +103,27 @@ void writeSize(Encoder* dst, uint32_t value) {
   }
   for (uint32_t i = 0; i < chunks; ++i) {
     if (i > 1) {
-      Encoder::writeNumber(dst, 2, 1);
+      EntropyEncoder::writeNumber(dst, 2, 1);
     }
-    Encoder::writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7u);
+    EntropyEncoder::writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7u);
   }
-  Encoder::writeNumber(dst, 2, 0);
+  EntropyEncoder::writeNumber(dst, 2, 0);
 }
 
-void CodecParams::write(RangeEncoder* dst) const {
+template <typename EntropyEncoder>
+void CodecParams::write(EntropyEncoder* dst) const {
   writeSize(dst, width);
   writeSize(dst, height);
-  RangeEncoder::writeNumber(dst, kMaxF1, params[0]);
-  RangeEncoder::writeNumber(dst, kMaxF2, params[1]);
-  RangeEncoder::writeNumber(dst, kMaxF3, params[2]);
-  RangeEncoder::writeNumber(dst, kMaxF4, params[3]);
-  RangeEncoder::writeNumber(dst, kMaxLineLimit, line_limit - 1);
-  RangeEncoder::writeNumber(dst, kMaxColorCode, color_code);
+  EntropyEncoder::writeNumber(dst, kMaxF1, params[0]);
+  EntropyEncoder::writeNumber(dst, kMaxF2, params[1]);
+  EntropyEncoder::writeNumber(dst, kMaxF3, params[2]);
+  EntropyEncoder::writeNumber(dst, kMaxF4, params[3]);
+  EntropyEncoder::writeNumber(dst, kMaxLineLimit, line_limit - 1);
+  EntropyEncoder::writeNumber(dst, kMaxColorCode, color_code);
 }
+
+template
+void CodecParams::write(XRangeEncoder* dst) const;
 
 uint32_t CodecParams::getLevel(const Vector<int32_t>& region) const {
   size_t count = region.len;

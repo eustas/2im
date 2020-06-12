@@ -22,11 +22,16 @@ add_library(twimLib STATIC
         io.cc
         io.h
         platform.h
-        range_code.h
-        range_decoder.cc
-        range_decoder.h
-        range_encoder.cc
-        range_encoder.h
+        #range_code.h
+        #range_decoder.cc
+        #range_decoder.h
+        #range_encoder.cc
+        #range_encoder.h
+        xrange_code.h
+        xrange_decoder.cc
+        xrange_decoder.h
+        xrange_encoder.cc
+        xrange_encoder.h
         region.cc
         region.h
         sin_cos.cc

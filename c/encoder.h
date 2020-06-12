@@ -10,6 +10,7 @@ namespace twim {
 
 namespace Encoder {
 
+template<typename EntropyEncoder>
 std::vector<uint8_t> encode(const Image& src, uint32_t target_size);
 
 }  // namespace Encoder

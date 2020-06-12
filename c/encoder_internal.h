@@ -76,7 +76,8 @@ class Fragment {
 
   explicit Fragment(Owned<Vector<int32_t>>&& region);
 
-  SIMD NOINLINE void encode(RangeEncoder* dst, const CodecParams& cp,
+  template<typename EntropyEncoder>
+  SIMD NOINLINE void encode(EntropyEncoder* dst, const CodecParams& cp,
                             bool is_leaf, const float* RESTRICT palette,
                             std::vector<Fragment*>* children);
 
@@ -105,6 +106,7 @@ SIMD NOINLINE Owned<Vector<float>> gatherPatches(
 SIMD NOINLINE Owned<Vector<float>> buildPalette(
     const Owned<Vector<float>>& patches, uint32_t palette_size);
 
+template<typename EntropyEncoder>
 std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
                               const std::vector<Fragment*>* partition,
                               const CodecParams& cp,
