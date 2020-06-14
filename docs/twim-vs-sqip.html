@@ -33,7 +33,6 @@
 </div>
 
 
-<script type="text/javascript" src="twim.js"></script>
 <script type="text/javascript">
 let items = [
   {name: "aaron-burden-unsplash", sqipSize: 1101},
@@ -61,6 +60,8 @@ function appendText(parent, text) {
   b.textContent = text;
   parent.appendChild(p);
 }
+
+(r=>{"use strict";let e,t,o,f,l,n=r=>new Int32Array(r),a=(r,e,t)=>{r.set(e,t)},i=r=>r.length-1,s=Math,u=256,h=u*u,w=h*h,d=w*u,v=d*u,g=s.floor,m=s.round,c=(r,e)=>{for(let t=3*r[i(r)]-3;0<=t;t-=3)e(r[t],r[t+1],r[t+2])},p=r=>{if(r)throw 4},I=r=>{if(2>r)return 0;{t=g(t/r);let o=g((f-e)/t);p(0>o||o>=r),r=o}for(e+=r*t,t*=r+1-r;;){if(g(e/d)!==g((e+t-1)/d)){if(t>=w)break;t=(v-e)%w}f=f%d*u+(0|l[o++]),t=t%d*u,e=e%d*u}return r},y=()=>{let r=-1;for(;8>r||0<I(2);)r=8*r+I(8)+8;return r},A=4*h,b=512,k=n(b),x=n(b);for(let r=0;r<b;++r){let e=s.PI*r/b;k[r]=m(A*s.sin(e)),x[r]=m(A*s.cos(e))}let C,D,M,P,U,j,q=n(7),z=n(7),B=0,E=0,F=0,G=0,H=r=>255*I(r)/(r-1)|0,J=r=>[H(r),H(r),H(r),255],K=(r,e,t)=>{var o=C;if(0==I(2)){let e=j.length?j[I(j.length)]:J(M);c(r,(r,f,l)=>{for(;f<l;++f)t.set(e,4*(r*o+f))})}else{var f=(r=>{let e=D+1,t=-1,o=C+1,f=-1;c(r,(r,l,n)=>{e=e<r?e:r,t=t>r?t:r,o=o<l?o:l,f=f>n?f:n}),p(0>t);var l=t+1-e;for(r=(r=f-o)*r+l*l,l=0;6>l&&!(r>=q[l]);++l);return l})(r),l=3*r[i(r)]+1,s=n(l);l=n(l),f=1<<z[f];var u=b/f;((r,e)=>{let t=k[e],o=x[e],f=w,l=-w;for(c(r,(r,e,n)=>{f=f<(e=o*r+t*e)?f:e,l=l>(r=o*r+t*n-t)?l:r}),p(l<f),E=f,F=l,G=A;(B=(l-f)/G|0)>U;)G+=G/16|0})(r,f=I(f)*u),u=I(B),((r,e,t,o,f)=>{let l=k[e],n=x[e],s=0,u=0;l?(t=2*t+l,n*=2,l*=2,c(r,(r,e,i)=>{let h=(t-r*n)/l|0;h<i&&a(o,[r,h>e?h:e,i],3*s++),h>e&&a(f,[r,e,h<i?h:i],3*u++)})):c(r,(r,e,l)=>{r*n>=t?a(o,[r,e,l],3*s++):a(f,[r,e,l],3*u++)}),o[i(o)]=s,f[i(f)]=u})(r,f,1<B?E+((F-E-(B-1)*G)/2|0)+G*u:(F+E)/2|0,s,l),e.push(s,l)}};r.decode2im=(r=>{for(l=r,f=o=e=0,t=v-1,r=0;6>r;++r)f=f*u+(0|l[o++]);C=y(),D=y();var h=I(4),w=2+I(5),d=10**(3-I(5)/5)|0;r=I(5),U=I(63)+1,w*=(C*C+D*D)*w;for(let r=0;7>r;++r)q[r]=w/36,w=40*w/d|0;for(h=9-h,d=0;7>d;++d)z[d]=s.max(h-d-(d*r/2|0),0);for(r=I(49),M=1+(4+(3&r)<<(r>>2)),P=r-17+1,j=[],r=0;r<P;++r)j.push(J(u));for((h=n(3*D+1))[i(h)]=D,r=0;r<D;++r)a(h,[r,0,C],3*r);for(r=new Uint8ClampedArray(4*C*D),h=[h],d=0;d<=i(h);)for(w=i(h);d<=w;++d)K(h[d],h,r);return new ImageData(r,C,D)})})(window);
 
 function onTwimLoad(td, xhr) {
   let data = new Uint8Array(xhr.response);
