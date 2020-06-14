@@ -1,5 +1,5 @@
 import {assertFalse, forEachScan, math, newInt32Array} from './Mini.js';
-import {readNumber, readSize} from "./RangeDecoder.js";
+import {readNumber} from "./XRangeDecoder.js";
 import * as SinCos from './SinCos.js';
 
 let /** @type{number} */ MAX_LEVEL = 7;
@@ -70,6 +70,17 @@ export let getPaletteSize = () => _paletteSize;
  * @return{number}
  */
 export let getLineQuant = () => SinCos.SCALE;
+
+/**
+ * @return {number}
+ */
+let readSize = () => {
+  let /** @type{number} */ bits = -1;
+  while ((bits < 8) || (readNumber(2) > 0)) {
+    bits = 8 * bits + readNumber(8) + 8;
+  }
+  return bits;
+};
 
 /** @return{void} */
 export let read = () => {

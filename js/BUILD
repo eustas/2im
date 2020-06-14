@@ -12,7 +12,7 @@ closure_js_library(
     suppress = ["moduleLoad"],
     deps = [
         ":Mini",
-        ":RangeDecoder",
+        ":XRangeDecoder",
         ":SinCos",
     ],
 )
@@ -51,7 +51,7 @@ closure_js_library(
     deps = [
         ":CodecParams",
         ":DistanceRange",
-        ":RangeDecoder",
+        ":XRangeDecoder",
         ":Mini",
         ":Region",
         ":SinCos",
@@ -100,6 +100,13 @@ closure_js_library(
 closure_js_library(
     name = "SinCos",
     srcs = ["SinCos.js"],
+    suppress = ["moduleLoad"],
+    deps = [":Mini"],
+)
+
+closure_js_library(
+    name = "XRangeDecoder",
+    srcs = ["XRangeDecoder.js"],
     suppress = ["moduleLoad"],
     deps = [":Mini"],
 )
@@ -168,6 +175,17 @@ closure_js_test(
     deps = [
         ":RangeDecoder",
         ":RangeEncoder",
+        "@io_bazel_rules_closure//closure/library:testing",
+    ],
+)
+
+closure_js_test(
+    name = "XRangeTest",
+    srcs = ["XRange_test.js"],
+    entry_points = ["XRange_test.js"],
+    suppress = ["moduleLoad"],
+    deps = [
+        ":XRangeDecoder",
         "@io_bazel_rules_closure//closure/library:testing",
     ],
 )

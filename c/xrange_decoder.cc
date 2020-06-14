@@ -19,11 +19,14 @@ uint32_t XRangeDecoder::readNumber(XRangeDecoder* src, size_t max) {
 }
 
 XRangeDecoder::XRangeDecoder(std::vector<uint8_t>&& data)
-    : data(std::move(data)),
-      state(1u),
-      pos(0) {
+    : data(std::move(data))
+    //, state(1u)
+    , state(1u << 16u)
+    , pos(0)
+    {
   for (size_t i = 0; i < XRangeCode::kBits; ++i) {
-    state = (state << 1u) | readBit();
+    // state = (state << 1u) | readBit();
+    state |= readBit() << i;
   }
 }
 

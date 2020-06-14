@@ -125,6 +125,19 @@ void CodecParams::write(EntropyEncoder* dst) const {
 template
 void CodecParams::write(XRangeEncoder* dst) const;
 
+struct FakeEntropyEncoder {
+  double cost = 0;
+  static void writeNumber(FakeEntropyEncoder* zis, size_t max, size_t value) {
+    zis->cost += std::log(max) / std::log(2);
+  }
+};
+
+double CodecParams::getTax() const {
+  FakeEntropyEncoder fakeEncoder;
+  write(&fakeEncoder);
+  return fakeEncoder.cost;
+}
+
 uint32_t CodecParams::getLevel(const Vector<int32_t>& region) const {
   size_t count = region.len;
   size_t step = region.capacity / 3;

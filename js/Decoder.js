@@ -1,7 +1,7 @@
 import * as CodecParams from "./CodecParams.js";
 import {getWidth, getHeight} from "./CodecParams.js";
-import * as RangeDecoder from "./RangeDecoder.js";
-import {readNumber} from "./RangeDecoder.js";
+import * as EntropyDecoder from "./XRangeDecoder.js";
+import {readNumber} from "./XRangeDecoder.js";
 import {b8, forEachScan, int32ArraySet, last, newInt32Array} from './Mini.js';
 import * as DistanceRange from "./DistanceRange.js";
 import * as Region from "./Region.js";
@@ -82,7 +82,7 @@ let parse = (region, children, width, rgba) => {
  * @return{!ImageData}
  */
 export let decode = (encoded) => {
-  RangeDecoder.init(encoded);
+  EntropyDecoder.init(encoded);
   CodecParams.read();
   _palette = [];
   for (let /** @type{number} */ j = 0; j < CodecParams.getPaletteSize(); ++j) {

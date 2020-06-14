@@ -24,6 +24,8 @@ export let last = (a) =>  a.length - 1;
 export let /** @const */ math = Math;
 
 export let /** @const @noinline @type{number} */ b8 = 256;
+export let /** @const @noinline @type{number} */ b11 = b8 * 8;
+export let /** @const @noinline @type{number} */ b11m = b11 - 1;
 export let /** @const @noinline @type{number} */ b16 = b8 * b8;
 export let /** @const @type{number} */ b32 = b16 * b16;
 export let /** @const @type{number} */ b40 = b32 * b8;

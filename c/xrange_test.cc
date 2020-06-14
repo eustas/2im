@@ -52,7 +52,7 @@ TEST(XRangeTest, Optimizer) {
   }
   auto data = encoder.finish();
 
-  int8_t expected[] = {-113, 77, 81, -45, -48, -46, -47, 51, 48, 50, 49, -77};
+  int8_t expected[] = {-78, -15, 81, -45, -48, -46, -47, 51, 48, 50, 49, -77};
   const size_t expected_size = sizeof(expected) / sizeof(expected[0]);
   ASSERT_EQ(kLength, expected_size);
   EXPECT_EQ(expected_size, data.size());
@@ -60,7 +60,7 @@ TEST(XRangeTest, Optimizer) {
 
   XRangeDecoder decoder(std::move(data));
   EXPECT_EQ(13, XRangeDecoder::readNumber(&decoder, 63));
-  for (size_t i = 42; i < kLength - 1; ++i) {
+  for (size_t i = 0; i < kLength - 1; ++i) {
     EXPECT_EQ(i + 42, XRangeDecoder::readNumber(&decoder, 256));
   }
 }

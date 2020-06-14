@@ -66,9 +66,12 @@ std::vector<uint8_t> XRangeEncoder::finish() {
     for (auto & entry : entries) {
       state = encodeNumber(state, entry.value, entry.max, &bits);
     }
+    //for (size_t i = 0; i < XRangeCode::kBits; ++i) {
+    //  bits.emplace_back(state & 1u);
+    //  state >>= 1u;
+    //}
     for (size_t i = 0; i < XRangeCode::kBits; ++i) {
-      bits.emplace_back(state & 1u);
-      state >>= 1u;
+      bits.emplace_back((state >> (XRangeCode::kBits - 1 - i)) & 1u);
     }
   }
 

@@ -77,14 +77,3 @@ export let readNumber = (max) => {
   removeRange(result, result + 1);
   return result;
 };
-
-/**
- * @return {number}
- */
-export let readSize = () => {
-  let /** @type{number} */ bits = -1;
-  while ((bits < 8) || (readNumber(2) > 0)) {
-    bits = 8 * bits + readNumber(8) + 8;
-  }
-  return bits;
-};

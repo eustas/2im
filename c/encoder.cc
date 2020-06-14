@@ -154,17 +154,6 @@ float bitCost(int32_t range) {
   return static_cast<float>(std::log(range) * kInvLog2);
 }
 
-int32_t sizeCost(uint32_t value) {
-  if (value < 8) return -1;
-  value -= 8;
-  uint32_t bits = 6;
-  while (value > (1u << bits)) {
-    value -= (1u << bits);
-    bits += 3;
-  }
-  return bits + (bits / 3) - 1;
-}
-
 SIMD INLINE void chooseColor(const __m128 rgb0, const float* RESTRICT palette,
                              uint32_t palette_size, uint32_t* RESTRICT index,
                              float* RESTRICT distance2) {
@@ -217,7 +206,7 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
                                                Cache* cache) {
   float tax = bitCost(NodeType::COUNT);
   float budget = size_limit * 8.0f - tax -
-                 bitCost(CodecParams::kTax);  // Minus flat image cost.
+                 cp.getTax();  // Minus flat image cost.
 
   std::vector<Fragment*> result;
   std::priority_queue<Fragment*, std::vector<Fragment*>, FragmentComparator>
@@ -438,7 +427,6 @@ class SimulationTask {
     Partition partitionHolder(*uber, cp, target_size);
     for (uint32_t color_code = 0; color_code < CodecParams::kMaxColorCode;
          ++color_code) {
-      // if (color_code != 1) continue;
       cp.setColorCode(color_code);
       float sqe = simulateEncode(partitionHolder, target_size, cp);
       if (sqe < best_sqe) {
@@ -622,7 +610,7 @@ void SIMD NOINLINE Fragment::findBestSubdivision(Cache* cache, CodecParams cp) {
     for (uint32_t line = 0; line < num_lines; ++line) {
       float full_score = 0.0f;
       constexpr const float kLocalWeight = 0.0f;
-      if (kLocalWeight > 0.0f) {
+      if (kLocalWeight != 0.0f) {
         Stats band;
         diff(&band, cache_stats[line + 2], cache_stats[line]);
         Stats left;
@@ -716,15 +704,14 @@ uint32_t Partition::subpartition(const CodecParams& cp,
                                  uint32_t target_size) const {
   const std::vector<Fragment*>* partition = getPartition();
   float node_tax = bitCost(NodeType::COUNT);
-  float image_tax =
-      bitCost(CodecParams::kTax) + sizeCost(cp.width) + sizeCost(cp.height);
+  float image_tax = cp.getTax();
   if (cp.palette_size == 0) {
     node_tax += 3.0f * bitCost(cp.color_quant);
   } else {
     node_tax += bitCost(cp.palette_size);
     image_tax += cp.palette_size * 3.0f * 8.0f;
   }
-  float budget = 8.0f * target_size - image_tax + node_tax;
+  float budget = 8.0f * target_size - 4.0f - image_tax - node_tax;
   uint32_t limit = static_cast<uint32_t>(partition->size());
   uint32_t i;
   for (i = 0; i < limit; ++i) {
