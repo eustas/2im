@@ -1,5 +1,7 @@
 #include "xrange_encoder.h"
 
+#include <algorithm>
+
 #include "xrange_code.h"
 
 namespace twim {
