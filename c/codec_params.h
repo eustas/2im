@@ -67,6 +67,8 @@ class CodecParams {
   static /*constexpr*/ Params splitCode(uint32_t code);
   void setPartitionParams(Params params);
 
+  uint32_t getPartitionCode() const;
+
   uint32_t levelScale[kMaxLevel] = {0};
 
   Params params = Params();

@@ -34,7 +34,7 @@ class DistanceRange {
     while (true) {
       this.numLines = (ma - mi) / lineQuant;
       if (this.numLines > cp.lineLimit) {
-        lineQuant = lineQuant + lineQuant / 16;
+        lineQuant += lineQuant >> 4;
       } else {
         break;
       }

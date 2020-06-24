@@ -37,6 +37,11 @@ void CodecParams::setPartitionCode(uint32_t code) {
   setPartitionParams(splitCode(code));
 }
 
+uint32_t CodecParams::getPartitionCode() const {
+  return params[0] +
+         kMaxF1 * (params[1] + kMaxF2 * (params[2] + kMaxF3 * params[3]));
+}
+
 void CodecParams::setPartitionParams(Params params) {
   this->params = params;
   uint32_t f1 = params[0];
@@ -58,8 +63,8 @@ void CodecParams::setPartitionParams(Params params) {
 
 std::string CodecParams::toString() const {
   std::stringstream out;
-  out << "p: " << params[0] << params[1] << params[2] << params[3]
-      << ", l: " << line_limit << ", c: " << color_code;
+  out << "p: " << params[0] << params[1] << params[2] << params[3] << "#"
+      << getPartitionCode() << ", l: " << line_limit << ", c: " << color_code;
   return out.str();
 }
 
@@ -90,8 +95,7 @@ CodecParams CodecParams::read(EntropyDecoder* src) {
   return cp;
 }
 
-template
-CodecParams CodecParams::read(XRangeDecoder* src);
+template CodecParams CodecParams::read(XRangeDecoder* src);
 
 template <typename EntropyEncoder>
 void writeSize(EntropyEncoder* dst, uint32_t value) {
@@ -122,8 +126,7 @@ void CodecParams::write(EntropyEncoder* dst) const {
   EntropyEncoder::writeNumber(dst, kMaxColorCode, color_code);
 }
 
-template
-void CodecParams::write(XRangeEncoder* dst) const;
+template void CodecParams::write(XRangeEncoder* dst) const;
 
 struct FakeEntropyEncoder {
   double cost = 0;

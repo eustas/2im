@@ -41,7 +41,7 @@ DistanceRange::DistanceRange(const Vector<int32_t>& region, int32_t angle,
   while (true) {
     num_lines = (ma - mi) / line_quant;
     if (num_lines > cp.line_limit) {
-      line_quant = line_quant + line_quant / 16;
+      line_quant += line_quant >> 4;
     } else {
       break;
     }

@@ -36,7 +36,7 @@ export let update = (region, angle) => {
   while (true) {
     numLines = (ma - mi) / _lineQuant | 0;
     if (numLines > getLineLimit()) {
-      _lineQuant = _lineQuant + (_lineQuant / 16 | 0);
+      _lineQuant += _lineQuant >> 4;
     } else {
       break;
     }
