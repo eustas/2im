@@ -234,7 +234,7 @@ cc_test(
 )
 
 cc_binary(
-    name = "main",
+    name = "twim",
     srcs = ["main.cc"],
     copts = DEFAULT_COPTS,
     linkopts = ["-pthread"],
