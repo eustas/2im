@@ -1,3 +1,5 @@
+<p align="center"><img src="https://eustas.github.io/2im/cat.gif" /></p>
+
 ### Introduction
 
 2im (twim) is an image format designed for extremely-low BPP (bits-per-pixels) range. Name of format hints that a single Twitter message (140 CJK characters, worth at least 287 bytes of payload) is enough to transfer an image.
