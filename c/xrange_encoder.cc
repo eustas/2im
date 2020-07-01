@@ -43,7 +43,7 @@ std::vector<uint8_t> XRangeEncoder::finish() {
   size_t max_leading_zeros = 0;
   size_t best_initial_state = XRangeCode::kMin;
   for (size_t initial_state = XRangeCode::kMin;
-       initial_state < XRangeCode::kMax; ++initial_state) {
+       initial_state < XRangeCode::kMax + 0x1C; initial_state += 32) {
     bits.clear();
     size_t state = initial_state;
     for (size_t i = 0; i < limit; ++i) {
