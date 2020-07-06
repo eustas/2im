@@ -19,6 +19,9 @@ namespace twim {
 
 using namespace ::twim::internal;
 
+using ::twim::Encoder::Result;
+using ::twim::Encoder::Variant;
+
 namespace {
 
 constexpr auto kVHD = SseVecTag<double>();
@@ -415,28 +418,36 @@ SIMD NOINLINE float simulateEncode(const Partition& partition_holder,
 
 class SimulationTask {
  public:
-  const uint32_t target_size;
+  const uint32_t targetSize;
+  Variant variant;
   const UberCache* uber;
   CodecParams cp;
-  float best_sqe = 1e35f;
-  uint32_t best_color_code = 0;
+  float bestSqe = 1e35f;
+  uint32_t bestColorCode = (uint32_t)-1;
   std::unique_ptr<Partition> partitionHolder;
 
-  SimulationTask(uint32_t target_size, const UberCache& uber)
-      : target_size(target_size), uber(&uber), cp(uber.width, uber.height) {}
+  SimulationTask(uint32_t targetSize, Variant variant, const UberCache& uber)
+      : targetSize(targetSize),
+        variant(variant),
+        uber(&uber),
+        cp(uber.width, uber.height) {}
 
   void run() {
-    partitionHolder.reset(new Partition(*uber, cp, target_size));
-    for (uint32_t color_code = 0; color_code < CodecParams::kMaxColorCode;
-         ++color_code) {
-      cp.setColorCode(color_code);
-      float sqe = simulateEncode(*partitionHolder, target_size, cp);
-      if (sqe < best_sqe) {
-        best_sqe = sqe;
-        best_color_code = color_code;
+    cp.setPartitionCode(variant.partitionCode);
+    cp.line_limit = variant.lineLimit + 1;
+    uint64_t colorOptions = variant.colorOptions;
+    // TODO: color-options based taxes
+    partitionHolder.reset(new Partition(*uber, cp, targetSize));
+    for (uint32_t colorCode = 0; colorCode < CodecParams::kMaxColorCode;
+         ++colorCode) {
+      if (!(colorOptions & (1 << colorCode))) continue;
+      cp.setColorCode(colorCode);
+      float sqe = simulateEncode(*partitionHolder, targetSize, cp);
+      if (sqe < bestSqe) {
+        bestSqe = sqe;
+        bestColorCode = colorCode;
       }
     }
-    cp.setColorCode(best_color_code);
   }
 };
 
@@ -445,27 +456,27 @@ class TaskExecutor {
   explicit TaskExecutor(size_t max_tasks) { tasks.reserve(max_tasks); }
 
   void run() {
-    float best_sqe = 1e35f;
-    size_t last_best_task = (size_t)-1;
+    float bestSqe = 1e35f;
+    size_t lastBestTask = (size_t)-1;
 
     while (true) {
-      size_t my_task = next_task++;
-      if (my_task >= tasks.size()) return;
-      SimulationTask& task = tasks[my_task];
+      size_t myTask = nextTask++;
+      if (myTask >= tasks.size()) return;
+      SimulationTask& task = tasks[myTask];
       task.run();
-      if (task.best_sqe < best_sqe) {
-        best_sqe = task.best_sqe;
-        if (last_best_task < my_task) {
-          tasks[last_best_task].partitionHolder.reset();
+      if (task.bestSqe < bestSqe) {
+        bestSqe = task.bestSqe;
+        if (lastBestTask < myTask) {
+          tasks[lastBestTask].partitionHolder.reset();
         }
-        last_best_task = my_task;
+        lastBestTask = myTask;
       } else {
         task.partitionHolder.reset();
       }
     }
   }
 
-  std::atomic<size_t> next_task{0};
+  std::atomic<size_t> nextTask{0};
   std::vector<SimulationTask> tasks;
 };
 
@@ -786,7 +797,9 @@ SIMD NOINLINE Owned<Vector<float>> buildPalette(
 namespace Encoder {
 
 template <typename EntropyEncoder>
-std::vector<uint8_t> encode(const Image& src, const Params& params) {
+Result encode(const Image& src, const Params& params) {
+  Result result;
+
   int32_t width = src.width;
   int32_t height = src.height;
   if (width < 8 || height < 8) {
@@ -794,21 +807,11 @@ std::vector<uint8_t> encode(const Image& src, const Params& params) {
     return {};
   }
   UberCache uber(src);
-  size_t max_tasks =
-      CodecParams::kMaxLineLimit * CodecParams::kMaxPartitionCode;
-  TaskExecutor executor(max_tasks);
-  std::vector<SimulationTask>* tasks = &executor.tasks;
-  for (uint32_t line_limit = 0; line_limit < CodecParams::kMaxLineLimit;
-       ++line_limit) {
-    for (uint32_t partition_code = 0;
-         partition_code < CodecParams::kMaxPartitionCode; ++partition_code) {
-      // if (line_limit != 0) continue;
-      // if (partition_code != 0) continue;
-      tasks->emplace_back(params.targetSize, uber);
-      SimulationTask& task = tasks->back();
-      task.cp.setPartitionCode(partition_code);
-      task.cp.line_limit = line_limit + 1;
-    }
+  const std::vector<Variant>& variants = params.variants;
+  TaskExecutor executor(variants.size());
+  std::vector<SimulationTask>& tasks = executor.tasks;
+  for (auto& variant : variants) {
+    tasks.emplace_back(params.targetSize, variant, uber);
   }
 
   std::vector<std::future<void>> futures;
@@ -821,42 +824,40 @@ std::vector<uint8_t> encode(const Image& src, const Params& params) {
   }
   for (uint32_t i = 0; i < params.numThreads; ++i) futures[i].get();
 
-  size_t best_task_index = 0;
-  float best_sqe = 1e35f;
-  for (size_t task_index = 0; task_index < tasks->size(); ++task_index) {
-    const SimulationTask& task = tasks->at(task_index);
+  size_t bestTaskIndex = 0;
+  float bestSqe = 1e35f;
+  for (size_t taskIndex = 0; taskIndex < tasks.size(); ++taskIndex) {
+    const SimulationTask& task = tasks[taskIndex];
     if (!task.partitionHolder) continue;
-    if (task.best_sqe < best_sqe) {
-      best_task_index = task_index;
-      best_sqe = task.best_sqe;
+    if (task.bestSqe < bestSqe) {
+      bestTaskIndex = taskIndex;
+      bestSqe = task.bestSqe;
     }
   }
-  best_sqe += uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2];
-  SimulationTask& best_task = tasks->at(best_task_index);
-  best_task.cp.setColorCode(best_task.best_color_code);
-  CodecParams& cp = best_task.cp;
-  const Partition& partitionHolder = *best_task.partitionHolder;
+  bestSqe += uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2];
+  SimulationTask& bestTask = tasks[bestTaskIndex];
+  CodecParams& cp = bestTask.cp;
+  uint32_t bestColorCode  = bestTask.bestColorCode;
+  cp.setColorCode(bestColorCode);
+  const Partition& partitionHolder = *bestTask.partitionHolder;
 
   // Encoder workflow >>
   // Partition partitionHolder(uber, cp, params.targetSize);
-  uint32_t num_non_leaf = partitionHolder.subpartition(cp, params.targetSize);
+  uint32_t numNonLeaf = partitionHolder.subpartition(cp, params.targetSize);
   const std::vector<Fragment*>* partition = partitionHolder.getPartition();
-  Owned<Vector<float>> patches = gatherPatches(partition, num_non_leaf);
+  Owned<Vector<float>> patches = gatherPatches(partition, numNonLeaf);
   Owned<Vector<float>> palette = buildPalette(patches, cp.palette_size);
   float* RESTRICT colors = palette->data();
-  std::vector<uint8_t> result =
-      doEncode<EntropyEncoder>(num_non_leaf, partition, cp, colors);
+  result.data = doEncode<EntropyEncoder>(numNonLeaf, partition, cp, colors);
   // << Encoder workflow
 
-  std::string best_cp = best_task.cp.toString();
-  fprintf(stdout, "size: %zu, cp: [%s], error: %.3f\n", result.size(),
-          best_cp.c_str(),
-          std::sqrt(best_sqe / static_cast<float>(width * height)));
+  result.variant = bestTask.variant;
+  result.variant.colorOptions = (uint64_t)1 << bestColorCode;
+  result.mse = bestSqe / static_cast<float>(width * height);
   return result;
 }
 
-template
-std::vector<uint8_t> encode<XRangeEncoder>(const Image& src, const Params& params);
+template Result encode<XRangeEncoder>(const Image& src, const Params& params);
 
 }  // namespace Encoder
 

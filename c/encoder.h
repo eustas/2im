@@ -10,13 +10,26 @@ namespace twim {
 
 namespace Encoder {
 
+struct Variant {
+  uint32_t partitionCode : 9;
+  uint32_t lineLimit : 6;
+  uint64_t colorOptions : 49;
+};
+
 struct Params {
   uint32_t targetSize;
   uint32_t numThreads;
+  std::vector<Variant> variants;
 };
 
-template<typename EntropyEncoder>
-std::vector<uint8_t> encode(const Image& src, const Params& params);
+struct Result {
+  std::vector<uint8_t> data;
+  Variant variant;
+  float mse;
+};
+
+template <typename EntropyEncoder>
+Result encode(const Image& src, const Params& params);
 
 }  // namespace Encoder
 

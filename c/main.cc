@@ -1,5 +1,9 @@
+#include <cmath>
 #include <cstdio>
+#include <iomanip>
+#include <sstream>
 
+#include "codec_params.h"
 #include "decoder.h"
 #include "encoder.h"
 #include "io.h"
@@ -8,6 +12,30 @@
 #include "xrange_encoder.h"
 
 namespace twim {
+
+using ::twim::Encoder::Result;
+using ::twim::Encoder::Variant;
+
+static const std::string kBase64Abc =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static const size_t kSupBitPosition = 53;
+static const int kBitPosition[kSupBitPosition] = {
+    -1, 0,  1,  17, 2,  47, 18, 14, 3,  34, 48, 6,  19, 24, 15, 12, 4,  10,
+    35, 37, 49, 31, 7,  39, 20, 42, 25, 51, 16, 46, 13, 33, 5,  23, 11, 9,
+    36, 30, 38, 41, 50, 45, 32, 22, 8,  29, 40, 44, 21, 28, 43, 27, 26};
+
+/* Inefficient, but won't be used much. */
+int parseBase64(char c) {
+  size_t pos = kBase64Abc.find(c);
+  if (pos >= 64) return -1;
+  return pos;
+}
+
+uint32_t getBitPosition(uint64_t bit) {
+  if ((bit & (bit - 1)) != 0) return kBitPosition[0];
+  return kBitPosition[bit % kSupBitPosition];
+}
 
 bool parseInt(const char* str, uint32_t min, uint32_t max, uint32_t* result) {
   uint32_t val = 0;
@@ -60,12 +88,27 @@ void printHelp(const char* name, bool error) {
 "decode a.2im, endode b.png, set target size to 42 and encode c.png\n");
 }
 
+void fillAllVariants(std::vector<Variant>* variants) {
+  uint64_t allColorOptions = ((uint64_t)1 << CodecParams::kMaxColorCode) - 1;
+  variants->resize(CodecParams::kMaxPartitionCode * CodecParams::kMaxLineLimit);
+  size_t idx = 0;
+  for (uint32_t p = 0; p < CodecParams::kMaxPartitionCode; ++p) {
+    for (uint32_t l = 0; l < CodecParams::kMaxLineLimit; ++l) {
+      Variant& v = variants->at(idx++);
+      v.partitionCode = p;
+      v.lineLimit = l;
+      v.colorOptions = allColorOptions;
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
   bool encode = false;
   bool roundtrip = false;
   Encoder::Params params;
   params.targetSize = kDefaultTargetSize;
   params.numThreads = 1;
+  fillAllVariants(&params.variants);
 
   if (argc < 2) {
     printHelp(fileName(argv[0]), false);
@@ -106,9 +149,24 @@ int main(int argc, char* argv[]) {
     std::string path(argv[i]);
     if (encode) {
       const Image src = Io::readPng(path);
-      auto data = Encoder::encode<XRangeEncoder>(src, params);
+      Result result = Encoder::encode<XRangeEncoder>(src, params);
+      Variant variant = result.variant;
+      uint32_t partitionCode = variant.partitionCode;
+      uint32_t lineLimit = variant.lineLimit;
+      uint32_t colorCode = getBitPosition(variant.colorOptions);
+      float psnr = INFINITY;
+      if (result.mse > 0.01f) {
+        psnr = 10.0 * std::log10(255.0f * 255.0f / result.mse);
+      }
+      std::stringstream out;
+      out << std::fixed << std::setprecision(2);
+      out << "size=" << result.data.size() << ", PSNR=" << psnr
+          << ", variant=" << kBase64Abc[partitionCode >> 6]
+          << kBase64Abc[partitionCode & 0x3F] << ":" << kBase64Abc[lineLimit]
+          << ":" << kBase64Abc[colorCode];
+      fprintf(stderr, "%s\n", out.str().c_str());
       path += ".2im";
-      Io::writeFile(path, data);
+      Io::writeFile(path, result.data);
     }
     if (!encode || roundtrip) {
       auto data = Io::readFile(path);

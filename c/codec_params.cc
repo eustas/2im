@@ -1,7 +1,6 @@
 #include "codec_params.h"
 
 #include <cmath>
-#include <sstream>
 
 #include "platform.h"
 #include "sin_cos.h"
@@ -59,13 +58,6 @@ void CodecParams::setPartitionParams(Params params) {
     int32_t level_bits = bits - i - (i * f4) / 2;
     angle_bits[i] = level_bits > 0 ? (static_cast<uint32_t>(level_bits)) : 0;
   }
-}
-
-std::string CodecParams::toString() const {
-  std::stringstream out;
-  out << "p: " << params[0] << params[1] << params[2] << params[3] << "#"
-      << getPartitionCode() << ", l: " << line_limit << ", c: " << color_code;
-  return out.str();
 }
 
 template <typename EntropyDecoder>

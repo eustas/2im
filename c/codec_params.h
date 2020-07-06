@@ -37,7 +37,6 @@ class CodecParams {
 
   void setColorCode(uint32_t code);
   void setPartitionCode(uint32_t code);
-  std::string toString() const;
 
   static constexpr const uint32_t kMaxLineLimit = 63;
 
