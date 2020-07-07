@@ -159,6 +159,7 @@ cc_library(
         ":image",
         ":platform",
         ":region",
+        "@hwy",
     ],
 )
 

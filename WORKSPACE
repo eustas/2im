@@ -17,3 +17,8 @@ local_repository(
     name = "ignore_js",
     path = "js",
 )
+
+local_repository(
+    name = "ignore_third_party",
+    path = "third_party",
+)

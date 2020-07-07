@@ -14,6 +14,10 @@ namespace twim {
 
 namespace {
 
+// TODO(eustas): move to common header
+// TODO(eustas): it is still required?
+constexpr size_t kDefaultAlign = 32;
+
 template<typename EntropyDecoder>
 uint32_t readColor(EntropyDecoder* src, const CodecParams& cp,
                    const uint32_t* palette) {
@@ -63,11 +67,10 @@ class Fragment {
     if (distance_range.num_lines == DistanceRange::kInvalid) return false;
     uint32_t line = EntropyDecoder::readNumber(src, distance_range.num_lines);
 
-    constexpr const auto vi32 = AvxVecTag<int32_t>();
     // Cutting with half-planes does not increase the number of scans.
-    uint32_t step = vecSize(vi32, region->len);
-    auto inner = allocVector(vi32, 3 * step);
-    auto outer = allocVector(vi32, 3 * step);
+    uint32_t step = vecSize<int32_t, kDefaultAlign>(region->len);
+    auto inner = allocVector<int32_t, kDefaultAlign>(3 * step);
+    auto outer = allocVector<int32_t, kDefaultAlign>(3 * step);
     Region::splitLine(*region.get(), angle, distance_range.distance(line),
                       inner.get(), outer.get());
     left_child.reset(new Fragment(std::move(inner)));
@@ -128,9 +131,8 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
     palette.push_back(argb);
   }
 
-  constexpr const auto vi32 = AvxVecTag<int32_t>();
-  uint32_t step = vecSize(vi32, height);
-  auto root_region = allocVector(vi32, 3 * step);
+  uint32_t step = vecSize<int32_t, kDefaultAlign>(height);
+  auto root_region = allocVector<int32_t, kDefaultAlign>(3 * step);
   int32_t* RESTRICT y = root_region->data();
   int32_t* RESTRICT x0 = y + step;
   int32_t* RESTRICT x1 = x0 + step;

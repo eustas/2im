@@ -6,6 +6,8 @@
 #include <queue>
 #include <vector>
 
+#include <hwy/highway.h>
+
 #include "encoder.h"
 #include "codec_params.h"
 #include "distance_range.h"
@@ -24,23 +26,11 @@ using ::twim::Encoder::Variant;
 
 namespace {
 
-constexpr auto kVHD = SseVecTag<double>();
-static_assert(kVHD.N == 2, "Expected vector size is 2");
-
 constexpr auto kVHF = SseVecTag<float>();
 static_assert(kVHF.N == 4, "Expected vector size is 4");
 
 constexpr auto kVHI32 = SseVecTag<int32_t>();
 static_assert(kVHI32.N == 4, "Expected vector size is 4");
-
-constexpr auto kVF = AvxVecTag<float>();
-static_assert(kVF.N == 8, "Expected vector size is 8");
-
-constexpr auto kVD = AvxVecTag<double>();
-static_assert(kVD.N == 4, "Expected vector size is 4");
-
-constexpr auto kVI32 = AvxVecTag<int32_t>();
-static_assert(kVI32.N == 8, "Expected vector size is 8");
 
 constexpr const size_t kStride = kVHF.N;
 
@@ -486,11 +476,11 @@ namespace internal {
 
 Cache::Cache(const UberCache& uber)
     : uber(&uber),
-      row_offset(allocVector(kVI32, uber.height)),
-      y(allocVector(kVF, uber.height)),
-      x0(allocVector(kVI32, uber.height)),
-      x1(allocVector(kVI32, uber.height)),
-      x(allocVector(kVI32, uber.height)) {}
+      row_offset(allocVector(kVHI32, uber.height)),
+      y(allocVector(kVHF, uber.height)),
+      x0(allocVector(kVHI32, uber.height)),
+      x1(allocVector(kVHI32, uber.height)),
+      x(allocVector(kVHI32, uber.height)) {}
 
 template <bool ABS>
 void NOINLINE SIMD Cache::sum(const int32_t* RESTRICT region_x, Stats* dst) {
@@ -667,9 +657,9 @@ void SIMD NOINLINE Fragment::findBestSubdivision(Cache* cache, CodecParams cp) {
     this->best_cost = -1.0f;
   } else {
     DistanceRange distance_range(region, best_angle_code * angle_mult, cp);
-    uint32_t child_step = vecSize(kVI32, region.len);
-    this->left_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
-    this->right_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
+    uint32_t child_step = vecSize(kVHI32, region.len);
+    this->left_child.reset(new Fragment(allocVector(kVHI32, 3 * child_step)));
+    this->right_child.reset(new Fragment(allocVector(kVHI32, 3 * child_step)));
     Region::splitLine(region, best_angle_code * angle_mult,
                       distance_range.distance(best_line),
                       this->left_child->region.get(),

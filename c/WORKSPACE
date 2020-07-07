@@ -117,3 +117,20 @@ cc_library(
     """,
     strip_prefix = "googletest-release-1.7.0",
 )
+
+new_local_repository(
+    name = "hwy",
+    path = __workspace_dir__ + "/../third_party/highway",
+    build_file_content = """
+cc_library(
+    name = "hwy",
+    srcs = glob(["hwy/*.cc"]),
+    hdrs = glob([
+        "hwy/*.h",
+        "hwy/ops/*.h",
+    ]),
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+    """,
+)
