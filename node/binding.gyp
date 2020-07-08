@@ -10,7 +10,6 @@
         "../c/distance_range.h",
         "../c/encoder.cc",
         "../c/encoder.h",
-        "../c/encoder_internal.h",
         "../c/image.cc",
         "../c/image.h",
         "../c/platform.h",

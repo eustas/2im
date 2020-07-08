@@ -150,7 +150,6 @@ cc_library(
     srcs = ["encoder.cc"],
     hdrs = [
         "encoder.h",
-        "encoder_internal.h",
     ],
     copts = DEFAULT_COPTS,
     deps = [

@@ -71,9 +71,6 @@ struct Desc {
 };
 
 template <typename T>
-using AvxVecTag = Desc<T, 32 / sizeof(T)>;
-
-template <typename T>
 using SseVecTag = Desc<T, 16 / sizeof(T)>;
 
 template <typename T, size_t N>
