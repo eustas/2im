@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <future>
+#include <hwy/highway.h>
 #include <list>
 #include <queue>
 #include <vector>
@@ -50,6 +51,10 @@ struct Stats {
   /* sum_r, sum_g, sum_b, pixel_count */
   ALIGNED_16 float values[4];
 };
+
+INLINE float rgb(const Stats& stats, size_t c) { return stats.values[c]; }
+
+INLINE float pixelCount(const Stats& stats) { return stats.values[3]; }
 
 class UberCache {
  public:
@@ -143,12 +148,10 @@ class Fragment {
   explicit Fragment(Owned<Vector<int32_t>>&& region)
     : region(std::move(region)) {}
 
-  template<typename EntropyEncoder>
-  SIMD NOINLINE void encode(EntropyEncoder* dst, const CodecParams& cp,
-                            bool is_leaf, const float* RESTRICT palette,
-                            std::vector<Fragment*>* children);
-
-  void SIMD NOINLINE findBestSubdivision(Cache* cache, CodecParams cp);
+  template <typename EntropyEncoder>
+  NOINLINE void encode(EntropyEncoder* dst, const CodecParams& cp, bool is_leaf,
+                       const float* RESTRICT palette,
+                       std::vector<Fragment*>* children);
 };
 
 class Partition {
@@ -191,30 +194,27 @@ Fragment makeRoot(uint32_t width, uint32_t height) {
   return Fragment(std::move(root));
 }
 
-// SIMD ZONE START
+#include <hwy/before_namespace-inl.h>
+#include <hwy/begin_target-inl.h>
 
-constexpr auto kVF = HWY_FULL(float);
-static_assert(Lanes(kVF) == 4, "Expected vector size is 4");
+constexpr HWY_FULL(float) kVF;
+constexpr HWY_FULL(int32_t) kVI32;
+using F32x4 = Vec<HWY_FULL(float)>;
 
-constexpr auto kVI32 = HWY_FULL(int32_t);
-static_assert(Lanes(kVI32) == 4, "Expected vector size is 4");
-
-//using F32x4 = Vec<kVF>;
-using F32x4 = __m128;
-
-INLINE float rgb(const Stats& stats, size_t c) { return stats.values[c]; }
-
-INLINE float pixelCount(const Stats& stats) { return stats.values[3]; }
-
-SIMD INLINE void reset(Stats* stats) { Store(Zero(kVF), kVF, stats->values); }
-
-SIMD INLINE void diff(Stats* diff, const Stats& plus, const Stats& minus) {
-  const auto p = Load(kVF, plus.values);
-  const auto m = Load(kVF, minus.values);
-  Store(Sub(p, m), kVF, diff->values);
+void checkSane() {
+  if ((Lanes(kVF) != 4) || (Lanes(kVI32) != 4)) __builtin_trap();
 }
 
-SIMD INLINE void copy(Stats* to, const Stats& from) {
+
+INLINE void reset(Stats* stats) { Store(Zero(kVF), kVF, stats->values); }
+
+INLINE void diff(Stats* diff, const Stats& plus, const Stats& minus) {
+  const auto p = Load(kVF, plus.values);
+  const auto m = Load(kVF, minus.values);
+  Store(p - m, kVF, diff->values);
+}
+
+INLINE void copy(Stats* to, const Stats& from) {
   Store(Load(kVF, from.values), kVF, to->values);
 }
 
@@ -239,7 +239,7 @@ void INLINE updateGeHorizontal(Cache* cache, int32_t d) {
   }
 }
 
-SIMD INLINE void updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
+INLINE void updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   float m_ny_nx = SinCos::kMinusCot[angle];
   float d_nx = static_cast<float>(d * SinCos::kInvSin[angle] + 0.5);
   int32_t* RESTRICT row_offset = cache->row_offset->data();
@@ -257,17 +257,17 @@ SIMD INLINE void updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   for (size_t i = 0; i < count; i += Lanes(vf)) {
     const auto y = Load(vf, region_y + i);
     const auto offset = Load(vi32, row_offset + i);
-    const auto xf = Add(Mul(y, m_ny_nx_), d_nx_);
+    const auto xf = MulAdd(y, m_ny_nx_, d_nx_);
     const auto xi = ConvertTo(vi32, xf);
     const auto x0 = Load(vi32, region_x0 + i);
     const auto x1 = Load(vi32, region_x1 + i);
     const auto x = Min(x1, Max(xi, x0));
-    const auto x_off = AddI(Mul(k4, x), offset);
+    const auto x_off = k4 * x + offset;
     Store(x_off, vi32, region_x + i);
   }
 }
 
-SIMD NOINLINE void updateGe(Cache* cache, int angle, int d) {
+NOINLINE void updateGe(Cache* cache, int angle, int d) {
   if (angle == 0) {
     updateGeHorizontal(cache, d);
   } else {
@@ -275,51 +275,51 @@ SIMD NOINLINE void updateGe(Cache* cache, int angle, int d) {
   }
 }
 
-SIMD NOINLINE float score(const Stats& whole, const Stats& left,
-                          const Stats& right) {
+NOINLINE float score(const Stats& whole, const Stats& left,
+                     const Stats& right) {
   if ((pixelCount(left) <= 0.0f) || (pixelCount(right) <= 0.0f)) return 0.0f;
 
   const auto k1 = Set(kVF, 1.0f);
   HWY_ALIGN float pc_array[4] = {pixelCount(whole), pixelCount(left),
                                 pixelCount(right), 1.0f};
   const auto pc = Load(kVF, pc_array);
-  const auto inv_pc = Div(k1, pc);
+  const auto inv_pc = k1 / pc;
 
   const auto k2 = Set(kVF, 2.0f);
   const auto whole_values = Load(kVF, whole.values);
-  const auto whole_average = Mul(whole_values, Broadcast<0>(inv_pc));
+  const auto whole_average = whole_values * Broadcast<0>(inv_pc);
 
   const auto left_values = Load(kVF, left.values);
   const auto left_pixel_count = Set(kVF, pixelCount(left));
-  const auto left_average = Mul(left_values, Broadcast<1>(inv_pc));
-  const auto left_plus = Add(whole_average, left_average);
-  const auto left_minus = Sub(whole_average, left_average);
-  const auto left_a = Mul(left_pixel_count, left_plus);
-  const auto left_b = Mul(k2, left_values);
-  const auto left_sum = Mul(left_minus, Sub(left_a, left_b));
+  const auto left_average = left_values *  Broadcast<1>(inv_pc);
+  const auto left_plus = whole_average + left_average;
+  const auto left_minus = whole_average - left_average;
+  const auto left_a = left_pixel_count * left_plus;
+  const auto left_b = k2 * left_values;
+  const auto left_sum = left_minus * (left_a - left_b);
 
   const auto right_values = Load(kVF, right.values);
   const auto right_pixel_count = Set(kVF, pixelCount(right));
-  const auto right_average = Mul(right_values, Broadcast<2>(inv_pc));
-  const auto right_plus = Add(whole_average, right_average);
-  const auto right_minus = Sub(whole_average, right_average);
-  const auto right_a = Mul(right_pixel_count, right_plus);
-  const auto right_b = Mul(k2, right_values);
-  const auto right_sum = Mul(right_minus, Sub(right_a, right_b));
+  const auto right_average = right_values *  Broadcast<2>(inv_pc);
+  const auto right_plus = whole_average + right_average;
+  const auto right_minus = whole_average - right_average;
+  const auto right_a = right_pixel_count * right_plus;
+  const auto right_b = k2 * right_values;
+  const auto right_sum = right_minus * (right_a - right_b);
 
-  return SumOfLanes(Add(left_sum, right_sum));
+  return GetLane(SumOfLanes(left_sum + right_sum));
 }
 
-SIMD INLINE void chooseColor(const F32x4 rgb0, const float* RESTRICT palette,
-                             uint32_t palette_size, uint32_t* RESTRICT index,
-                             float* RESTRICT distance2) {
+INLINE void chooseColor(const F32x4 rgb0, const float* RESTRICT palette,
+                        uint32_t palette_size, uint32_t* RESTRICT index,
+                        float* RESTRICT distance2) {
   const size_t m = palette_size;
   uint32_t best_j = 0;
   float best_d2 = 1e35f;
   for (uint32_t j = 0; j < m; ++j) {
     const auto center = Load(kVF, palette + 4 * j);
-    const auto d = Sub(rgb0, center);
-    float d2 = SumOfLanes(Mul(d, d));
+    const auto d = rgb0 - center;
+    float d2 = GetLane(SumOfLanes(d * d));
     if (d2 < best_d2) {
       best_j = j;
       best_d2 = d2;
@@ -329,9 +329,9 @@ SIMD INLINE void chooseColor(const F32x4 rgb0, const float* RESTRICT palette,
   *distance2 = best_d2;
 }
 
-SIMD NOINLINE uint32_t chooseColor(float r, float g, float b,
-                                   const float* RESTRICT palette,
-                                   uint32_t palette_size) {
+NOINLINE uint32_t chooseColor(float r, float g, float b,
+                              const float* RESTRICT palette,
+                              uint32_t palette_size) {
   uint32_t index;
   float dummy;
   HWY_ALIGN float rgb0[4];
@@ -343,8 +343,8 @@ SIMD NOINLINE uint32_t chooseColor(float r, float g, float b,
   return index;
 }
 
-SIMD INLINE void makePalette(const float* stats, float* RESTRICT storage,
-                             uint32_t num_patches, uint32_t palette_size) {
+INLINE void makePalette(const float* stats, float* RESTRICT storage,
+                        uint32_t num_patches, uint32_t palette_size) {
   const uint32_t n = num_patches;
   const uint32_t m = palette_size;
   float* RESTRICT centers = storage;
@@ -384,8 +384,8 @@ SIMD INLINE void makePalette(const float* stats, float* RESTRICT storage,
       float best_distance = 1e35f;
       for (size_t k = 0; k < j; ++k) {
         const auto center = Load(kVF, centers + 4 * k);
-        const auto d = Sub(rgb0, center);
-        float distance = SumOfLanes(Mul(d, d));
+        const auto d = rgb0 - center;
+        float distance = GetLane(SumOfLanes(d * d));
         if (distance < best_distance) best_distance = distance;
       }
       float weight = best_distance * stats[4 * i + 3];
@@ -411,16 +411,16 @@ SIMD INLINE void makePalette(const float* stats, float* RESTRICT storage,
     for (size_t i = 0; i < n; ++i) {
       const auto rgbc = Load(kVF, stats + 4 * i);
       const auto rgb0 = And(rgb_mask, rgbc);
-      const auto rgb1 = Add(rgb0, pc_one);
+      const auto rgb1 = rgb0 + pc_one;
       uint32_t index;
       float d2;
       chooseColor(rgb0, centers, m, &index, &d2);
       const float pixel_count_value = stats[4 * i + 3];
       const auto pixel_count = Set(kVF, pixel_count_value);
       score += d2 * pixel_count_value;
-      const auto weighted_rgbc = Mul(rgb1, pixel_count);
+      const auto weighted_rgbc = rgb1 * pixel_count;
       auto center_acc = Load(kVF, centers_acc + 4 * index);
-      center_acc = Add(center_acc, weighted_rgbc);
+      center_acc = center_acc + weighted_rgbc;
       Store(center_acc, kVF, centers_acc + 4 * index);
     }
     for (size_t j = 0; j < m; ++j) {
@@ -430,7 +430,7 @@ SIMD INLINE void makePalette(const float* stats, float* RESTRICT storage,
         // Ooops, an orphaned center... Let it be.
       } else {
         const auto weighted_rgbc = Load(kVF, centers_acc + 4 * j);
-        const auto rgb1 = Div(weighted_rgbc, pixel_count);
+        const auto rgb1 = weighted_rgbc / pixel_count;
         const auto rgb0 = And(rgb_mask, rgb1);
         Store(rgb0, kVF, centers + 4 * j);
       }
@@ -440,13 +440,13 @@ SIMD INLINE void makePalette(const float* stats, float* RESTRICT storage,
   }
 }
 
-SIMD NOINLINE Owned<Vector<float>> buildPalette(
-    const Owned<Vector<float>>& patches, uint32_t palette_size) {
+NOINLINE Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
+                                           uint32_t palette_size) {
   uint32_t n = patches->len;
   uint32_t m = palette_size;
   uint32_t palette_space = 4 * m;
   uint32_t extra_space = 4 * m + ((m > 0) ? n : 1);
-  Owned<Vector<float>> result = allocVector(kVF, palette_space + extra_space);
+  Owned<Vector<float>> result = allocVector<float, kDefaultAlign>(palette_space + extra_space);
   const float* RESTRICT stats = patches->data();
 
   result->len = m;
@@ -458,7 +458,7 @@ SIMD NOINLINE Owned<Vector<float>> buildPalette(
     const auto k05 = Set(kVF, 0.5f);
     for (size_t i = 0; i < m; ++i) {
       auto rgbx = Load(kVF, colors + 4 * i);
-      rgbx = Add(rgbx, k05);
+      rgbx = rgbx + k05;
       rgbx = ConvertTo(kVF, ConvertTo(kVI32, rgbx));
       Store(rgbx, kVF, colors + 4 * i);
     }
@@ -467,11 +467,11 @@ SIMD NOINLINE Owned<Vector<float>> buildPalette(
   return result;
 }
 
-SIMD NOINLINE Owned<Vector<float>> gatherPatches(
+NOINLINE Owned<Vector<float>> gatherPatches(
     const std::vector<Fragment*>* partition, uint32_t num_non_leaf) {
   uint32_t n = num_non_leaf + 1;
   uint32_t stats_size = 4 * n;
-  Owned<Vector<float>> result = allocVector(kVF, stats_size);
+  Owned<Vector<float>> result = allocVector<float, kDefaultAlign>(stats_size);
   float* RESTRICT stats = result->data();
 
   HWY_ALIGN const int32_t kRgbMask[4] = {-1, -1, -1, 0};
@@ -480,13 +480,13 @@ SIMD NOINLINE Owned<Vector<float>> gatherPatches(
   const auto pc_mask = BitCast(kVF, Load(kVI32, kPcMask));
 
   size_t pos = 0;
-  const auto maybe_add_leaf = [&](Fragment* leaf) SIMD {
+  const auto maybe_add_leaf = [&](Fragment* leaf) {
     if (leaf->ordinal < num_non_leaf) return;
     const auto sum_rgb1 = Load(kVF, leaf->stats.values);
     const auto pixel_count = Broadcast<3>(sum_rgb1);
-    const auto rgb1 = Div(sum_rgb1, pixel_count);
+    const auto rgb1 = sum_rgb1 / pixel_count;
     const auto rgb0 = And(rgb_mask, rgb1);
-    const auto rgbc = Add(rgb0, And(pc_mask, pixel_count));
+    const auto rgbc = rgb0 + And(pc_mask, pixel_count);
     Store(rgbc, kVF, stats + 4 * pos++);
   };
 
@@ -500,9 +500,8 @@ SIMD NOINLINE Owned<Vector<float>> gatherPatches(
   return result;
 }
 
-SIMD NOINLINE float simulateEncode(const Partition& partition_holder,
-                                   uint32_t target_size,
-                                   const CodecParams& cp) {
+NOINLINE float simulateEncode(const Partition& partition_holder,
+                              uint32_t target_size, const CodecParams& cp) {
   uint32_t num_non_leaf = partition_holder.subpartition(cp, target_size);
   if (num_non_leaf <= 1) {
     // Let's deal with flat image separately.
@@ -531,26 +530,26 @@ SIMD NOINLINE float simulateEncode(const Partition& partition_holder,
 
   auto result_rgbx = k0;
   typedef std::function<F32x4(F32x4)> ColorTransformer;
-  auto accumulate_score = [&](const ColorTransformer& get_color) SIMD {
+  auto accumulate_score = [&](const ColorTransformer& get_color) {
     for (size_t i = 0; i < n; ++i) {
       const auto rgbc = Load(kVF, stats + 4 * i);
       const auto pixel_count = Broadcast<3>(rgbc);
       const auto color = get_color(rgbc);
-      const auto t0 = Add(rgbc, rgbc);
-      const auto t1 = Mul(pixel_count, color);
-      const auto t2 = Sub(color, t0);
-      const auto t3 = Mul(t1, t2);
-      result_rgbx = Add(result_rgbx, t3);
+      const auto t0 = rgbc + rgbc;
+      const auto t1 = pixel_count * color;
+      const auto t2 = color - t0;
+      const auto t3 = t1 * t2;
+      result_rgbx = result_rgbx + t3;
     }
   };
   if (m == 0) {
     int32_t v_max = cp.color_quant - 1;
     const auto quant = Set(kVF, v_max / 255.0f);
     const auto dequant = Set(kVF, 255.0f / v_max);
-    auto quantizer = [&](F32x4 rgbc) SIMD {
+    auto quantizer = [&](F32x4 rgbc) {
       const auto v_scaled = MulAdd(quant, rgbc, k05);
       const auto v = ConvertTo(kVF, ConvertTo(kVI32, v_scaled));
-      const auto color = Mul(v, dequant);
+      const auto color = v * dequant;
       return ConvertTo(kVF, ConvertTo(kVI32, color));
     };
     accumulate_score(quantizer);
@@ -565,11 +564,10 @@ SIMD NOINLINE float simulateEncode(const Partition& partition_holder,
   }
 
   const auto result_rgb0 = And(result_rgbx, rgb_mask);
-  return SumOfLanes(result_rgb0);
+  return GetLane(SumOfLanes(result_rgb0));
 }
 
-void SIMD sumCache(const Cache* c, const int32_t* RESTRICT region_x,
-                   Stats* dst) {
+void sumCache(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
   size_t count = c->count;
   const int32_t* RESTRICT row_offset = c->row_offset->data();
   const float* RESTRICT sum = c->uber->sum->data();
@@ -579,14 +577,13 @@ void SIMD sumCache(const Cache* c, const int32_t* RESTRICT region_x,
     // TODO(eustas): why 2 loops?
     for (size_t j = 0; j < Lanes(kVF); ++j) {
       int32_t offset = row_offset[i + j] + 4 * region_x[i + j];
-      tmp = Add(tmp, Load(kVF, sum + offset));
+      tmp = tmp + Load(kVF, sum + offset);
     }
   }
   Store(tmp, kVF, dst->values);
 }
 
-void SIMD sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x,
-                      Stats* dst) {
+void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
   size_t count = c->count;
   const float* RESTRICT sum = c->uber->sum->data();
 
@@ -594,13 +591,13 @@ void SIMD sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x,
   for (size_t i = 0; i < count; i += Lanes(kVF)) {
     // TODO(eustas): why 2 loops?
     for (size_t j = 0; j < Lanes(kVF); ++j) {
-      tmp = Add(tmp, Load(kVF, sum + region_x[i + j]));
+      tmp = tmp + Load(kVF, sum + region_x[i + j]);
     }
   }
   Store(tmp, kVF, dst->values);
 }
 
-void INLINE SIMD prepareCache(Cache* c, Vector<int32_t>* region) {
+void INLINE prepareCache(Cache* c, Vector<int32_t>* region) {
   uint32_t count = region->len;
   uint32_t step = region->capacity / 3;
   uint32_t sum_stride = c->uber->stride;
@@ -627,7 +624,87 @@ void INLINE SIMD prepareCache(Cache* c, Vector<int32_t>* region) {
   c->count = count;
 }
 
-// SIMD ZONE END
+void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
+  Vector<int32_t>& region = *f->region;
+  Stats& stats = f->stats;
+  Stats* cache_stats = cache->stats;
+  uint32_t level = cp.getLevel(region);
+  // TODO(eustas): assert level is not kInvalid.
+  uint32_t angle_max = 1u << cp.angle_bits[level];
+  uint32_t angle_mult = (SinCos::kMaxAngle / angle_max);
+  uint32_t best_angle_code = 0;
+  uint32_t best_line = 0;
+  float best_score = -1.0f;
+  prepareCache(cache, &region);
+  sumCache(cache, cache->x1->data(), &cache->plus);
+  sumCache(cache, cache->x0->data(), &cache->minus);
+  diff(&stats, cache->plus, cache->minus);
+
+  // Find subdivision
+  for (uint32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
+    int32_t angle = angle_code * angle_mult;
+    DistanceRange distance_range(region, angle, cp);
+    uint32_t num_lines = distance_range.num_lines;
+    reset(&cache_stats[0]);
+    for (uint32_t line = 0; line < num_lines; ++line) {
+      updateGe(cache, angle, distance_range.distance(line));
+      sumCacheAbs(cache, cache->x->data(), &cache->minus);
+      diff(&cache_stats[line + 1], cache->plus, cache->minus);
+    }
+    copy(&cache_stats[num_lines + 1], stats);
+
+    for (uint32_t line = 0; line < num_lines; ++line) {
+      float full_score = 0.0f;
+      constexpr const float kLocalWeight = 0.0f;
+      if (kLocalWeight != 0.0f) {
+        Stats band;
+        diff(&band, cache_stats[line + 2], cache_stats[line]);
+        Stats left;
+        diff(&left, band, cache_stats[line + 1]);
+        Stats right;
+        diff(&right, band, left);
+        full_score += kLocalWeight * (score(band, left, right));
+      }
+
+      {
+        Stats right;
+        diff(&right, stats, cache_stats[line + 1]);
+        full_score += score(stats, cache_stats[line + 1], right);
+      }
+
+      if (full_score > best_score) {
+        best_angle_code = angle_code;
+        best_line = line;
+        best_score = full_score;
+      }
+    }
+  }
+
+  f->level = level;
+  f->best_score = best_score;
+
+  if (best_score < 0.0f) {
+    f->best_cost = -1.0f;
+  } else {
+    DistanceRange distance_range(region, best_angle_code * angle_mult, cp);
+    uint32_t child_step = vecSize<int32_t, kDefaultAlign>(region.len);
+    f->left_child.reset(new Fragment(allocVector<int32_t, kDefaultAlign>(3 * child_step)));
+    f->right_child.reset(new Fragment(allocVector<int32_t, kDefaultAlign>(3 * child_step)));
+    Region::splitLine(region, best_angle_code * angle_mult,
+                      distance_range.distance(best_line),
+                      f->left_child->region.get(),
+                      f->right_child->region.get());
+
+    f->best_angle_code = best_angle_code;
+    f->best_num_lines = distance_range.num_lines;
+    f->best_line = best_line;
+    f->best_cost =
+        bitCost(NodeType::COUNT * angle_max * distance_range.num_lines);
+  }
+}
+
+#include <hwy/end_target-inl.h>
+#include <hwy/after_namespace-inl.h>
 
 class SimulationTask {
  public:
@@ -655,7 +732,7 @@ class SimulationTask {
          ++colorCode) {
       if (!(colorOptions & (1 << colorCode))) continue;
       cp.setColorCode(colorCode);
-      float sqe = simulateEncode(*partitionHolder, targetSize, cp);
+      float sqe = HWY_STATIC_DISPATCH(simulateEncode)(*partitionHolder, targetSize, cp);
       if (sqe < bestSqe) {
         bestSqe = sqe;
         bestColorCode = colorCode;
@@ -710,7 +787,7 @@ NOINLINE void Fragment::encode(EntropyEncoder* dst, const CodecParams& cp,
       float r = rgb(stats, 0) / pixelCount(stats);
       float g = rgb(stats, 1) / pixelCount(stats);
       float b = rgb(stats, 2) / pixelCount(stats);
-      uint32_t index = chooseColor(r, g, b, palette, cp.palette_size);
+      uint32_t index = HWY_STATIC_DISPATCH(chooseColor)(r, g, b, palette, cp.palette_size);
       EntropyEncoder::writeNumber(dst, cp.palette_size, index);
     }
     return;
@@ -721,85 +798,6 @@ NOINLINE void Fragment::encode(EntropyEncoder* dst, const CodecParams& cp,
   EntropyEncoder::writeNumber(dst, best_num_lines, best_line);
   children->push_back(left_child.get());
   children->push_back(right_child.get());
-}
-
-void SIMD NOINLINE Fragment::findBestSubdivision(Cache* cache, CodecParams cp) {
-  Vector<int32_t>& region = *this->region;
-  Stats& stats = this->stats;
-  Stats* cache_stats = cache->stats;
-  uint32_t level = cp.getLevel(region);
-  // TODO(eustas): assert level is not kInvalid.
-  uint32_t angle_max = 1u << cp.angle_bits[level];
-  uint32_t angle_mult = (SinCos::kMaxAngle / angle_max);
-  uint32_t best_angle_code = 0;
-  uint32_t best_line = 0;
-  float best_score = -1.0f;
-  prepareCache(cache, &region);
-  sumCache(cache, cache->x1->data(), &cache->plus);
-  sumCache(cache, cache->x0->data(), &cache->minus);
-  diff(&stats, cache->plus, cache->minus);
-
-  // Find subdivision
-  for (uint32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
-    int32_t angle = angle_code * angle_mult;
-    DistanceRange distance_range(region, angle, cp);
-    uint32_t num_lines = distance_range.num_lines;
-    reset(&cache_stats[0]);
-    for (uint32_t line = 0; line < num_lines; ++line) {
-      updateGe(cache, angle, distance_range.distance(line));
-      sumCacheAbs(cache, cache->x->data(), &cache->minus);
-      diff(&cache_stats[line + 1], cache->plus, cache->minus);
-    }
-    copy(&cache_stats[num_lines + 1], stats);
-
-    for (uint32_t line = 0; line < num_lines; ++line) {
-      float full_score = 0.0f;
-      constexpr const float kLocalWeight = 0.0f;
-      if (kLocalWeight != 0.0f) {
-        Stats band;
-        diff(&band, cache_stats[line + 2], cache_stats[line]);
-        Stats left;
-        diff(&left, band, cache_stats[line + 1]);
-        Stats right;
-        diff(&right, band, left);
-        full_score += kLocalWeight * (score(band, left, right));
-      }
-
-      {
-        Stats right;
-        diff(&right, stats, cache_stats[line + 1]);
-        full_score += score(stats, cache_stats[line + 1], right);
-      }
-
-      if (full_score > best_score) {
-        best_angle_code = angle_code;
-        best_line = line;
-        best_score = full_score;
-      }
-    }
-  }
-
-  this->level = level;
-  this->best_score = best_score;
-
-  if (best_score < 0.0f) {
-    this->best_cost = -1.0f;
-  } else {
-    DistanceRange distance_range(region, best_angle_code * angle_mult, cp);
-    uint32_t child_step = vecSize(kVI32, region.len);
-    this->left_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
-    this->right_child.reset(new Fragment(allocVector(kVI32, 3 * child_step)));
-    Region::splitLine(region, best_angle_code * angle_mult,
-                      distance_range.distance(best_line),
-                      this->left_child->region.get(),
-                      this->right_child->region.get());
-
-    this->best_angle_code = best_angle_code;
-    this->best_num_lines = distance_range.num_lines;
-    this->best_line = best_line;
-    this->best_cost =
-        bitCost(NodeType::COUNT * angle_max * distance_range.num_lines);
-  }
 }
 
 template<typename EntropyEncoder>
@@ -852,7 +850,7 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
   std::vector<Fragment*> result;
   std::priority_queue<Fragment*, std::vector<Fragment*>, FragmentComparator>
       queue;
-  root->findBestSubdivision(cache, cp);
+  HWY_STATIC_DISPATCH(findBestSubdivision)(root, cache, cp);
   queue.push(root);
   while (!queue.empty()) {
     Fragment* candidate = queue.top();
@@ -862,9 +860,9 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
       budget -= tax + candidate->best_cost;
       candidate->ordinal = static_cast<uint32_t>(result.size());
       result.push_back(candidate);
-      candidate->left_child->findBestSubdivision(cache, cp);
+      HWY_STATIC_DISPATCH(findBestSubdivision)(candidate->left_child.get(), cache, cp);
       queue.push(candidate->left_child.get());
-      candidate->right_child->findBestSubdivision(cache, cp);
+      HWY_STATIC_DISPATCH(findBestSubdivision)(candidate->right_child.get(), cache, cp);
       queue.push(candidate->right_child.get());
     }
   }
@@ -912,6 +910,8 @@ template <typename EntropyEncoder>
 Result encode(const Image& src, const Params& params) {
   Result result;
 
+  HWY_STATIC_DISPATCH(checkSane)();
+
   int32_t width = src.width;
   int32_t height = src.height;
   if (width < 8 || height < 8) {
@@ -957,8 +957,8 @@ Result encode(const Image& src, const Params& params) {
   // Partition partitionHolder(uber, cp, params.targetSize);
   uint32_t numNonLeaf = partitionHolder.subpartition(cp, params.targetSize);
   const std::vector<Fragment*>* partition = partitionHolder.getPartition();
-  Owned<Vector<float>> patches = gatherPatches(partition, numNonLeaf);
-  Owned<Vector<float>> palette = buildPalette(patches, cp.palette_size);
+  Owned<Vector<float>> patches = HWY_STATIC_DISPATCH(gatherPatches)(partition, numNonLeaf);
+  Owned<Vector<float>> palette = HWY_STATIC_DISPATCH(buildPalette)(patches, cp.palette_size);
   float* RESTRICT colors = palette->data();
   result.data = doEncode<EntropyEncoder>(numNonLeaf, partition, cp, colors);
   // << Encoder workflow
