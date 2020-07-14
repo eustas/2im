@@ -100,6 +100,7 @@ void fillAllVariants(std::vector<Variant>* variants) {
       v.colorOptions = allColorOptions;
     }
   }
+  variants->resize(idx);
 }
 
 int main(int argc, char* argv[]) {

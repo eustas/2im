@@ -410,7 +410,7 @@ public class Encoder {
         for (int c = 0; c < 3; ++c) {
           int q = cp.colorQuant;
           int d = 255 * stats.pixelCount;
-          int v = (2 *  (q - 1) * stats.rgb[c] + d) / (2 * d);
+          int v = (2 * (q - 1) * stats.rgb[c] + d) / (2 * d);
           writeNumber(dst, q, v);
         }
         return;
