@@ -129,7 +129,6 @@ class Fragment {
   std::unique_ptr<Fragment> right_child;
 
   Stats stats;
-  Stats stats2;
 
   // Subdivision.
   uint32_t ordinal = 0x7FFFFFFF;
@@ -197,14 +196,13 @@ Fragment makeRoot(uint32_t width, uint32_t height) {
 #include <hwy/before_namespace-inl.h>
 #include <hwy/begin_target-inl.h>
 
-constexpr HWY_FULL(float) kVF;
-constexpr HWY_FULL(int32_t) kVI32;
-using F32x4 = Vec<HWY_FULL(float)>;
+constexpr HWY_CAPPED(float, 4) kVF;
+constexpr HWY_CAPPED(int32_t, 4) kVI32;
+using F32x4 = Vec<HWY_CAPPED(float, 4)>;
 
 void checkSane() {
   if ((Lanes(kVF) != 4) || (Lanes(kVI32) != 4)) __builtin_trap();
 }
-
 
 INLINE void reset(Stats* stats) { Store(Zero(kVF), kVF, stats->values); }
 
@@ -469,8 +467,9 @@ NOINLINE Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
 
 NOINLINE Owned<Vector<float>> gatherPatches(
     const std::vector<Fragment*>* partition, uint32_t num_non_leaf) {
+  /* In a binary tree the number of leaves is number of nodes plus one. */
   uint32_t n = num_non_leaf + 1;
-  uint32_t stats_size = 4 * n;
+  uint32_t stats_size = 4 * vecSize<float, kDefaultAlign>(n);
   Owned<Vector<float>> result = allocVector<float, kDefaultAlign>(stats_size);
   float* RESTRICT stats = result->data();
 
@@ -655,6 +654,7 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
 
     for (uint32_t line = 0; line < num_lines; ++line) {
       float full_score = 0.0f;
+      /*
       constexpr const float kLocalWeight = 0.0f;
       if (kLocalWeight != 0.0f) {
         Stats band;
@@ -665,6 +665,7 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
         diff(&right, band, left);
         full_score += kLocalWeight * (score(band, left, right));
       }
+      */
 
       {
         Stats right;
