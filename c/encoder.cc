@@ -102,8 +102,6 @@ class UberCache {
 class Cache {
  public:
   const UberCache* uber;
-  Stats plus;
-  Stats minus;
   Stats stats[CodecParams::kMaxLineLimit + 3];
 
   uint32_t count;
@@ -196,24 +194,28 @@ Fragment makeRoot(uint32_t width, uint32_t height) {
 #include <hwy/before_namespace-inl.h>
 #include <hwy/begin_target-inl.h>
 
-constexpr HWY_CAPPED(float, 4) kVF;
-constexpr HWY_CAPPED(int32_t, 4) kVI32;
-using F32x4 = Vec<HWY_CAPPED(float, 4)>;
+constexpr const HWY_FULL(uint32_t) kDu32;
 
-void checkSane() {
-  if ((Lanes(kVF) != 4) || (Lanes(kVI32) != 4)) __builtin_trap();
+HWY_ALIGN static const uint32_t kIotaArray[] = {
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+static const U32xN kIota = Load(kDu32, kIotaArray);
+static const U32xN kStep = Set(kDu32, Lanes(kDu32));
+
+INLINE void reset(Stats* stats) {
+  constexpr HWY_CAPPED(float, 4) df;
+  Store(Zero(df), df, stats->values);
 }
 
-INLINE void reset(Stats* stats) { Store(Zero(kVF), kVF, stats->values); }
-
 INLINE void diff(Stats* diff, const Stats& plus, const Stats& minus) {
-  const auto p = Load(kVF, plus.values);
-  const auto m = Load(kVF, minus.values);
-  Store(p - m, kVF, diff->values);
+  constexpr HWY_CAPPED(float, 4) df;
+  const auto p = Load(df, plus.values);
+  const auto m = Load(df, minus.values);
+  Store(p - m, df, diff->values);
 }
 
 INLINE void copy(Stats* to, const Stats& from) {
-  Store(Load(kVF, from.values), kVF, to->values);
+  constexpr HWY_CAPPED(float, 4) df;
+  Store(Load(df, from.values), df, to->values);
 }
 
 void INLINE updateGeHorizontal(Cache* cache, int32_t d) {
@@ -238,6 +240,9 @@ void INLINE updateGeHorizontal(Cache* cache, int32_t d) {
 }
 
 INLINE void updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
+  constexpr HWY_FULL(float) df;
+  constexpr HWY_FULL(int32_t) di32;
+
   float m_ny_nx = SinCos::kMinusCot[angle];
   float d_nx = static_cast<float>(d * SinCos::kInvSin[angle] + 0.5);
   int32_t* RESTRICT row_offset = cache->row_offset->data();
@@ -246,22 +251,20 @@ INLINE void updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   int32_t* RESTRICT region_x1 = cache->x1->data();
   int32_t* RESTRICT region_x = cache->x->data();
 
-  const auto& vf = kVF;
-  const auto& vi32 = kVI32;
-  const auto k4 = Set(vi32, 4);
-  const auto d_nx_ = Set(vf, d_nx);
-  const auto m_ny_nx_ = Set(vf, m_ny_nx);
+  const auto k4 = Set(di32, 4);
+  const auto d_nx_ = Set(df, d_nx);
+  const auto m_ny_nx_ = Set(df, m_ny_nx);
   const size_t count = cache->count;
-  for (size_t i = 0; i < count; i += Lanes(vf)) {
-    const auto y = Load(vf, region_y + i);
-    const auto offset = Load(vi32, row_offset + i);
+  for (size_t i = 0; i < count; i += Lanes(df)) {
+    const auto y = Load(df, region_y + i);
+    const auto offset = Load(di32, row_offset + i);
     const auto xf = MulAdd(y, m_ny_nx_, d_nx_);
-    const auto xi = ConvertTo(vi32, xf);
-    const auto x0 = Load(vi32, region_x0 + i);
-    const auto x1 = Load(vi32, region_x1 + i);
+    const auto xi = ConvertTo(di32, xf);
+    const auto x0 = Load(di32, region_x0 + i);
+    const auto x1 = Load(di32, region_x1 + i);
     const auto x = Min(x1, Max(xi, x0));
     const auto x_off = k4 * x + offset;
-    Store(x_off, vi32, region_x + i);
+    Store(x_off, di32, region_x + i);
   }
 }
 
@@ -275,30 +278,32 @@ NOINLINE void updateGe(Cache* cache, int angle, int d) {
 
 NOINLINE float score(const Stats& whole, const Stats& left,
                      const Stats& right) {
+  constexpr HWY_CAPPED(float, 4) df;
+
   if ((pixelCount(left) <= 0.0f) || (pixelCount(right) <= 0.0f)) return 0.0f;
 
-  const auto k1 = Set(kVF, 1.0f);
-  HWY_ALIGN float pc_array[4] = {pixelCount(whole), pixelCount(left),
+  const auto k1 = Set(df, 1.0f);
+  HWY_ALIGN float c_array[4] = {pixelCount(whole), pixelCount(left),
                                 pixelCount(right), 1.0f};
-  const auto pc = Load(kVF, pc_array);
-  const auto inv_pc = k1 / pc;
+  const auto c = Load(df, c_array);
+  const auto inv_c = k1 / c;
 
-  const auto k2 = Set(kVF, 2.0f);
-  const auto whole_values = Load(kVF, whole.values);
-  const auto whole_average = whole_values * Broadcast<0>(inv_pc);
+  const auto k2 = Set(df, 2.0f);
+  const auto whole_values = Load(df, whole.values);
+  const auto whole_average = whole_values * Broadcast<0>(inv_c);
 
-  const auto left_values = Load(kVF, left.values);
-  const auto left_pixel_count = Set(kVF, pixelCount(left));
-  const auto left_average = left_values *  Broadcast<1>(inv_pc);
+  const auto left_values = Load(df, left.values);
+  const auto left_pixel_count = Set(df, pixelCount(left));
+  const auto left_average = left_values *  Broadcast<1>(inv_c);
   const auto left_plus = whole_average + left_average;
   const auto left_minus = whole_average - left_average;
   const auto left_a = left_pixel_count * left_plus;
   const auto left_b = k2 * left_values;
   const auto left_sum = left_minus * (left_a - left_b);
 
-  const auto right_values = Load(kVF, right.values);
-  const auto right_pixel_count = Set(kVF, pixelCount(right));
-  const auto right_average = right_values *  Broadcast<2>(inv_pc);
+  const auto right_values = Load(df, right.values);
+  const auto right_pixel_count = Set(df, pixelCount(right));
+  const auto right_average = right_values *  Broadcast<2>(inv_c);
   const auto right_plus = whole_average + right_average;
   const auto right_minus = whole_average - right_average;
   const auto right_a = right_pixel_count * right_plus;
@@ -308,67 +313,143 @@ NOINLINE float score(const Stats& whole, const Stats& left,
   return GetLane(SumOfLanes(left_sum + right_sum));
 }
 
-INLINE void chooseColor(const F32x4 rgb0, const float* RESTRICT palette,
-                        uint32_t palette_size, uint32_t* RESTRICT index,
-                        float* RESTRICT distance2) {
-  const size_t m = palette_size;
-  uint32_t best_j = 0;
-  float best_d2 = 1e35f;
-  for (uint32_t j = 0; j < m; ++j) {
-    const auto center = Load(kVF, palette + 4 * j);
-    const auto d = rgb0 - center;
-    float d2 = GetLane(SumOfLanes(d * d));
-    if (d2 < best_d2) {
-      best_j = j;
-      best_d2 = d2;
-    }
+/* |length| is for scalar mode; vectorized versions look after the end of
+   input up to complete vector, where "big" fillers have to be placed. */
+INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
+  constexpr HWY_FULL(float) df;
+  constexpr HWY_FULL(uint32_t) du32;
+
+#if HWY_TARGET == HWY_SCALAR
+  bool use_scalar = true;
+#else
+  bool use_scalar = length < 4;
+#endif
+  if (use_scalar) {
+    return std::distance(values, std::min_element(values, values + length));
   }
-  *index = best_j;
-  *distance2 = best_d2;
+
+  auto idx = kIota;
+  auto bestIdx = idx;
+  auto bestValue = Load(df, values);
+  for (size_t i = Lanes(df); i < length; i += Lanes(df)) {
+    idx = idx + kStep;
+    const auto value = Load(df, values + i);
+    const auto selector = value < bestValue;
+    bestValue = IfThenElse(selector, value, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))), idx,
+                         bestIdx);
+  }
+
+#if HWY_TARGET == HWY_AVX2
+  {
+    const auto shuffledIdx = ConcatLowerUpper(bestIdx, bestIdx);
+    const auto shuffledValue = ConcatLowerUpper(bestValue, bestValue);
+    const auto selector = shuffledValue < bestValue;
+    bestValue = IfThenElse(selector, shuffledValue, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+                         shuffledIdx, bestIdx);
+  }
+#endif
+#if HWY_TARGET != HWY_SCALAR
+  {
+    const auto shuffledIdx = Shuffle1032(bestIdx);
+    const auto shuffledValue = Shuffle1032(bestValue);
+    const auto selector = shuffledValue < bestValue;
+    bestValue = IfThenElse(selector, shuffledValue, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+                         shuffledIdx, bestIdx);
+  }
+  {
+    const auto shuffledIdx = Shuffle0321(bestIdx);
+    const auto shuffledValue = Shuffle0321(bestValue);
+    const auto selector = shuffledValue < bestValue;
+    // bestValue = IfThenElse(selector, shuffledValue, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+                         shuffledIdx, bestIdx);
+  }
+#endif
+  return GetLane(bestIdx);
 }
 
-NOINLINE uint32_t chooseColor(float r, float g, float b,
-                              const float* RESTRICT palette,
-                              uint32_t palette_size) {
-  uint32_t index;
-  float dummy;
-  HWY_ALIGN float rgb0[4];
-  rgb0[0] = r;
-  rgb0[1] = g;
-  rgb0[2] = b;
-  rgb0[3] = 0.0f;
-  chooseColor(Load(kVF, rgb0), palette, palette_size, &index, &dummy);
-  return index;
+INLINE uint32_t chooseColor(float r, float g, float b,
+                            const float* RESTRICT palette_r,
+                            const float* RESTRICT palette_g,
+                            const float* RESTRICT palette_b,
+                            uint32_t palette_size, float* RESTRICT distance2) {
+  constexpr HWY_FULL(float) df;
+  const size_t m = palette_size;
+
+  HWY_ALIGN float d2[32];
+
+  const auto cr = Set(df, r);
+  const auto cg = Set(df, g);
+  const auto cb = Set(df, b);
+
+  for (size_t i = 0; i < m; i += Lanes(df)) {
+    const auto dr = cr - Load(df, palette_r + i);
+    const auto dg = cg - Load(df, palette_g + i);
+    const auto db = cb - Load(df, palette_b + i);
+    Store(dr * dr + dg * dg + db * db, df, d2 + i);
+  }
+
+  uint32_t best = chooseMin(d2, m);
+  *distance2 = d2[best];
+  return best;
 }
 
-INLINE void makePalette(const float* stats, float* RESTRICT storage,
+INLINE void makePalette(const float* stats, float* RESTRICT palette,
+                        float* RESTRICT storage,
                         uint32_t num_patches, uint32_t palette_size) {
+  constexpr HWY_FULL(float) df;
+  constexpr HWY_FULL(int32_t) di32;
+
   const uint32_t n = num_patches;
   const uint32_t m = palette_size;
-  float* RESTRICT centers = storage;
-  float* RESTRICT centers_acc = centers + 4 * m;
-  float* RESTRICT weights = centers_acc + 4 * m;
-  const auto k0 = Zero(kVF);
-  HWY_ALIGN const int32_t kRgbMask[4] = {-1, -1, -1, 0};
-  const auto rgb_mask = BitCast(kVF, Load(kVI32, kRgbMask));
-  HWY_ALIGN const float kPcOne[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-  const auto pc_one = Load(kVF, kPcOne);
+  const size_t centers_step = vecSize<float, kDefaultAlign>(m);
+  const size_t stats_step = vecSize<float, kDefaultAlign>(n);
+  float* RESTRICT centers_r = palette + 0 * centers_step;
+  float* RESTRICT centers_g = palette + 1 * centers_step;
+  float* RESTRICT centers_b = palette + 2 * centers_step;
+  float* RESTRICT centers_acc_r = storage + 0 * centers_step;
+  float* RESTRICT centers_acc_g = storage + 1 * centers_step;
+  float* RESTRICT centers_acc_b = storage + 2 * centers_step;
+  float* RESTRICT centers_acc_c = storage + 3 * centers_step;
+  float* RESTRICT weights = storage + 0 * centers_step;
+  const float* RESTRICT stats_r = stats + 0 * stats_step;
+  const float* RESTRICT stats_g = stats + 1 * stats_step;
+  const float* RESTRICT stats_b = stats + 2 * stats_step;
+  const float* RESTRICT stats_c = stats + 3 * stats_step;
+  const float* RESTRICT stats_wr = stats + 4 * stats_step;
+  const float* RESTRICT stats_wg = stats + 5 * stats_step;
+  const float* RESTRICT stats_wb = stats + 6 * stats_step;
+  const auto k0 = Zero(df);
+  const auto kOne = Set(df, 1.0f);
+
+#if HWY_TARGET != HWY_SCALAR
+  // Fill palette with nonsence for vectorized "chooseColor".
+  const auto kInf = Set(df, 1024.0f);
+  for (size_t j = 0; j < m; j += Lanes(df)) {
+    Store(kInf, df, centers_r + j);
+    Store(kInf, df, centers_g + j);
+    Store(kInf, df, centers_b + j);
+  }
+#endif
 
   {
     // Choose one center uniformly at random from among the data points.
     float total = 0.0f;
     uint32_t i;
-    for (i = 0; i < n; ++i) total += stats[4 * i + 3];
+    for (i = 0; i < n; ++i) total += stats_c[i];
     float target = total * kRandom[0];
     float partial = 0.0f;
     for (i = 0; i < n; ++i) {
-      partial += stats[4 * i + 3];
+      partial += stats_c[i];
       if (partial >= target) break;
     }
     i = std::max(i, n - 1);
-    const auto rgbc = Load(kVF, stats + 4 * i);
-    const auto rgb0 = And(rgb_mask, rgbc);
-    Store(rgb0, kVF, centers);
+    centers_r[0] = stats_r[i];
+    centers_g[0] = stats_g[i];
+    centers_b[0] = stats_b[i];
   }
 
   for (uint32_t j = 1; j < m; ++j) {
@@ -377,16 +458,10 @@ INLINE void makePalette(const float* stats, float* RESTRICT storage,
     uint32_t i;
     float total = 0.0f;
     for (i = 0; i < n; ++i) {
-      const auto rgbc = Load(kVF, stats + 4 * i);
-      const auto rgb0 = And(rgb_mask, rgbc);
-      float best_distance = 1e35f;
-      for (size_t k = 0; k < j; ++k) {
-        const auto center = Load(kVF, centers + 4 * k);
-        const auto d = rgb0 - center;
-        float distance = GetLane(SumOfLanes(d * d));
-        if (distance < best_distance) best_distance = distance;
-      }
-      float weight = best_distance * stats[4 * i + 3];
+      float distance;
+      chooseColor(stats_r[i], stats_g[i], stats_b[i], centers_r, centers_g,
+                  centers_b, j, &distance);
+      float weight = distance * stats_c[i];
       weights[i] = weight;
       total += weight;
     }
@@ -397,44 +472,54 @@ INLINE void makePalette(const float* stats, float* RESTRICT storage,
       if (partial >= target) break;
     }
     i = std::max(i, n - 1);
-    const auto rgbc = Load(kVF, stats + 4 * i);
-    const auto rgb0 = And(rgb_mask, rgbc);
-    Store(rgb0, kVF, centers + 4 * j);
+    centers_r[j] = stats_r[i];
+    centers_g[j] = stats_g[i];
+    centers_b[j] = stats_b[i];
   }
 
   float last_score = 1e35f;
   while (true) {
-    for (size_t j = 0; j < m; ++j) Store(k0, kVF, centers_acc + 4 * j);
+    for (size_t j = 0; j < m; j += Lanes(df)) {
+      Store(k0, df, centers_acc_r + j);
+      Store(k0, df, centers_acc_g + j);
+      Store(k0, df, centers_acc_b + j);
+      Store(k0, df, centers_acc_c + j);
+    }
     float score = 0.0f;
     for (size_t i = 0; i < n; ++i) {
-      const auto rgbc = Load(kVF, stats + 4 * i);
-      const auto rgb0 = And(rgb_mask, rgbc);
-      const auto rgb1 = rgb0 + pc_one;
-      uint32_t index;
       float d2;
-      chooseColor(rgb0, centers, m, &index, &d2);
-      const float pixel_count_value = stats[4 * i + 3];
-      const auto pixel_count = Set(kVF, pixel_count_value);
-      score += d2 * pixel_count_value;
-      const auto weighted_rgbc = rgb1 * pixel_count;
-      auto center_acc = Load(kVF, centers_acc + 4 * index);
-      center_acc = center_acc + weighted_rgbc;
-      Store(center_acc, kVF, centers_acc + 4 * index);
+      uint32_t index = chooseColor(stats_r[i], stats_g[i], stats_b[i],
+                                   centers_r, centers_g, centers_b, m, &d2);
+      float c = stats_c[i];
+      score += d2 * c;
+      centers_acc_r[index] += stats_wr[i];
+      centers_acc_g[index] += stats_wg[i];
+      centers_acc_b[index] += stats_wb[i];
+      centers_acc_c[index] += c;
     }
-    for (size_t j = 0; j < m; ++j) {
-      const float pixel_count_value = centers_acc[4 * j + 3];
-      const auto pixel_count = Set(kVF, pixel_count_value);
-      if (pixel_count_value < 0.5f) {
-        // Ooops, an orphaned center... Let it be.
-      } else {
-        const auto weighted_rgbc = Load(kVF, centers_acc + 4 * j);
-        const auto rgb1 = weighted_rgbc / pixel_count;
-        const auto rgb0 = And(rgb_mask, rgb1);
-        Store(rgb0, kVF, centers + 4 * j);
-      }
+    for (size_t j = 0; j < m; j += Lanes(df)) {
+      const auto c = Load(df, centers_acc_c + j);
+      const auto inv_c = kOne / Max(c, kOne);
+      Store(Load(df, centers_acc_r + j) * inv_c, df, centers_r + j);
+      Store(Load(df, centers_acc_g + j) * inv_c, df, centers_g + j);
+      Store(Load(df, centers_acc_b + j) * inv_c, df, centers_b + j);
     }
     if (last_score - score < 1.0f) break;
     last_score = score;
+  }
+
+  // Round the pallete values.
+  const auto k05 = Set(df, 0.5f);
+  for (size_t j = 0; j < m; j += Lanes(df)) {
+    const auto r =
+        ConvertTo(df, ConvertTo(di32, Load(df, centers_r + j) + k05));
+    const auto g =
+        ConvertTo(df, ConvertTo(di32, Load(df, centers_g + j) + k05));
+    const auto b =
+        ConvertTo(df, ConvertTo(di32, Load(df, centers_b + j) + k05));
+    Store(r, df, centers_r + j);
+    Store(g, df, centers_g + j);
+    Store(b, df, centers_b + j);
   }
 }
 
@@ -442,57 +527,63 @@ NOINLINE Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
                                            uint32_t palette_size) {
   uint32_t n = patches->len;
   uint32_t m = palette_size;
-  uint32_t palette_space = 4 * m;
-  uint32_t extra_space = 4 * m + ((m > 0) ? n : 1);
-  Owned<Vector<float>> result = allocVector<float, kDefaultAlign>(palette_space + extra_space);
-  const float* RESTRICT stats = patches->data();
+  uint32_t padded_m = vecSize<float, kDefaultAlign>(m);
+  uint32_t palette_space = 3 * padded_m;
+  uint32_t extra_space = std::max(4 * padded_m, ((m > 0) ? n : 1));
+  Owned<Vector<float>> result =
+      allocVector<float, kDefaultAlign>((m > 0) ? palette_space : 1);
+  Owned<Vector<float>> extra = allocVector<float, kDefaultAlign>(extra_space);
 
   result->len = m;
-  if (m > 0) {
-    makePalette(stats, result->data(), n, m);
-
-    // Round the pallete values.
-    float* RESTRICT colors = result->data();
-    const auto k05 = Set(kVF, 0.5f);
-    for (size_t i = 0; i < m; ++i) {
-      auto rgbx = Load(kVF, colors + 4 * i);
-      rgbx = rgbx + k05;
-      rgbx = ConvertTo(kVF, ConvertTo(kVI32, rgbx));
-      Store(rgbx, kVF, colors + 4 * i);
-    }
-  }
+  if (m > 0) makePalette(patches->data(), result->data(), extra->data(), n, m);
 
   return result;
 }
 
 NOINLINE Owned<Vector<float>> gatherPatches(
     const std::vector<Fragment*>* partition, uint32_t num_non_leaf) {
+  constexpr HWY_FULL(float) df;
+  const auto kOne = Set(df, 1.0f);
+
   /* In a binary tree the number of leaves is number of nodes plus one. */
   uint32_t n = num_non_leaf + 1;
-  uint32_t stats_size = 4 * vecSize<float, kDefaultAlign>(n);
-  Owned<Vector<float>> result = allocVector<float, kDefaultAlign>(stats_size);
+  uint32_t stats_size = vecSize<float, kDefaultAlign>(n);
+  Owned<Vector<float>> result =
+      allocVector<float, kDefaultAlign>(7 * stats_size);
   float* RESTRICT stats = result->data();
-
-  HWY_ALIGN const int32_t kRgbMask[4] = {-1, -1, -1, 0};
-  const auto rgb_mask = BitCast(kVF, Load(kVI32, kRgbMask));
-  HWY_ALIGN const int32_t kPcMask[4] = {0, 0, 0, -1};
-  const auto pc_mask = BitCast(kVF, Load(kVI32, kPcMask));
+  float* RESTRICT stats_r = stats + 0 * stats_size;
+  float* RESTRICT stats_g = stats + 1 * stats_size;
+  float* RESTRICT stats_b = stats + 2 * stats_size;
+  float* RESTRICT stats_c = stats + 3 * stats_size;
+  float* RESTRICT stats_wr = stats + 4 * stats_size;
+  float* RESTRICT stats_wg = stats + 5 * stats_size;
+  float* RESTRICT stats_wb = stats + 6 * stats_size;
 
   size_t pos = 0;
   const auto maybe_add_leaf = [&](Fragment* leaf) {
     if (leaf->ordinal < num_non_leaf) return;
-    const auto sum_rgb1 = Load(kVF, leaf->stats.values);
-    const auto pixel_count = Broadcast<3>(sum_rgb1);
-    const auto rgb1 = sum_rgb1 / pixel_count;
-    const auto rgb0 = And(rgb_mask, rgb1);
-    const auto rgbc = rgb0 + And(pc_mask, pixel_count);
-    Store(rgbc, kVF, stats + 4 * pos++);
+    stats_wr[pos] = leaf->stats.values[0];
+    stats_wg[pos] = leaf->stats.values[1];
+    stats_wb[pos] = leaf->stats.values[2];
+    stats_c[pos] = leaf->stats.values[3];
+    pos++;
   };
 
   for (size_t i = 0; i < num_non_leaf; ++i) {
     Fragment* node = partition->at(i);
     maybe_add_leaf(node->left_child.get());
     maybe_add_leaf(node->right_child.get());
+  }
+
+  for (size_t i = 0; i < n; i += Lanes(df)) {
+    const auto c = Load(df, stats_c + i);
+    const auto inv_c = kOne / c;
+    const auto r = Load(df, stats_wr + i);
+    const auto g = Load(df, stats_wg + i);
+    const auto b = Load(df, stats_wb + i);
+    Store(r * inv_c, df, stats_r + i);
+    Store(g * inv_c, df, stats_g + i);
+    Store(b * inv_c, df, stats_b + i);
   }
 
   result->len = n;
@@ -508,16 +599,20 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
   }
   Owned<Vector<float>> patches =
       gatherPatches(partition_holder.getPartition(), num_non_leaf);
+  size_t patches_step = patches->capacity / 7;
   float* RESTRICT stats = patches->data();
+  float* RESTRICT patches_r = stats + 0 * patches_step;
+  float* RESTRICT patches_g = stats + 1 * patches_step;
+  float* RESTRICT patches_b = stats + 2 * patches_step;
+  float* RESTRICT patches_c = stats + 3 * patches_step;
 
   size_t n = patches->len;
   const uint32_t m = cp.palette_size;
   Owned<Vector<float>> palette = buildPalette(patches, m);
-  float* RESTRICT colors = palette->data();
-  const auto k0 = Zero(kVF);
-  const auto k05 = Set(kVF, 0.5f);
-  HWY_ALIGN const int32_t kRgbMask[4] = {-1, -1, -1, 0};
-  const auto rgb_mask = BitCast(kVF, Load(kVI32, kRgbMask));
+  const float* RESTRICT palette_r = palette->data();
+  const size_t palette_step = vecSize<float, kDefaultAlign>(m);
+  const float* RESTRICT palette_g = palette_r + palette_step;
+  const float* RESTRICT palette_b = palette_g + palette_step;
 
   // pixel_score = (orig - color)^2
   // patch_score = sum(pixel_score)
@@ -527,73 +622,72 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
   // score = sum(patch_score)
   // sum(sum(orig^2)) is a constant => could be omitted from calculations
 
-  auto result_rgbx = k0;
-  typedef std::function<F32x4(F32x4)> ColorTransformer;
+  float result[3] = {0.0f};
+
+  typedef std::function<void(float* rgb)> ColorTransformer;
   auto accumulate_score = [&](const ColorTransformer& get_color) {
     for (size_t i = 0; i < n; ++i) {
-      const auto rgbc = Load(kVF, stats + 4 * i);
-      const auto pixel_count = Broadcast<3>(rgbc);
-      const auto color = get_color(rgbc);
-      const auto t0 = rgbc + rgbc;
-      const auto t1 = pixel_count * color;
-      const auto t2 = color - t0;
-      const auto t3 = t1 * t2;
-      result_rgbx = result_rgbx + t3;
+      float orig[3] = {patches_r[i], patches_g[i], patches_b[i]};
+      float color[3] = {orig[0], orig[1], orig[2]};
+      float c = patches_c[i];
+      get_color(color);
+      for (size_t j = 0; j < 3; ++j) {
+        // TODO(eustas): could use non-normalized patch color.
+        result[j] += c * color[j] * (color[j] - 2.0f * orig[j]);
+      }
     }
   };
   if (m == 0) {
     int32_t v_max = cp.color_quant - 1;
-    const auto quant = Set(kVF, v_max / 255.0f);
-    const auto dequant = Set(kVF, 255.0f / v_max);
-    auto quantizer = [&](F32x4 rgbc) {
-      const auto v_scaled = MulAdd(quant, rgbc, k05);
-      const auto v = ConvertTo(kVF, ConvertTo(kVI32, v_scaled));
-      const auto color = v * dequant;
-      return ConvertTo(kVF, ConvertTo(kVI32, color));
+    const float quant = v_max / 255.0f;
+    const float dequant = 255.0f / v_max;
+    auto quantizer = [&](float* rgb) {
+      for (size_t i = 0; i < 3; ++i) {
+        rgb[i] = std::floorf(std::roundf(rgb[i] * quant) * dequant);
+      }
     };
     accumulate_score(quantizer);
   } else {
-    auto color_matcher = [&](F32x4 rgbc) {
-      uint32_t index;
+    auto color_matcher = [&](float* rgb) {
       float dummy;
-      chooseColor(And(rgbc, rgb_mask), colors, m, &index, &dummy);
-      return Load(kVF, colors + 4 * index);
+      uint32_t index = chooseColor(rgb[0], rgb[1], rgb[2], palette_r, palette_g,
+                                   palette_b, m, &dummy);
+      rgb[0] = palette_r[index];
+      rgb[1] = palette_g[index];
+      rgb[2] = palette_b[index];
     };
     accumulate_score(color_matcher);
   }
 
-  const auto result_rgb0 = And(result_rgbx, rgb_mask);
-  return GetLane(SumOfLanes(result_rgb0));
+  return result[0] + result[1] + result[2];
 }
 
 void sumCache(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
+  constexpr HWY_CAPPED(float, 4) df;
+
   size_t count = c->count;
   const int32_t* RESTRICT row_offset = c->row_offset->data();
   const float* RESTRICT sum = c->uber->sum->data();
 
-  auto tmp = Zero(kVF);
-  for (size_t i = 0; i < count; i += Lanes(kVF)) {
-    // TODO(eustas): why 2 loops?
-    for (size_t j = 0; j < Lanes(kVF); ++j) {
-      int32_t offset = row_offset[i + j] + 4 * region_x[i + j];
-      tmp = tmp + Load(kVF, sum + offset);
-    }
+  auto tmp = Zero(df);
+  for (size_t i = 0; i < count; i++) {
+    int32_t offset = row_offset[i] + 4 * region_x[i];
+    tmp = tmp + Load(df, sum + offset);
   }
-  Store(tmp, kVF, dst->values);
+  Store(tmp, df, dst->values);
 }
 
 void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
+  constexpr HWY_CAPPED(float, 4) df;
+
   size_t count = c->count;
   const float* RESTRICT sum = c->uber->sum->data();
 
-  auto tmp = Zero(kVF);
-  for (size_t i = 0; i < count; i += Lanes(kVF)) {
-    // TODO(eustas): why 2 loops?
-    for (size_t j = 0; j < Lanes(kVF); ++j) {
-      tmp = tmp + Load(kVF, sum + region_x[i + j]);
-    }
+  auto tmp = Zero(df);
+  for (size_t i = 0; i < count; i++) {
+    tmp = tmp + Load(df, sum + region_x[i]);
   }
-  Store(tmp, kVF, dst->values);
+  Store(tmp, df, dst->values);
 }
 
 void INLINE prepareCache(Cache* c, Vector<int32_t>* region) {
@@ -626,6 +720,8 @@ void INLINE prepareCache(Cache* c, Vector<int32_t>* region) {
 void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
   Vector<int32_t>& region = *f->region;
   Stats& stats = f->stats;
+  Stats plus;
+  Stats minus;
   Stats* cache_stats = cache->stats;
   uint32_t level = cp.getLevel(region);
   // TODO(eustas): assert level is not kInvalid.
@@ -635,9 +731,9 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
   uint32_t best_line = 0;
   float best_score = -1.0f;
   prepareCache(cache, &region);
-  sumCache(cache, cache->x1->data(), &cache->plus);
-  sumCache(cache, cache->x0->data(), &cache->minus);
-  diff(&stats, cache->plus, cache->minus);
+  sumCache(cache, cache->x1->data(), &plus);
+  sumCache(cache, cache->x0->data(), &minus);
+  diff(&stats, plus, minus);
 
   // Find subdivision
   for (uint32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
@@ -647,32 +743,15 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
     reset(&cache_stats[0]);
     for (uint32_t line = 0; line < num_lines; ++line) {
       updateGe(cache, angle, distance_range.distance(line));
-      sumCacheAbs(cache, cache->x->data(), &cache->minus);
-      diff(&cache_stats[line + 1], cache->plus, cache->minus);
+      sumCacheAbs(cache, cache->x->data(), &minus);
+      diff(&cache_stats[line + 1], plus, minus);
     }
     copy(&cache_stats[num_lines + 1], stats);
 
     for (uint32_t line = 0; line < num_lines; ++line) {
-      float full_score = 0.0f;
-      /*
-      constexpr const float kLocalWeight = 0.0f;
-      if (kLocalWeight != 0.0f) {
-        Stats band;
-        diff(&band, cache_stats[line + 2], cache_stats[line]);
-        Stats left;
-        diff(&left, band, cache_stats[line + 1]);
-        Stats right;
-        diff(&right, band, left);
-        full_score += kLocalWeight * (score(band, left, right));
-      }
-      */
-
-      {
-        Stats right;
-        diff(&right, stats, cache_stats[line + 1]);
-        full_score += score(stats, cache_stats[line + 1], right);
-      }
-
+      Stats right;
+      diff(&right, stats, cache_stats[line + 1]);
+      float full_score = score(stats, cache_stats[line + 1], right);
       if (full_score > best_score) {
         best_angle_code = angle_code;
         best_line = line;
@@ -788,7 +867,11 @@ NOINLINE void Fragment::encode(EntropyEncoder* dst, const CodecParams& cp,
       float r = rgb(stats, 0) / pixelCount(stats);
       float g = rgb(stats, 1) / pixelCount(stats);
       float b = rgb(stats, 2) / pixelCount(stats);
-      uint32_t index = HWY_STATIC_DISPATCH(chooseColor)(r, g, b, palette, cp.palette_size);
+      size_t palette_step = vecSize<float, kDefaultAlign>(cp.palette_size);
+      float  dummy;
+      uint32_t index = HWY_STATIC_DISPATCH(chooseColor)(
+          r, g, b, palette, palette + palette_step, palette + 2 * palette_step,
+          cp.palette_size, &dummy);
       EntropyEncoder::writeNumber(dst, cp.palette_size, index);
     }
     return;
@@ -801,7 +884,7 @@ NOINLINE void Fragment::encode(EntropyEncoder* dst, const CodecParams& cp,
   children->push_back(right_child.get());
 }
 
-template<typename EntropyEncoder>
+template <typename EntropyEncoder>
 std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
                               const std::vector<Fragment*>* partition,
                               const CodecParams& cp,
@@ -816,9 +899,11 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
   EntropyEncoder dst;
   cp.write(&dst);
 
+  size_t palette_step = vecSize<float, kDefaultAlign>(cp.palette_size);
+
   for (uint32_t j = 0; j < m; ++j) {
     for (size_t c = 0; c < 3; ++c) {
-      uint32_t clr = static_cast<uint32_t>(palette[4 * j + c]);
+      uint32_t clr = static_cast<uint32_t>(palette[c * palette_step + j]);
       EntropyEncoder::writeNumber(&dst, 256, clr);
     }
   }
@@ -910,8 +995,6 @@ namespace Encoder {
 template <typename EntropyEncoder>
 Result encode(const Image& src, const Params& params) {
   Result result;
-
-  HWY_STATIC_DISPATCH(checkSane)();
 
   int32_t width = src.width;
   int32_t height = src.height;

@@ -160,7 +160,7 @@ cc_library(
         ":region",
         "@hwy",
     ],
-    defines = ["HWY_BASELINE_TARGETS=HWY_SSE4"],
+    defines = ["HWY_BASELINE_TARGETS=HWY_AVX2"],
 )
 
 cc_library(
