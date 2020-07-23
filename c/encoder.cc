@@ -335,18 +335,17 @@ NOINLINE void score(const Stats& whole, size_t n, const float* RESTRICT r,
 
 /* |length| is for scalar mode; vectorized versions look after the end of
    input up to complete vector, where "big" fillers have to be placed. */
-INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
+template<typename Op>
+INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
   constexpr HWY_FULL(float) df;
   constexpr HWY_FULL(uint32_t) du32;
 
 #if HWY_TARGET == HWY_SCALAR
   bool use_scalar = true;
 #else
-  bool use_scalar = length < 4;
+  bool use_scalar = (length < 4);
 #endif
-  if (use_scalar) {
-    return std::distance(values, std::min_element(values, values + length));
-  }
+  if (use_scalar) return op.scalarChoose(values, length);
 
   auto idx = kIota;
   auto bestIdx = idx;
@@ -354,7 +353,7 @@ INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
   for (size_t i = Lanes(df); i < length; i += Lanes(df)) {
     idx = idx + kStep;
     const auto value = Load(df, values + i);
-    const auto selector = value < bestValue;
+    const auto selector = op.select(value, bestValue);
     bestValue = IfThenElse(selector, value, bestValue);
     bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))), idx,
                          bestIdx);
@@ -364,7 +363,7 @@ INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
   {
     const auto shuffledIdx = ConcatLowerUpper(bestIdx, bestIdx);
     const auto shuffledValue = ConcatLowerUpper(bestValue, bestValue);
-    const auto selector = shuffledValue < bestValue;
+    const auto selector = op.select(shuffledValue, bestValue);
     bestValue = IfThenElse(selector, shuffledValue, bestValue);
     bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
                          shuffledIdx, bestIdx);
@@ -374,7 +373,7 @@ INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
   {
     const auto shuffledIdx = Shuffle1032(bestIdx);
     const auto shuffledValue = Shuffle1032(bestValue);
-    const auto selector = shuffledValue < bestValue;
+    const auto selector = op.select(shuffledValue, bestValue);
     bestValue = IfThenElse(selector, shuffledValue, bestValue);
     bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
                          shuffledIdx, bestIdx);
@@ -382,7 +381,7 @@ INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
   {
     const auto shuffledIdx = Shuffle0321(bestIdx);
     const auto shuffledValue = Shuffle0321(bestValue);
-    const auto selector = shuffledValue < bestValue;
+    const auto selector = op.select(shuffledValue, bestValue);
     // bestValue = IfThenElse(selector, shuffledValue, bestValue);
     bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
                          shuffledIdx, bestIdx);
@@ -390,61 +389,33 @@ INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
 #endif
   return GetLane(bestIdx);
 }
-// TODO: dedup
-INLINE uint32_t chooseMax(const float* RESTRICT values, size_t length) {
-  constexpr HWY_FULL(float) df;
-  constexpr HWY_FULL(uint32_t) du32;
 
-#if HWY_TARGET == HWY_SCALAR
-  bool use_scalar = true;
-#else
-  bool use_scalar = length < 4;
-#endif
-  if (use_scalar) {
+struct OpMin {
+  template<typename T>
+  INLINE auto select(T a, T b) -> decltype(a < b) {
+    return a < b;
+  }
+  INLINE uint32_t scalarChoose(const float* RESTRICT values, size_t length) {
+    return std::distance(values, std::min_element(values, values + length));
+  }
+};
+
+INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
+  return choose(OpMin(), values, length);
+}
+
+struct OpMax {
+  template<typename T>
+  INLINE auto select(T a, T b) -> decltype(a > b) {
+    return a > b;
+  }
+  INLINE uint32_t scalarChoose(const float* RESTRICT values, size_t length) {
     return std::distance(values, std::max_element(values, values + length));
   }
+};
 
-  auto idx = kIota;
-  auto bestIdx = idx;
-  auto bestValue = Load(df, values);
-  for (size_t i = Lanes(df); i < length; i += Lanes(df)) {
-    idx = idx + kStep;
-    const auto value = Load(df, values + i);
-    const auto selector = value > bestValue;
-    bestValue = IfThenElse(selector, value, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))), idx,
-                         bestIdx);
-  }
-
-#if HWY_TARGET == HWY_AVX2
-  {
-    const auto shuffledIdx = ConcatLowerUpper(bestIdx, bestIdx);
-    const auto shuffledValue = ConcatLowerUpper(bestValue, bestValue);
-    const auto selector = shuffledValue < bestValue;
-    bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
-                         shuffledIdx, bestIdx);
-  }
-#endif
-#if HWY_TARGET != HWY_SCALAR
-  {
-    const auto shuffledIdx = Shuffle1032(bestIdx);
-    const auto shuffledValue = Shuffle1032(bestValue);
-    const auto selector = shuffledValue > bestValue;
-    bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
-                         shuffledIdx, bestIdx);
-  }
-  {
-    const auto shuffledIdx = Shuffle0321(bestIdx);
-    const auto shuffledValue = Shuffle0321(bestValue);
-    const auto selector = shuffledValue > bestValue;
-    // bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
-                         shuffledIdx, bestIdx);
-  }
-#endif
-  return GetLane(bestIdx);
+INLINE uint32_t chooseMax(const float* RESTRICT values, size_t length) {
+  return choose(OpMax(), values, length);
 }
 
 INLINE uint32_t chooseColor(float r, float g, float b,
