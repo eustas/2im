@@ -70,21 +70,23 @@ struct Desc {
   static_assert((N & (N - 1)) == 0, "N must be a power of two");
 };
 
-template <typename T, size_t N>
-static uint32_t vecSize(const Desc<T, N>& /* tag */, uint32_t capacity) {
+// TODO(eustas): move to common header
+// TODO(eustas): adjust to SIMD implementation
+constexpr size_t kDefaultAlign = 32;
+
+static INLINE uint32_t vecSize(uint32_t capacity) {
+  // In twim only (u)int32_t and float vectors are used.
+  constexpr size_t N = kDefaultAlign / 4;
   return static_cast<uint32_t>((capacity + N - 1) & ~(N - 1));
 }
 
-template <typename T, size_t kAlign>
-static uint32_t vecSize(uint32_t capacity) {
-  constexpr const Desc<T, kAlign / sizeof(T)> tag;
-  return vecSize(tag, capacity);
-}
-
-template <typename T, size_t N>
-Owned<Vector<T>> allocVector(const Desc<T, N>& tag, uint32_t capacity) {
+template <typename T>
+Owned<Vector<T>> allocVector(uint32_t capacity) {
+  // In twim only (u)int32_t and float vectors are used.
+  constexpr size_t N = kDefaultAlign / 4;
+  static_assert(sizeof(T) == 4, "sizeot(T) must be 4");
   using V = Vector<T>;
-  const uint32_t vector_capacity = vecSize(tag, capacity);
+  const uint32_t vector_capacity = vecSize(capacity);
   const uint32_t size = sizeof(V) + vector_capacity * sizeof(T);
   constexpr const size_t alignment = N * sizeof(T);
   uintptr_t memory = reinterpret_cast<uintptr_t>(malloc(size + alignment));
@@ -94,12 +96,6 @@ Owned<Vector<T>> allocVector(const Desc<T, N>& tag, uint32_t capacity) {
   v->offset = static_cast<uint32_t>(aligned_memory - memory);
   v->capacity = vector_capacity;
   return {v, destroyVector};
-}
-
-template <typename T, size_t kAlign>
-Owned<Vector<T>> allocVector(uint32_t capacity) {
-  constexpr const Desc<T, kAlign / sizeof(T)> tag;
-  return allocVector(tag, capacity);
 }
 
 typedef std::chrono::time_point<std::chrono::high_resolution_clock> NanoTime;

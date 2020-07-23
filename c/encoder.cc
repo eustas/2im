@@ -20,10 +20,6 @@ namespace twim {
 using ::twim::Encoder::Result;
 using ::twim::Encoder::Variant;
 
-// TODO(eustas): move to common header
-// TODO(eustas): adjust to SIMD implementation
-constexpr size_t kDefaultAlign = 32;
-
 /*
  * https://xkcd.com/221/
  *
@@ -70,8 +66,8 @@ class UberCache {
       : width(src.width),
         height(src.height),
         // 4 == [r, g, b, count].length
-        stride(vecSize<float, kDefaultAlign>(4 * (src.width + 1))),
-        sum(allocVector<float, kDefaultAlign>(stride * src.height)) {
+        stride(vecSize(4 * (src.width + 1))),
+        sum(allocVector<float>(stride * src.height)) {
     float* RESTRICT sum = this->sum->data();
     for (size_t y = 0; y < src.height; ++y) {
       float row_rgb2[3] = {0.0f};
@@ -102,7 +98,6 @@ class UberCache {
 class Cache {
  public:
   const UberCache* uber;
-  Stats stats[CodecParams::kMaxLineLimit + 3];
 
   uint32_t count;
   Owned<Vector<int32_t>> row_offset;
@@ -110,14 +105,16 @@ class Cache {
   Owned<Vector<int32_t>> x0;
   Owned<Vector<int32_t>> x1;
   Owned<Vector<int32_t>> x;
+  Owned<Vector<float>> stats;
 
   explicit Cache(const UberCache& uber)
       : uber(&uber),
-        row_offset(allocVector<int32_t, kDefaultAlign>(uber.height)),
-        y(allocVector<float, kDefaultAlign>(uber.height)),
-        x0(allocVector<int32_t, kDefaultAlign>(uber.height)),
-        x1(allocVector<int32_t, kDefaultAlign>(uber.height)),
-        x(allocVector<int32_t, kDefaultAlign>(uber.height)) {}
+        row_offset(allocVector<int32_t>(uber.height)),
+        y(allocVector<float>(uber.height)),
+        x0(allocVector<int32_t>(uber.height)),
+        x1(allocVector<int32_t>(uber.height)),
+        x(allocVector<int32_t>(uber.height)),
+        stats(allocVector<float>(6 * vecSize(CodecParams::kMaxLineLimit * SinCos::kMaxAngle))) {}
 };
 
 class Fragment {
@@ -153,7 +150,7 @@ class Fragment {
 
 class Partition {
  public:
-  Partition(const UberCache& uber, const CodecParams& cp, size_t target_size);
+  Partition(Cache* cache, const CodecParams& cp, size_t target_size);
 
   const std::vector<Fragment*>* getPartition() const;
 
@@ -162,7 +159,6 @@ class Partition {
   uint32_t subpartition(const CodecParams& cp, uint32_t target_size) const;
 
  private:
-  Cache cache;
   Fragment root;
   std::vector<Fragment*> partition;
 };
@@ -179,8 +175,8 @@ struct FragmentComparator {
 };
 
 Fragment makeRoot(uint32_t width, uint32_t height) {
-  uint32_t step = vecSize<int32_t, kDefaultAlign>(height);
-  Owned<Vector<int32_t>> root = allocVector<int32_t, kDefaultAlign>(3 * step);
+  uint32_t step = vecSize(height);
+  Owned<Vector<int32_t>> root = allocVector<int32_t>(3 * step);
   int32_t* RESTRICT data = root->data();
   for (uint32_t y = 0; y < height; ++y) {
     data[y] = y;
@@ -201,26 +197,25 @@ HWY_ALIGN static const uint32_t kIotaArray[] = {
 static const U32xN kIota = Load(kDu32, kIotaArray);
 static const U32xN kStep = Set(kDu32, Lanes(kDu32));
 
-INLINE void reset(Stats* stats) {
-  constexpr HWY_CAPPED(float, 4) df;
-  Store(Zero(df), df, stats->values);
-}
-
 INLINE void diff(Stats* diff, const Stats& plus, const Stats& minus) {
+#if HWY_TARGET == HWY_SCALAR
+  for (size_t i = 0; i < 4; ++i) {
+    diff->values[i] = plus.values[i] - minus.values[i];
+  }
+#else
   constexpr HWY_CAPPED(float, 4) df;
   const auto p = Load(df, plus.values);
   const auto m = Load(df, minus.values);
   Store(p - m, df, diff->values);
-}
-
-INLINE void copy(Stats* to, const Stats& from) {
-  constexpr HWY_CAPPED(float, 4) df;
-  Store(Load(df, from.values), df, to->values);
+#endif
 }
 
 void INLINE updateGeHorizontal(Cache* cache, int32_t d) {
+  constexpr HWY_FULL(float) df;
+  constexpr HWY_FULL(int32_t) di32;
+
   int32_t ny = SinCos::kCos[0];
-  float dny = d / (float)ny;  // TODO: precalculate
+  float d_ny = d / (float)ny;  // TODO: precalculate
   size_t count = cache->count;
   int32_t* RESTRICT row_offset = cache->row_offset->data();
   float* RESTRICT region_y = cache->y->data();
@@ -228,14 +223,17 @@ void INLINE updateGeHorizontal(Cache* cache, int32_t d) {
   int32_t* RESTRICT region_x1 = cache->x1->data();
   int32_t* RESTRICT region_x = cache->x->data();
 
-  for (size_t i = 0; i < count; i++) {
-    float y = region_y[i];
-    int32_t offset = row_offset[i];
-    int32_t x0 = region_x0[i];
-    int32_t x1 = region_x1[i];
-    int32_t x = (y < dny) ? x1 : x0;
-    int32_t x_off = 4 * x + offset;
-    region_x[i] = x_off;
+  const auto k4 = Set(di32, 4);
+  const auto d_ny_ = Set(df, d_ny);
+  for (size_t i = 0; i < count; i += Lanes(df)) {
+    const auto y = Load(df, region_y + i);
+    const auto offset = Load(di32, row_offset + i);
+    const auto x0 = Load(di32, region_x0 + i);
+    const auto x1 = Load(di32, region_x1 + i);
+    const auto selector = MaskFromVec(BitCast(di32, VecFromMask(y < d_ny_)));
+    const auto x = IfThenElse(selector, x1, x0);
+    const auto x_off = k4 * x + offset;
+    Store(x_off, di32, region_x + i);
   }
 }
 
@@ -276,41 +274,63 @@ NOINLINE void updateGe(Cache* cache, int angle, int d) {
   }
 }
 
-NOINLINE float score(const Stats& whole, const Stats& left,
-                     const Stats& right) {
-  constexpr HWY_CAPPED(float, 4) df;
-
-  if ((pixelCount(left) <= 0.0f) || (pixelCount(right) <= 0.0f)) return 0.0f;
+/*
+ * (whole_avg^2 - left_avg^2) * left_pc + 2 * left_pc * (left_avg^2 -left_avg*whole_avg)
+ * left_pc* (whole_avg^2 - 2 *  whole_avg * left_avg + left_avg^2) = 
+ * (whole_avg - left_avg) ^ 2 * left_pc
+ */
+NOINLINE void score(const Stats& whole, size_t n, const float* RESTRICT r,
+                    const float* RESTRICT g, const float* RESTRICT b,
+                    const float* RESTRICT c, float* RESTRICT s) {
+  constexpr HWY_FULL(float) df;
 
   const auto k1 = Set(df, 1.0f);
-  HWY_ALIGN float c_array[4] = {pixelCount(whole), pixelCount(left),
-                                pixelCount(right), 1.0f};
-  const auto c = Load(df, c_array);
-  const auto inv_c = k1 / c;
 
-  const auto k2 = Set(df, 2.0f);
-  const auto whole_values = Load(df, whole.values);
-  const auto whole_average = whole_values * Broadcast<0>(inv_c);
+  // TODO(eustas): could be done more energy-efficiently.
+  const auto whole_c = Set(df, whole.values[3]);
+  const auto whole_inv_c = k1 / whole_c;
+  const auto whole_r = Set(df, whole.values[0]);
+  const auto whole_g = Set(df, whole.values[1]);
+  const auto whole_b = Set(df, whole.values[2]);
+  const auto whole_avg_r = whole_r * whole_inv_c;
+  const auto whole_avg_g = whole_g * whole_inv_c;
+  const auto whole_avg_b = whole_b * whole_inv_c;
 
-  const auto left_values = Load(df, left.values);
-  const auto left_pixel_count = Set(df, pixelCount(left));
-  const auto left_average = left_values *  Broadcast<1>(inv_c);
-  const auto left_plus = whole_average + left_average;
-  const auto left_minus = whole_average - left_average;
-  const auto left_a = left_pixel_count * left_plus;
-  const auto left_b = k2 * left_values;
-  const auto left_sum = left_minus * (left_a - left_b);
+  for (size_t i = 0; i < n; i += Lanes(df)) {
+    const auto left_c = Load(df, c + i);
+    const auto left_inv_c = k1 / left_c;
+    const auto right_c = whole_c - left_c;
+    const auto right_inv_c = k1 / right_c;
 
-  const auto right_values = Load(df, right.values);
-  const auto right_pixel_count = Set(df, pixelCount(right));
-  const auto right_average = right_values *  Broadcast<2>(inv_c);
-  const auto right_plus = whole_average + right_average;
-  const auto right_minus = whole_average - right_average;
-  const auto right_a = right_pixel_count * right_plus;
-  const auto right_b = k2 * right_values;
-  const auto right_sum = right_minus * (right_a - right_b);
+    const auto left_r = Load(df, r + i);
+    const auto left_avg_r = left_r * left_inv_c;
+    const auto left_diff_r = left_avg_r - whole_avg_r;
+    auto sum_left = left_diff_r * left_diff_r;
+    const auto right_r = whole_r - left_r;
+    const auto right_avg_r = right_r * right_inv_c;
+    const auto right_diff_r = right_avg_r - whole_avg_r;
+    auto sum_right = right_diff_r * right_diff_r;
 
-  return GetLane(SumOfLanes(left_sum + right_sum));
+    const auto left_g = Load(df, g + i);
+    const auto left_avg_g = left_g * left_inv_c;
+    const auto left_diff_g = left_avg_g - whole_avg_g;
+    sum_left = MulAdd(left_diff_g, left_diff_g, sum_left);
+    const auto right_g = whole_g - left_g;
+    const auto right_avg_g = right_g * right_inv_c;
+    const auto right_diff_g = right_avg_g - whole_avg_g;
+    sum_right = MulAdd(right_diff_g, right_diff_g, sum_right);
+
+    const auto left_b = Load(df, b + i);
+    const auto left_avg_b = left_b * left_inv_c;
+    const auto left_diff_b = left_avg_b - whole_avg_b;
+    sum_left = MulAdd(left_diff_b, left_diff_b, sum_left);
+    const auto right_b = whole_b - left_b;
+    const auto right_avg_b = right_b * right_inv_c;
+    const auto right_diff_b = right_avg_b - whole_avg_b;
+    sum_right = MulAdd(right_diff_b, right_diff_b, sum_right);
+
+    Store(sum_left * left_c + sum_right * right_c, df, s + i);
+  }
 }
 
 /* |length| is for scalar mode; vectorized versions look after the end of
@@ -370,6 +390,62 @@ INLINE uint32_t chooseMin(const float* RESTRICT values, size_t length) {
 #endif
   return GetLane(bestIdx);
 }
+// TODO: dedup
+INLINE uint32_t chooseMax(const float* RESTRICT values, size_t length) {
+  constexpr HWY_FULL(float) df;
+  constexpr HWY_FULL(uint32_t) du32;
+
+#if HWY_TARGET == HWY_SCALAR
+  bool use_scalar = true;
+#else
+  bool use_scalar = length < 4;
+#endif
+  if (use_scalar) {
+    return std::distance(values, std::max_element(values, values + length));
+  }
+
+  auto idx = kIota;
+  auto bestIdx = idx;
+  auto bestValue = Load(df, values);
+  for (size_t i = Lanes(df); i < length; i += Lanes(df)) {
+    idx = idx + kStep;
+    const auto value = Load(df, values + i);
+    const auto selector = value > bestValue;
+    bestValue = IfThenElse(selector, value, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))), idx,
+                         bestIdx);
+  }
+
+#if HWY_TARGET == HWY_AVX2
+  {
+    const auto shuffledIdx = ConcatLowerUpper(bestIdx, bestIdx);
+    const auto shuffledValue = ConcatLowerUpper(bestValue, bestValue);
+    const auto selector = shuffledValue < bestValue;
+    bestValue = IfThenElse(selector, shuffledValue, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+                         shuffledIdx, bestIdx);
+  }
+#endif
+#if HWY_TARGET != HWY_SCALAR
+  {
+    const auto shuffledIdx = Shuffle1032(bestIdx);
+    const auto shuffledValue = Shuffle1032(bestValue);
+    const auto selector = shuffledValue > bestValue;
+    bestValue = IfThenElse(selector, shuffledValue, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+                         shuffledIdx, bestIdx);
+  }
+  {
+    const auto shuffledIdx = Shuffle0321(bestIdx);
+    const auto shuffledValue = Shuffle0321(bestValue);
+    const auto selector = shuffledValue > bestValue;
+    // bestValue = IfThenElse(selector, shuffledValue, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+                         shuffledIdx, bestIdx);
+  }
+#endif
+  return GetLane(bestIdx);
+}
 
 INLINE uint32_t chooseColor(float r, float g, float b,
                             const float* RESTRICT palette_r,
@@ -405,8 +481,8 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
 
   const uint32_t n = num_patches;
   const uint32_t m = palette_size;
-  const size_t centers_step = vecSize<float, kDefaultAlign>(m);
-  const size_t stats_step = vecSize<float, kDefaultAlign>(n);
+  const size_t centers_step = vecSize(m);
+  const size_t stats_step = vecSize(n);
   float* RESTRICT centers_r = palette + 0 * centers_step;
   float* RESTRICT centers_g = palette + 1 * centers_step;
   float* RESTRICT centers_b = palette + 2 * centers_step;
@@ -527,12 +603,11 @@ NOINLINE Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
                                            uint32_t palette_size) {
   uint32_t n = patches->len;
   uint32_t m = palette_size;
-  uint32_t padded_m = vecSize<float, kDefaultAlign>(m);
+  uint32_t padded_m = vecSize(m);
   uint32_t palette_space = 3 * padded_m;
   uint32_t extra_space = std::max(4 * padded_m, ((m > 0) ? n : 1));
-  Owned<Vector<float>> result =
-      allocVector<float, kDefaultAlign>((m > 0) ? palette_space : 1);
-  Owned<Vector<float>> extra = allocVector<float, kDefaultAlign>(extra_space);
+  Owned<Vector<float>> result = allocVector<float>((m > 0) ? palette_space : 1);
+  Owned<Vector<float>> extra = allocVector<float>(extra_space);
 
   result->len = m;
   if (m > 0) makePalette(patches->data(), result->data(), extra->data(), n, m);
@@ -547,9 +622,8 @@ NOINLINE Owned<Vector<float>> gatherPatches(
 
   /* In a binary tree the number of leaves is number of nodes plus one. */
   uint32_t n = num_non_leaf + 1;
-  uint32_t stats_size = vecSize<float, kDefaultAlign>(n);
-  Owned<Vector<float>> result =
-      allocVector<float, kDefaultAlign>(7 * stats_size);
+  uint32_t stats_size = vecSize(n);
+  Owned<Vector<float>> result = allocVector<float>(7 * stats_size);
   float* RESTRICT stats = result->data();
   float* RESTRICT stats_r = stats + 0 * stats_size;
   float* RESTRICT stats_g = stats + 1 * stats_size;
@@ -610,7 +684,7 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
   const uint32_t m = cp.palette_size;
   Owned<Vector<float>> palette = buildPalette(patches, m);
   const float* RESTRICT palette_r = palette->data();
-  const size_t palette_step = vecSize<float, kDefaultAlign>(m);
+  const size_t palette_step = vecSize(m);
   const float* RESTRICT palette_g = palette_r + palette_step;
   const float* RESTRICT palette_b = palette_g + palette_step;
 
@@ -677,7 +751,7 @@ void sumCache(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
   Store(tmp, df, dst->values);
 }
 
-void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
+NOINLINE void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
   constexpr HWY_CAPPED(float, 4) df;
 
   size_t count = c->count;
@@ -722,54 +796,78 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
   Stats& stats = f->stats;
   Stats plus;
   Stats minus;
-  Stats* cache_stats = cache->stats;
+  float*  stats_ = cache->stats->data();
+  size_t stats_step = vecSize(CodecParams::kMaxLineLimit * SinCos::kMaxAngle);
+  float* RESTRICT stats_r = stats_ + 0 * stats_step;
+  float* RESTRICT stats_g = stats_ + 1 * stats_step;
+  float* RESTRICT stats_b = stats_ + 2 * stats_step;
+  float* RESTRICT stats_c = stats_ + 3 * stats_step;
+  float* RESTRICT stats_s = stats_ + 4 * stats_step;
+  uint32_t* RESTRICT stats_v = reinterpret_cast<uint32_t*>(stats_ + 5 * stats_step);
   uint32_t level = cp.getLevel(region);
   // TODO(eustas): assert level is not kInvalid.
   uint32_t angle_max = 1u << cp.angle_bits[level];
   uint32_t angle_mult = (SinCos::kMaxAngle / angle_max);
-  uint32_t best_angle_code = 0;
-  uint32_t best_line = 0;
-  float best_score = -1.0f;
   prepareCache(cache, &region);
   sumCache(cache, cache->x1->data(), &plus);
   sumCache(cache, cache->x0->data(), &minus);
   diff(&stats, plus, minus);
+
+  size_t num_subdivisions = 0;
+  float min_c = 0.5f;
+  float max_c = pixelCount(stats) - 0.5f;
 
   // Find subdivision
   for (uint32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
     int32_t angle = angle_code * angle_mult;
     DistanceRange distance_range(region, angle, cp);
     uint32_t num_lines = distance_range.num_lines;
-    reset(&cache_stats[0]);
     for (uint32_t line = 0; line < num_lines; ++line) {
       updateGe(cache, angle, distance_range.distance(line));
       sumCacheAbs(cache, cache->x->data(), &minus);
-      diff(&cache_stats[line + 1], plus, minus);
-    }
-    copy(&cache_stats[num_lines + 1], stats);
-
-    for (uint32_t line = 0; line < num_lines; ++line) {
-      Stats right;
-      diff(&right, stats, cache_stats[line + 1]);
-      float full_score = score(stats, cache_stats[line + 1], right);
-      if (full_score > best_score) {
-        best_angle_code = angle_code;
-        best_line = line;
-        best_score = full_score;
-      }
+      Stats left;
+      diff(&left, plus, minus);
+      stats_r[num_subdivisions] = left.values[0];
+      stats_g[num_subdivisions] = left.values[1];
+      stats_b[num_subdivisions] = left.values[2];
+      stats_c[num_subdivisions] = left.values[3];
+      stats_v[num_subdivisions] = line * angle_max + angle_code;
+      float c = pixelCount(left);
+      num_subdivisions += ((c > min_c) && (c < max_c)) ? 1 : 0;
     }
   }
+
+  if (num_subdivisions == 0) {
+    f->best_cost = -1.0f;
+    return;
+  }
+
+  uint32_t step = vecSize(1);
+  while ((num_subdivisions % step) != 0) {
+    stats_r[num_subdivisions] = stats_r[num_subdivisions - 1];
+    stats_g[num_subdivisions] = stats_g[num_subdivisions - 1];
+    stats_b[num_subdivisions] = stats_b[num_subdivisions - 1];
+    stats_c[num_subdivisions] = stats_c[num_subdivisions - 1];
+    stats_v[num_subdivisions] = stats_v[num_subdivisions - 1];
+    num_subdivisions++;
+  }
+  score(stats, num_subdivisions, stats_r, stats_g, stats_b, stats_c, stats_s);
+  uint32_t index = chooseMax(stats_s, num_subdivisions);
+  uint32_t best_angle_code = stats_v[index] % angle_max;
+  uint32_t best_line = stats_v[index] / angle_max;
+  float best_score = stats_s[index];
 
   f->level = level;
   f->best_score = best_score;
 
   if (best_score < 0.0f) {
     f->best_cost = -1.0f;
+    // TODO(eustas): why not unreachable?
   } else {
     DistanceRange distance_range(region, best_angle_code * angle_mult, cp);
-    uint32_t child_step = vecSize<int32_t, kDefaultAlign>(region.len);
-    f->left_child.reset(new Fragment(allocVector<int32_t, kDefaultAlign>(3 * child_step)));
-    f->right_child.reset(new Fragment(allocVector<int32_t, kDefaultAlign>(3 * child_step)));
+    uint32_t child_step = vecSize(region.len);
+    f->left_child.reset(new Fragment(allocVector<int32_t>(3 * child_step)));
+    f->right_child.reset(new Fragment(allocVector<int32_t>(3 * child_step)));
     Region::splitLine(region, best_angle_code * angle_mult,
                       distance_range.distance(best_line),
                       f->left_child->region.get(),
@@ -790,7 +888,6 @@ class SimulationTask {
  public:
   const uint32_t targetSize;
   Variant variant;
-  const UberCache* uber;
   CodecParams cp;
   float bestSqe = 1e35f;
   uint32_t bestColorCode = (uint32_t)-1;
@@ -799,15 +896,14 @@ class SimulationTask {
   SimulationTask(uint32_t targetSize, Variant variant, const UberCache& uber)
       : targetSize(targetSize),
         variant(variant),
-        uber(&uber),
         cp(uber.width, uber.height) {}
 
-  void run() {
+  void run(Cache* cache) {
     cp.setPartitionCode(variant.partitionCode);
     cp.line_limit = variant.lineLimit + 1;
     uint64_t colorOptions = variant.colorOptions;
     // TODO: color-options based taxes
-    partitionHolder.reset(new Partition(*uber, cp, targetSize));
+    partitionHolder.reset(new Partition(cache, cp, targetSize));
     for (uint32_t colorCode = 0; colorCode < CodecParams::kMaxColorCode;
          ++colorCode) {
       if (!(colorOptions & (1 << colorCode))) continue;
@@ -823,17 +919,20 @@ class SimulationTask {
 
 class TaskExecutor {
  public:
-  explicit TaskExecutor(size_t max_tasks) { tasks.reserve(max_tasks); }
+  explicit TaskExecutor(const UberCache& uber, size_t max_tasks) : uber(&uber) {
+    tasks.reserve(max_tasks);
+  }
 
   void run() {
     float bestSqe = 1e35f;
     size_t lastBestTask = (size_t)-1;
+    Cache cache(*uber);
 
     while (true) {
       size_t myTask = nextTask++;
       if (myTask >= tasks.size()) return;
       SimulationTask& task = tasks[myTask];
-      task.run();
+      task.run(&cache);
       if (task.bestSqe < bestSqe) {
         bestSqe = task.bestSqe;
         if (lastBestTask < myTask) {
@@ -846,6 +945,7 @@ class TaskExecutor {
     }
   }
 
+  const UberCache* uber;
   std::atomic<size_t> nextTask{0};
   std::vector<SimulationTask> tasks;
 };
@@ -867,7 +967,7 @@ NOINLINE void Fragment::encode(EntropyEncoder* dst, const CodecParams& cp,
       float r = rgb(stats, 0) / pixelCount(stats);
       float g = rgb(stats, 1) / pixelCount(stats);
       float b = rgb(stats, 2) / pixelCount(stats);
-      size_t palette_step = vecSize<float, kDefaultAlign>(cp.palette_size);
+      size_t palette_step = vecSize(cp.palette_size);
       float  dummy;
       uint32_t index = HWY_STATIC_DISPATCH(chooseColor)(
           r, g, b, palette, palette + palette_step, palette + 2 * palette_step,
@@ -899,7 +999,7 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
   EntropyEncoder dst;
   cp.write(&dst);
 
-  size_t palette_step = vecSize<float, kDefaultAlign>(cp.palette_size);
+  size_t palette_step = vecSize(cp.palette_size);
 
   for (uint32_t j = 0; j < m; ++j) {
     for (size_t c = 0; c < 3; ++c) {
@@ -955,11 +1055,9 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
   return result;
 }
 
-Partition::Partition(const UberCache& uber, const CodecParams& cp,
-                     size_t target_size)
-    : cache(uber),
-      root(makeRoot(uber.width, uber.height)),
-      partition(buildPartition(&root, target_size, cp, &cache)) {}
+Partition::Partition(Cache* cache, const CodecParams& cp, size_t target_size)
+    : root(makeRoot(cache->uber->width, cache->uber->height)),
+      partition(buildPartition(&root, target_size, cp, cache)) {}
 
 const std::vector<Fragment*>* Partition::getPartition() const {
   return &partition;
@@ -1004,7 +1102,7 @@ Result encode(const Image& src, const Params& params) {
   }
   UberCache uber(src);
   const std::vector<Variant>& variants = params.variants;
-  TaskExecutor executor(variants.size());
+  TaskExecutor executor(uber, variants.size());
   std::vector<SimulationTask>& tasks = executor.tasks;
   for (auto& variant : variants) {
     tasks.emplace_back(params.targetSize, variant, uber);
