@@ -359,7 +359,22 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
                          bestIdx);
   }
 
-#if HWY_TARGET == HWY_AVX2
+#if HWY_TARGET == HWY_AVX3
+  {
+    const decltype(bestIdx) shuffledIdx1{Blocks2301(bestIdx.raw)};
+    const decltype(bestValue) shuffledValue1{Blocks2301(bestValue.raw)};
+    const auto selector1 = op.select(shuffledValue1, bestValue);
+    bestValue = IfThenElse(selector1, shuffledValue1, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector1))),
+                         shuffledIdx1, bestIdx);
+    const decltype(bestIdx) shuffledIdx2{Blocks1032(bestIdx.raw)};
+    const decltype(bestValue) shuffledValue2{Blocks1032(bestValue.raw)};
+    const auto selector2 = op.select(shuffledValue2, bestValue);
+    bestValue = IfThenElse(selector2, shuffledValue2, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector2))),
+                         shuffledIdx2, bestIdx);
+  }
+#elif HWY_TARGET == HWY_AVX2
   {
     const auto shuffledIdx = ConcatLowerUpper(bestIdx, bestIdx);
     const auto shuffledValue = ConcatLowerUpper(bestValue, bestValue);
@@ -442,6 +457,16 @@ INLINE uint32_t chooseColor(float r, float g, float b,
   uint32_t best = chooseMin(d2, m);
   *distance2 = d2[best];
   return best;
+}
+
+NOINLINE uint32_t noinlineChooseColor(float r, float g, float b,
+                                      const float* RESTRICT palette_r,
+                                      const float* RESTRICT palette_g,
+                                      const float* RESTRICT palette_b,
+                                      uint32_t palette_size,
+                                      float* RESTRICT distance2) {
+  return chooseColor(r, g, b, palette_r, palette_g, palette_b, palette_size,
+                     distance2);
 }
 
 INLINE void makePalette(const float* stats, float* RESTRICT palette,
@@ -708,31 +733,59 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
 }
 
 void sumCache(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
-  constexpr HWY_CAPPED(float, 4) df;
-
   size_t count = c->count;
   const int32_t* RESTRICT row_offset = c->row_offset->data();
   const float* RESTRICT sum = c->uber->sum->data();
 
+#if HWY_TARGET == HWY_SCALAR
+  Stats tmp = {0.0, 0.0, 0.0, 0.0};
+  for (size_t i = 0; i < count; i++) {
+    int32_t offset = row_offset[i] + 4 * region_x[i];
+    tmp.values[0] += sum[offset + 0];
+    tmp.values[1] += sum[offset + 1];
+    tmp.values[2] += sum[offset + 2];
+    tmp.values[3] += sum[offset + 3];
+  }
+  *dst = tmp;
+#else
+  constexpr HWY_CAPPED(float, 4) df;
   auto tmp = Zero(df);
   for (size_t i = 0; i < count; i++) {
     int32_t offset = row_offset[i] + 4 * region_x[i];
     tmp = tmp + Load(df, sum + offset);
   }
   Store(tmp, df, dst->values);
+#endif
 }
 
 NOINLINE void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
-  constexpr HWY_CAPPED(float, 4) df;
-
   size_t count = c->count;
   const float* RESTRICT sum = c->uber->sum->data();
 
-  auto tmp = Zero(df);
+#if HWY_TARGET == HWY_SCALAR
+  Stats tmp = {0.0, 0.0, 0.0, 0.0};
   for (size_t i = 0; i < count; i++) {
-    tmp = tmp + Load(df, sum + region_x[i]);
+    int32_t offset = region_x[i];
+    tmp.values[0] += sum[offset + 0];
+    tmp.values[1] += sum[offset + 1];
+    tmp.values[2] += sum[offset + 2];
+    tmp.values[3] += sum[offset + 3];
   }
-  Store(tmp, df, dst->values);
+  *dst = tmp;
+#else
+  constexpr HWY_CAPPED(float, 4) df;
+  auto tmp1 = Zero(df);
+  auto tmp2 = Zero(df);
+  auto tmp3 = Zero(df);
+  auto tmp4 = Zero(df);
+  for (size_t i = 0; i < count; i += 4) {
+    tmp1 = tmp1 + Load(df, sum + region_x[i + 0]);
+    tmp2 = tmp2 + Load(df, sum + region_x[i + 1]);
+    tmp3 = tmp3 + Load(df, sum + region_x[i + 2]);
+    tmp4 = tmp4 + Load(df, sum + region_x[i + 3]);
+  }
+  Store((tmp1 + tmp2) + (tmp3 + tmp4), df, dst->values);
+#endif
 }
 
 void INLINE prepareCache(Cache* c, Vector<int32_t>* region) {
@@ -940,7 +993,7 @@ NOINLINE void Fragment::encode(EntropyEncoder* dst, const CodecParams& cp,
       float b = rgb(stats, 2) / pixelCount(stats);
       size_t palette_step = vecSize(cp.palette_size);
       float  dummy;
-      uint32_t index = HWY_STATIC_DISPATCH(chooseColor)(
+      uint32_t index = HWY_STATIC_DISPATCH(noinlineChooseColor)(
           r, g, b, palette, palette + palette_step, palette + 2 * palette_step,
           cp.palette_size, &dummy);
       EntropyEncoder::writeNumber(dst, cp.palette_size, index);
@@ -1063,31 +1116,37 @@ namespace Encoder {
 
 template <typename EntropyEncoder>
 Result encode(const Image& src, const Params& params) {
-  Result result;
+  Result result{};
 
   int32_t width = src.width;
   int32_t height = src.height;
   if (width < 8 || height < 8) {
     fprintf(stderr, "image is too small (%d x %d)\n", width, height);
-    return {};
+    return result;
   }
   UberCache uber(src);
   const std::vector<Variant>& variants = params.variants;
-  TaskExecutor executor(uber, variants.size());
+  size_t numVariants = variants.size();
+  if (numVariants == 0) {
+    fprintf(stderr, "no encoding variants specified\n");
+    return result;
+  }
+  TaskExecutor executor(uber, numVariants);
   std::vector<SimulationTask>& tasks = executor.tasks;
   for (auto& variant : variants) {
     tasks.emplace_back(params.targetSize, variant, uber);
   }
 
   std::vector<std::future<void>> futures;
-  futures.reserve(params.numThreads);
-  bool singleThreaded = (params.numThreads == 1);
-  for (uint32_t i = 0; i < params.numThreads; ++i) {
+  size_t numThreads = std::min<size_t>(params.numThreads, numVariants);
+  futures.reserve(numThreads);
+  bool singleThreaded = (numThreads == 1);
+  for (uint32_t i = 0; i < numThreads; ++i) {
     futures.push_back(
         std::async(singleThreaded ? std::launch::deferred : std::launch::async,
                    &TaskExecutor::run, &executor));
   }
-  for (uint32_t i = 0; i < params.numThreads; ++i) futures[i].get();
+  for (uint32_t i = 0; i < numThreads; ++i) futures[i].get();
 
   size_t bestTaskIndex = 0;
   float bestSqe = 1e35f;
