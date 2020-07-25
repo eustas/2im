@@ -147,9 +147,14 @@ cc_library(
 
 cc_library(
     name = "encoder",
-    srcs = ["encoder.cc"],
+    srcs = [
+        "encoder.cc",
+        "encoder_simd.cc",
+    ],
     hdrs = [
         "encoder.h",
+        "encoder_internal.h",
+        "encoder_simd.h",
     ],
     copts = DEFAULT_COPTS,
     deps = [
@@ -160,7 +165,6 @@ cc_library(
         ":region",
         "@hwy",
     ],
-    defines = ["HWY_BASELINE_TARGETS=HWY_AVX2"],
 )
 
 cc_library(

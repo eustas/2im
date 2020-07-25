@@ -14,19 +14,18 @@ namespace twim {
 
 namespace {
 
-template<typename EntropyDecoder>
-uint32_t readColor(EntropyDecoder* src, const CodecParams& cp,
+uint32_t readColor(XRangeDecoder* src, const CodecParams& cp,
                    const uint32_t* palette) {
   if (cp.palette_size == 0) {
     uint32_t argb = 0xFF;  // alpha = 1
     for (size_t c = 0; c < 3; ++c) {
       uint32_t q = cp.color_quant;
       argb = (argb << 8u) |
-             CodecParams::dequantizeColor(EntropyDecoder::readNumber(src, q), q);
+             CodecParams::dequantizeColor(XRangeDecoder::readNumber(src, q), q);
     }
     return argb;
   } else {
-    return palette[EntropyDecoder::readNumber(src, cp.palette_size)];
+    return palette[XRangeDecoder::readNumber(src, cp.palette_size)];
   }
 }
 
@@ -41,10 +40,9 @@ class Fragment {
   explicit Fragment(Owned<Vector<int32_t>> region)
       : region(std::move(region)) {}
 
-  template<typename EntropyDecoder>
-  bool parse(EntropyDecoder* src, const CodecParams& cp, uint32_t* palette,
+  bool parse(XRangeDecoder* src, const CodecParams& cp, uint32_t* palette,
              std::vector<Fragment*>* children) {
-    type = EntropyDecoder::readNumber(src, NodeType::COUNT);
+    type = XRangeDecoder::readNumber(src, NodeType::COUNT);
     if (type == NodeType::FILL) {
       color = readColor(src, cp, palette);
       return true;
@@ -57,11 +55,11 @@ class Fragment {
 
     uint32_t angleMax = 1u << cp.angle_bits[level];
     uint32_t angleMult = (SinCos::kMaxAngle / angleMax);
-    uint32_t angleCode = EntropyDecoder::readNumber(src, angleMax);
+    uint32_t angleCode = XRangeDecoder::readNumber(src, angleMax);
     uint32_t angle = angleCode * angleMult;
     DistanceRange distance_range(*region.get(), angle, cp);
     if (distance_range.num_lines == DistanceRange::kInvalid) return false;
-    uint32_t line = EntropyDecoder::readNumber(src, distance_range.num_lines);
+    uint32_t line = XRangeDecoder::readNumber(src, distance_range.num_lines);
 
     // Cutting with half-planes does not increase the number of scans.
     uint32_t step = vecSize(region->len);
@@ -109,11 +107,10 @@ class Fragment {
 
 }  // namespace
 
-template<typename EntropyDecoder>
 Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   Image result = Image();
 
-  EntropyDecoder src(std::move(encoded));
+  XRangeDecoder src(std::move(encoded));
   CodecParams cp = CodecParams::read(&src);
   uint32_t width = cp.width;
   uint32_t height = cp.height;
@@ -122,7 +119,7 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   for (size_t j = 0; j < cp.palette_size; ++j) {
     uint32_t argb = 0xFFu;  // alpha = 1
     for (size_t c = 0; c < 3; ++c) {
-      argb = (argb << 8u) | EntropyDecoder::readNumber(&src, 256);
+      argb = (argb << 8u) | XRangeDecoder::readNumber(&src, 256);
     }
     palette.push_back(argb);
   }
@@ -163,8 +160,5 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
 
   return result;
 }
-
-template
-Image Decoder::decode<XRangeDecoder>(std::vector<uint8_t>&& encoded);
 
 }  // namespace twim

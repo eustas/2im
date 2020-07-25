@@ -150,7 +150,7 @@ int main(int argc, char* argv[]) {
     std::string path(argv[i]);
     if (encode) {
       const Image src = Io::readPng(path);
-      Result result = Encoder::encode<XRangeEncoder>(src, params);
+      Result result = Encoder::encode(src, params);
       Variant variant = result.variant;
       uint32_t partitionCode = variant.partitionCode;
       uint32_t lineLimit = variant.lineLimit;
@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Failed to read [%s].\n", path.c_str());
         continue;
       }
-      Image decoded = Decoder::decode<XRangeDecoder>(std::move(data));
+      Image decoded = Decoder::decode(std::move(data));
       if (decoded.height == 0) {
         fprintf(stderr, "Corrupted image [%s].\n", path.c_str());
         continue;

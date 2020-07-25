@@ -6,7 +6,9 @@ set(CMAKE_CXX_STANDARD 11)
 find_package(ZLIB REQUIRED)  # dependency of PNG
 find_package(PNG REQUIRED)
 
-include_directories(../third_party/highway)
+option(BUILD_TESTING "" OFF)
+include(CTest)
+add_subdirectory(../third_party/highway third_party/highway)
 
 add_library(twimLib STATIC
         codec_params.cc
@@ -17,6 +19,9 @@ add_library(twimLib STATIC
         distance_range.cc
         distance_range.h
         encoder.cc
+        encoder_internal.h
+        encoder_simd.cc
+        encoder_simd.h
         encoder.h
         image.cc
         image.h
@@ -34,6 +39,7 @@ add_library(twimLib STATIC
         sin_cos.h)
 
 target_link_libraries(twimLib PUBLIC
+        "hwy"
         "${PNG_LIBRARIES}")
 
 target_include_directories(twimLib PUBLIC

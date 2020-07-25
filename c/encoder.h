@@ -29,7 +29,6 @@ struct Result {
   float mse;
 };
 
-template <typename EntropyEncoder>
 Result encode(const Image& src, const Params& params);
 
 }  // namespace Encoder
