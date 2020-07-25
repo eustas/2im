@@ -22,8 +22,6 @@
 // SSE: 128 bits = 16 bytes = 4 floats / int32_t
 #define ALIGNED_16 alignas(16)
 
-#define HWY_ALIGN ALIGNED_16
-
 namespace twim {
 
 namespace {

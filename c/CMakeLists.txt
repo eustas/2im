@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 11)
 find_package(ZLIB REQUIRED)  # dependency of PNG
 find_package(PNG REQUIRED)
 
+include_directories(../third_party/highway)
+
 add_library(twimLib STATIC
         codec_params.cc
         codec_params.h

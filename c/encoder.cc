@@ -43,15 +43,6 @@ constexpr float kRandom[64] = {
     0.989061239776f, 0.815374917179f, 0.951061519055f, 0.211362121050f,
     0.255234747636f, 0.047947586972f, 0.520984579718f, 0.399461090480f};
 
-struct Stats {
-  /* sum_r, sum_g, sum_b, pixel_count */
-  ALIGNED_16 float values[4];
-};
-
-INLINE float rgb(const Stats& stats, size_t c) { return stats.values[c]; }
-
-INLINE float pixelCount(const Stats& stats) { return stats.values[3]; }
-
 class UberCache {
  public:
   const uint32_t width;
@@ -123,7 +114,7 @@ class Fragment {
   std::unique_ptr<Fragment> left_child;
   std::unique_ptr<Fragment> right_child;
 
-  Stats stats;
+  float stats[4];
 
   // Subdivision.
   uint32_t ordinal = 0x7FFFFFFF;
@@ -189,6 +180,11 @@ Fragment makeRoot(uint32_t width, uint32_t height) {
 
 #include <hwy/before_namespace-inl.h>
 #include <hwy/begin_target-inl.h>
+
+struct Stats {
+  /* sum_r, sum_g, sum_b, pixel_count */
+  HWY_ALIGN float values[4];
+};
 
 constexpr const HWY_FULL(uint32_t) kDu32;
 
@@ -632,10 +628,10 @@ NOINLINE Owned<Vector<float>> gatherPatches(
   size_t pos = 0;
   const auto maybe_add_leaf = [&](Fragment* leaf) {
     if (leaf->ordinal < num_non_leaf) return;
-    stats_wr[pos] = leaf->stats.values[0];
-    stats_wg[pos] = leaf->stats.values[1];
-    stats_wb[pos] = leaf->stats.values[2];
-    stats_c[pos] = leaf->stats.values[3];
+    stats_wr[pos] = leaf->stats[0];
+    stats_wg[pos] = leaf->stats[1];
+    stats_wb[pos] = leaf->stats[2];
+    stats_c[pos] = leaf->stats[3];
     pos++;
   };
 
@@ -817,7 +813,7 @@ void INLINE prepareCache(Cache* c, Vector<int32_t>* region) {
 
 void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
   Vector<int32_t>& region = *f->region;
-  Stats& stats = f->stats;
+  Stats stats;
   Stats plus;
   Stats minus;
   float*  stats_ = cache->stats->data();
@@ -836,10 +832,11 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
   sumCache(cache, cache->x1->data(), &plus);
   sumCache(cache, cache->x0->data(), &minus);
   diff(&stats, plus, minus);
+  for (size_t i = 0; i < 4; ++i) f->stats[i] = stats.values[i];
 
   size_t num_subdivisions = 0;
   float min_c = 0.5f;
-  float max_c = pixelCount(stats) - 0.5f;
+  float max_c = stats.values[3] - 0.5f;
 
   // Find subdivision
   for (uint32_t angle_code = 0; angle_code < angle_max; ++angle_code) {
@@ -856,7 +853,7 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
       stats_b[num_subdivisions] = left.values[2];
       stats_c[num_subdivisions] = left.values[3];
       stats_v[num_subdivisions] = line * angle_max + angle_code;
-      float c = pixelCount(left);
+      float c = left.values[3];
       num_subdivisions += ((c > min_c) && (c < max_c)) ? 1 : 0;
     }
   }
@@ -903,6 +900,10 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache, CodecParams cp) {
     f->best_cost =
         bitCost(NodeType::COUNT * angle_max * distance_range.num_lines);
   }
+}
+
+const char* targetName() {
+return hwy::TargetName(HWY_TARGET);
 }
 
 #include <hwy/end_target-inl.h>
@@ -980,17 +981,17 @@ NOINLINE void Fragment::encode(EntropyEncoder* dst, const CodecParams& cp,
                                std::vector<Fragment*>* children) {
   if (is_leaf) {
     EntropyEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
+    float inv_c = 1.0f / stats[3];
     if (cp.palette_size == 0) {
       float quant = static_cast<float>(cp.color_quant - 1) / 255.0f;
       for (size_t c = 0; c < 3; ++c) {
-        uint32_t v = static_cast<uint32_t>(
-            roundf(quant * rgb(stats, c) / pixelCount(stats)));
+        uint32_t v = static_cast<uint32_t>(roundf(quant * stats[c] * inv_c));
         EntropyEncoder::writeNumber(dst, cp.color_quant, v);
       }
     } else {
-      float r = rgb(stats, 0) / pixelCount(stats);
-      float g = rgb(stats, 1) / pixelCount(stats);
-      float b = rgb(stats, 2) / pixelCount(stats);
+      float r = stats[0] * inv_c;
+      float g = stats[1] * inv_c;
+      float b = stats[2] * inv_c;
       size_t palette_step = vecSize(cp.palette_size);
       float  dummy;
       uint32_t index = HWY_STATIC_DISPATCH(noinlineChooseColor)(
@@ -1117,6 +1118,10 @@ namespace Encoder {
 template <typename EntropyEncoder>
 Result encode(const Image& src, const Params& params) {
   Result result{};
+
+  if (params.debug) {
+    fprintf(stderr, "SIMD: %s\n", HWY_STATIC_DISPATCH(targetName)());
+  }
 
   int32_t width = src.width;
   int32_t height = src.height;
