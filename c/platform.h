@@ -1,8 +1,6 @@
 #ifndef TWIM_PLATFORM
 #define TWIM_PLATFORM
 
-#include <immintrin.h>
-
 #include <chrono>
 #include <cstddef>
 #include <cstdint>

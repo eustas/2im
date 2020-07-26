@@ -77,9 +77,9 @@ class Fragment {
   void render(Image* out) {
     if (type == NodeType::FILL) {
       size_t width = out->width;
-      uint8_t* RESTRICT r = out->r.data();
-      uint8_t* RESTRICT g = out->g.data();
-      uint8_t* RESTRICT b = out->b.data();
+      uint8_t* RESTRICT r = out->r;
+      uint8_t* RESTRICT g = out->g;
+      uint8_t* RESTRICT b = out->b;
       size_t step = region->capacity / 3;
       size_t count = region->len;
       uint8_t cr = static_cast<uint8_t>(color & 0xFFu);
@@ -151,11 +151,7 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
     }
   }
 
-  result.width = width;
-  result.height = height;
-  result.r.resize(width * height);
-  result.g.resize(width * height);
-  result.b.resize(width * height);
+  result.init(width, height);
   root.render(&result);
 
   return result;

@@ -4,7 +4,7 @@
 #include <cstring>
 #include <memory>
 
-#include "png.h"
+#include <png.h>
 
 namespace twim {
 
@@ -135,24 +135,19 @@ Image Io::readPng(const std::string& path) {
   // Only RGB is supported.
   if (components != 3) return result;
 
-  result.r.resize(width * height);
-  result.g.resize(width * height);
-  result.b.resize(width * height);
+  result.init(width, height);
 
   for (size_t y = 0; y < height; ++y) {
     const uint8_t* from = row_pointers[y];
-    uint8_t* to_r = &result.r[width * y];
-    uint8_t* to_g = &result.g[width * y];
-    uint8_t* to_b = &result.b[width * y];
+    uint8_t* to_r = result.r + width * y;
+    uint8_t* to_g = result.g + width * y;
+    uint8_t* to_b = result.b + width * y;
     for (size_t x = 0; x < width; ++x) {
-      to_r[x] = from[3 * x];
+      to_r[x] = from[3 * x + 0];
       to_g[x] = from[3 * x + 1];
       to_b[x] = from[3 * x + 2];
     }
   }
-
-  result.width = width;
-  result.height = height;
 
   return result;
 }
@@ -180,9 +175,9 @@ bool Io::writePng(const std::string& path, const Image& img) {
 
   uint8_t* RESTRICT rgb = row.data();
   for (size_t y = 0; y < img.height; y++) {
-    const uint8_t* RESTRICT r = img.r.data() + width * y;
-    const uint8_t* RESTRICT g = img.g.data() + width * y;
-    const uint8_t* RESTRICT b = img.b.data() + width * y;
+    const uint8_t* RESTRICT r = img.r + width * y;
+    const uint8_t* RESTRICT g = img.g + width * y;
+    const uint8_t* RESTRICT b = img.b + width * y;
     for (size_t x = 0; x < width; ++x) {
       rgb[3 * x + 2] = r[x];
       rgb[3 * x + 1] = g[x];

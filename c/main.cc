@@ -150,6 +150,10 @@ int main(int argc, char* argv[]) {
     std::string path(argv[i]);
     if (encode) {
       const Image src = Io::readPng(path);
+      if (!src.ok) {
+        fprintf(stderr, "Failed to read PNG image [%s].\n", path.c_str());
+        continue;
+      }
       Result result = Encoder::encode(src, params);
       Variant variant = result.variant;
       uint32_t partitionCode = variant.partitionCode;

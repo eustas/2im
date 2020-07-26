@@ -31,9 +31,9 @@ UberCache::UberCache(const Image& src)
   for (size_t y = 0; y < src.height; ++y) {
     float row_rgb2[3] = {0.0f};
     size_t src_row_offset = y * src.width;
-    const uint8_t* RESTRICT r_row = src.r.data() + src_row_offset;
-    const uint8_t* RESTRICT g_row = src.g.data() + src_row_offset;
-    const uint8_t* RESTRICT b_row = src.b.data() + src_row_offset;
+    const uint8_t* RESTRICT r_row = src.r + src_row_offset;
+    const uint8_t* RESTRICT g_row = src.g + src_row_offset;
+    const uint8_t* RESTRICT b_row = src.b + src_row_offset;
     size_t dstRowOffset = y * this->stride;
     for (size_t i = 0; i < 4; ++i) sum[dstRowOffset + i] = 0.0f;
     for (size_t x = 0; x < src.width; ++x) {
