@@ -10,11 +10,19 @@ typedef std::array<float, SinCos::kMaxAngle> LutF;
 
 const double kPi = std::acos(-1);
 
+// Avoid roundtrip to JS in WASM build.
+static int32_t toInt(double x) {
+  if (x >= +0.0) {
+    return static_cast<int32_t>(x + 0.5);
+  } else {
+    return -static_cast<int32_t>(-x + 0.5);
+  }
+}
+
 const LutI SinCos::kSin = []() -> LutI {
   LutI result;
   for (int32_t i = 0; i < SinCos::kMaxAngle; ++i) {
-    result[i] = static_cast<int32_t>(
-        std::round(SinCos::kOne * std::sin((kPi * i) / SinCos::kMaxAngle)));
+    result[i] = toInt(SinCos::kOne * std::sin((kPi * i) / SinCos::kMaxAngle));
   }
   return result;
 }();
@@ -31,8 +39,7 @@ const LutD SinCos::kInvSin = []() -> LutD {
 const LutI SinCos::kCos = []() -> LutI {
   LutI result;
   for (int32_t i = 0; i < SinCos::kMaxAngle; ++i) {
-    result[i] = static_cast<int32_t>(
-        std::round(SinCos::kOne * std::cos((kPi * i) / SinCos::kMaxAngle)));
+    result[i] = toInt(SinCos::kOne * std::cos((kPi * i) / SinCos::kMaxAngle));
   }
   return result;
 }();

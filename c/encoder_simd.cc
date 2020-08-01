@@ -543,7 +543,8 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
     const float dequant = 255.0f / v_max;
     auto quantizer = [&](float* rgb) {
       for (size_t i = 0; i < 3; ++i) {
-        rgb[i] = std::floorf(std::roundf(rgb[i] * quant) * dequant);
+        int32_t quantized = static_cast<int32_t>(rgb[i] * quant + 0.5f);
+        rgb[i] = std::floorf(quantized * dequant);
       }
     };
     accumulate_score(quantizer);

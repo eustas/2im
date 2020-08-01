@@ -4,7 +4,10 @@
 
 #include <hwy/highway.h>
 
+#if !defined(__EMSCRIPTEN__)
 #include <future>
+#endif
+
 #include <memory>
 #include <queue>
 #include <vector>
@@ -20,6 +23,47 @@ namespace twim {
 
 using ::twim::Encoder::Result;
 using ::twim::Encoder::Variant;
+
+#if defined(__EMSCRIPTEN__)
+static void log(const char* message) {(void)message;}
+#else
+static void log(const char* message) {
+  fprintf(stderr, "%s\n", message);
+}
+#endif
+
+void writeSize(XRangeEncoder* dst, uint32_t value) {
+  value -= 8;
+  uint32_t chunks = 2;
+  while (value > (1u << (chunks * 3))) {
+    value -= (1u << (chunks * 3));
+    chunks++;
+  }
+  for (uint32_t i = 0; i < chunks; ++i) {
+    if (i > 1) {
+      XRangeEncoder::writeNumber(dst, 2, 1);
+    }
+    XRangeEncoder::writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7u);
+  }
+  XRangeEncoder::writeNumber(dst, 2, 0);
+}
+
+void CodecParams::write(XRangeEncoder* dst) const {
+  writeSize(dst, width);
+  writeSize(dst, height);
+  XRangeEncoder::writeNumber(dst, kMaxF1, params[0]);
+  XRangeEncoder::writeNumber(dst, kMaxF2, params[1]);
+  XRangeEncoder::writeNumber(dst, kMaxF3, params[2]);
+  XRangeEncoder::writeNumber(dst, kMaxF4, params[3]);
+  XRangeEncoder::writeNumber(dst, kMaxLineLimit, line_limit - 1);
+  XRangeEncoder::writeNumber(dst, kMaxColorCode, color_code);
+}
+
+double CodecParams::getTax() const {
+  XRangeEncoder fakeEncoder;
+  write(&fakeEncoder);
+  return XRangeEncoder::estimateCost(&fakeEncoder);
+}
 
 UberCache::UberCache(const Image& src)
     : width(src.width),
@@ -136,7 +180,7 @@ NOINLINE void Fragment::encode(XRangeEncoder* dst, const CodecParams& cp,
     if (cp.palette_size == 0) {
       float quant = static_cast<float>(cp.color_quant - 1) / 255.0f;
       for (size_t c = 0; c < 3; ++c) {
-        uint32_t v = static_cast<uint32_t>(roundf(quant * stats[c] * inv_c));
+        uint32_t v = static_cast<uint32_t>(quant * stats[c] * inv_c + 0.5f);
         XRangeEncoder::writeNumber(dst, cp.color_quant, v);
       }
     } else {
@@ -281,29 +325,33 @@ namespace Encoder {
 Result encode(const Image& src, const Params& params) {
   Result result{};
 
-  if (params.debug) {
-    fprintf(stderr, "SIMD: %s\n", targetName());
-  }
+  if (params.debug) log(targetName());
 
   int32_t width = src.width;
   int32_t height = src.height;
   if (width < 8 || height < 8) {
-    fprintf(stderr, "image is too small (%d x %d)\n", width, height);
+    if (params.debug) log("image is too small");
     return result;
   }
   UberCache uber(src);
   const std::vector<Variant>& variants = params.variants;
   size_t numVariants = variants.size();
   if (numVariants == 0) {
-    fprintf(stderr, "no encoding variants specified\n");
+    if (params.debug) log("no encoding variants specified");
     return result;
   }
+
+#if defined(__EMSCRIPTEN__)
+  SimulationTask bestTask(params.targetSize, variants[0], uber);
+  Cache cache(uber);
+  bestTask.run(&cache);
+  float bestSqe = bestTask.bestSqe;
+#else
   TaskExecutor executor(uber, numVariants);
   std::vector<SimulationTask>& tasks = executor.tasks;
   for (auto& variant : variants) {
     tasks.emplace_back(params.targetSize, variant, uber);
   }
-
   std::vector<std::future<void>> futures;
   size_t numThreads = std::min<size_t>(params.numThreads, numVariants);
   futures.reserve(numThreads);
@@ -314,7 +362,6 @@ Result encode(const Image& src, const Params& params) {
                    &TaskExecutor::run, &executor));
   }
   for (uint32_t i = 0; i < numThreads; ++i) futures[i].get();
-
   size_t bestTaskIndex = 0;
   float bestSqe = 1e35f;
   for (size_t taskIndex = 0; taskIndex < tasks.size(); ++taskIndex) {
@@ -325,8 +372,9 @@ Result encode(const Image& src, const Params& params) {
       bestSqe = task.bestSqe;
     }
   }
-  bestSqe += uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2];
   SimulationTask& bestTask = tasks[bestTaskIndex];
+#endif
+
   CodecParams& cp = bestTask.cp;
   uint32_t bestColorCode = bestTask.bestColorCode;
   cp.setColorCode(bestColorCode);
@@ -344,7 +392,8 @@ Result encode(const Image& src, const Params& params) {
 
   result.variant = bestTask.variant;
   result.variant.colorOptions = (uint64_t)1 << bestColorCode;
-  result.mse = bestSqe / static_cast<float>(width * height);
+  result.mse = (bestSqe + uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2]) /
+               static_cast<float>(width * height);
   return result;
 }
 

@@ -5,6 +5,8 @@
 
 #include "platform.h"
 #include "sin_cos.h"
+#include "xrange_decoder.h"
+#include "xrange_encoder.h"
 
 namespace twim {
 
@@ -22,11 +24,9 @@ class CodecParams {
  public:
   CodecParams(uint32_t width, uint32_t height) : width(width), height(height) {}
 
-  template<typename EntropyDecoder>
-  static CodecParams read(EntropyDecoder* src);
+  static CodecParams read(XRangeDecoder* src);
 
-  template<typename EntropyEncoder>
-  void write(EntropyEncoder* dst) const;
+  void write(XRangeEncoder* dst) const;
 
   double getTax() const;
 

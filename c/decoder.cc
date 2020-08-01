@@ -107,6 +107,31 @@ class Fragment {
 
 }  // namespace
 
+uint32_t readSize(XRangeDecoder* src) {
+  uint32_t plus = 0;
+  uint32_t bits = XRangeDecoder::readNumber(src, 8);
+  do {
+    plus = (plus + 1) << 3u;
+    uint32_t extra = XRangeDecoder::readNumber(src, 8);
+    bits = (bits << 3u) + extra;
+  } while ((XRangeDecoder::readNumber(src, 2) == 1));
+  return bits + plus;
+}
+
+CodecParams CodecParams::read(XRangeDecoder* src) {
+  uint32_t width = readSize(src);
+  uint32_t height = readSize(src);
+  CodecParams cp(width, height);
+  Params params = {XRangeDecoder::readNumber(src, kMaxF1),
+                   XRangeDecoder::readNumber(src, kMaxF2),
+                   XRangeDecoder::readNumber(src, kMaxF3),
+                   XRangeDecoder::readNumber(src, kMaxF4)};
+  cp.setPartitionParams(params);
+  cp.line_limit = XRangeDecoder::readNumber(src, kMaxLineLimit) + 1;
+  cp.setColorCode(XRangeDecoder::readNumber(src, kMaxColorCode));
+  return cp;
+}
+
 Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   Image result = Image();
 
