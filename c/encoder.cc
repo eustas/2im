@@ -59,7 +59,7 @@ void CodecParams::write(XRangeEncoder* dst) const {
   XRangeEncoder::writeNumber(dst, kMaxColorCode, color_code);
 }
 
-double CodecParams::getTax() const {
+NOINLINE double CodecParams::getTax() const {
   XRangeEncoder fakeEncoder;
   write(&fakeEncoder);
   return XRangeEncoder::estimateCost(&fakeEncoder);
@@ -237,6 +237,47 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
   return dst.finish();
 }
 
+struct PqNode {
+  PqNode(Fragment* v = nullptr) : v(v) {}
+
+  Fragment* v;
+  uint32_t leftChild = 0;
+  uint32_t nextSibling = 0;
+};
+
+void addChild(PqNode* storage, uint32_t node, uint32_t child) {
+  uint32_t leftChild = storage[node].leftChild;
+  if (leftChild != 0) {
+    storage[child].nextSibling = leftChild;
+  }
+  storage[node].leftChild = child;
+}
+
+NOINLINE uint32_t merge(PqNode* storage, uint32_t a, uint32_t b) {
+  if (a == 0) return b;
+  if (b == 0) return a;
+
+  if (storage[a].v->best_score < storage[b].v->best_score) {
+    uint32_t c = a;
+    a = b;
+    b = c;
+  }
+
+  addChild(storage, a, b);
+  return a;
+}
+
+// TODO(eustas): turn to loop
+uint32_t fold(PqNode* storage, uint32_t node) {
+  if (node == 0) return 0;
+  uint32_t sibling = storage[node].nextSibling;
+  if (sibling == 0) return node;
+  uint32_t tail = storage[sibling].nextSibling;
+  storage[node].nextSibling = 0;
+  storage[sibling].nextSibling = 0;
+  return merge(storage, merge(storage, node, sibling), fold(storage, tail));
+}
+
 /**
  * Builds the space partition.
  *
@@ -253,22 +294,30 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
       size_limit * 8.0f - tax - cp.getTax();  // Minus flat image cost.
 
   std::vector<Fragment*> result;
-  std::priority_queue<Fragment*, std::vector<Fragment*>, FragmentComparator>
-      queue;
+
   findBestSubdivision(root, cache, cp);
-  queue.push(std::move(root));  // Otherwise, there will be 2 "push" instances.
-  while (!queue.empty()) {
-    Fragment* candidate = queue.top();
-    queue.pop();
+
+  std::vector<PqNode> queue;
+  // 0-th node is a "nullptr"
+  queue.emplace_back(nullptr);
+  queue.emplace_back(root);
+  uint32_t rootNode = 1;
+  uint32_t next = 2;
+
+  while (rootNode != 0) {
+    Fragment* candidate = queue[rootNode].v;
+    rootNode = fold(queue.data(), queue[rootNode].leftChild);  // pop
     if (candidate->best_score < 0.0 || candidate->best_cost < 0.0) break;
     if (tax + candidate->best_cost <= budget) {
       budget -= tax + candidate->best_cost;
       candidate->ordinal = static_cast<uint32_t>(result.size());
       result.push_back(candidate);
       findBestSubdivision(candidate->left_child.get(), cache, cp);
-      queue.push(candidate->left_child.get());
+      queue.emplace_back(candidate->left_child.get());
+      rootNode = merge(queue.data(), rootNode, next++);  // push
       findBestSubdivision(candidate->right_child.get(), cache, cp);
-      queue.push(candidate->right_child.get());
+      queue.emplace_back(candidate->right_child.get());
+      rootNode = merge(queue.data(), rootNode, next++);  // push
     }
   }
   return result;
@@ -334,8 +383,8 @@ Result encode(const Image& src, const Params& params) {
     return result;
   }
   UberCache uber(src);
-  const std::vector<Variant>& variants = params.variants;
-  size_t numVariants = variants.size();
+  const Variant* variants = params.variants;
+  size_t numVariants = params.numVariants;
   if (numVariants == 0) {
     if (params.debug) log("no encoding variants specified");
     return result;
@@ -349,8 +398,8 @@ Result encode(const Image& src, const Params& params) {
 #else
   TaskExecutor executor(uber, numVariants);
   std::vector<SimulationTask>& tasks = executor.tasks;
-  for (auto& variant : variants) {
-    tasks.emplace_back(params.targetSize, variant, uber);
+  for (size_t i = 0; i < numVariants; ++i) {
+    tasks.emplace_back(params.targetSize, variants[i], uber);
   }
   std::vector<std::future<void>> futures;
   size_t numThreads = std::min<size_t>(params.numThreads, numVariants);

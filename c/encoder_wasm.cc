@@ -11,14 +11,16 @@ const uint8_t* twimEncode(uint32_t width, uint32_t height, uint8_t* rgba,
                           uint32_t colorPaletteOptions) {
   ::twim::Image src = ::twim::Image::fromRgba(rgba, width, height);
   ::twim::Encoder::Params params;
+  ::twim::Encoder::Variant variant;
   params.targetSize = targetSize;
   params.numThreads = 1;
-  params.variants.resize(1);
-  params.variants[0].partitionCode = partitionCode;
-  params.variants[0].lineLimit = lineLimit;
-  params.variants[0].colorOptions =
-      colorQuantOptions & 0x1FFFF |
-      ((colorPaletteOptions & 0xFFFF) << ::twim::CodecParams::kNumColorQuantOptions);
+  params.variants = &variant;
+  params.numVariants = 1;
+  variant.partitionCode = partitionCode;
+  variant.lineLimit = lineLimit;
+  variant.colorOptions = colorQuantOptions & 0x1FFFF |
+                         ((colorPaletteOptions & 0xFFFF)
+                          << ::twim::CodecParams::kNumColorQuantOptions);
   ::twim::Encoder::Result result = ::twim::Encoder::encode(src, params);
 
   size_t size = result.data.size();

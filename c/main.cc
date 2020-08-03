@@ -109,7 +109,10 @@ int main(int argc, char* argv[]) {
   Encoder::Params params;
   params.targetSize = kDefaultTargetSize;
   params.numThreads = 1;
-  fillAllVariants(&params.variants);
+  std::vector<Variant> variants;
+  fillAllVariants(&variants);
+  params.variants = variants.data();
+  params.numVariants = variants.size();
 
   if (argc < 2) {
     printHelp(fileName(argv[0]), false);

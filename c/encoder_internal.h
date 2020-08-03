@@ -113,12 +113,6 @@ float INLINE bitCost(int32_t range) {
   return static_cast<float>(std::log(range) * kInvLog2);
 }
 
-struct FragmentComparator {
-  bool operator()(const Fragment* left, const Fragment* right) const {
-    return left->best_score < right->best_score;
-  }
-};
-
 }  // namespace twim
 
 #endif  // TWIM_ENCODER_INTERNAL

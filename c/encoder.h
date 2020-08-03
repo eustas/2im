@@ -19,7 +19,8 @@ struct Variant {
 struct Params {
   uint32_t targetSize = 200;
   uint32_t numThreads = 1;
-  std::vector<Variant> variants;
+  const Variant* variants;
+  size_t numVariants;
   bool debug = false;
 };
 
