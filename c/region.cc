@@ -23,8 +23,8 @@ void Region::splitLine(const Vector<int32_t>& region, int32_t angle, int32_t d,
   int32_t* RESTRICT right_x0 = right_y + right_step;
   int32_t* RESTRICT right_x1 = right_x0 + right_step;
 
-  int32_t nx = SinCos::kSin[angle];
-  int32_t ny = SinCos::kCos[angle];
+  int32_t nx = SinCos.kSin[angle];
+  int32_t ny = SinCos.kCos[angle];
   uint32_t l_count = 0;
   uint32_t r_count = 0;
 

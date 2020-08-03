@@ -22,8 +22,8 @@ DistanceRange::DistanceRange(const Vector<int32_t>& region, int32_t angle,
   const int32_t* RESTRICT x1 = x0 + step;
 
   // Note: kSin is all positive -> d0 <= d1
-  int32_t nx = SinCos::kSin[angle];
-  int32_t ny = SinCos::kCos[angle];
+  int32_t nx = SinCos.kSin[angle];
+  int32_t ny = SinCos.kCos[angle];
   int32_t mi = std::numeric_limits<int32_t>::max();
   int32_t ma = std::numeric_limits<int32_t>::min();
   for (size_t i = 0; i < count; i++) {

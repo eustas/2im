@@ -105,7 +105,7 @@ Cache::Cache(const UberCache& uber)
       x1(allocVector<int32_t>(uber.height)),
       x(allocVector<int32_t>(uber.height)),
       stats(allocVector<float>(
-          6 * vecSize(CodecParams::kMaxLineLimit * SinCos::kMaxAngle))) {}
+          6 * vecSize(CodecParams::kMaxLineLimit * SinCos.kMaxAngle))) {}
 
 class SimulationTask {
  public:
@@ -256,7 +256,7 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
   std::priority_queue<Fragment*, std::vector<Fragment*>, FragmentComparator>
       queue;
   findBestSubdivision(root, cache, cp);
-  queue.push(root);
+  queue.push(std::move(root));  // Otherwise, there will be 2 "push" instances.
   while (!queue.empty()) {
     Fragment* candidate = queue.top();
     queue.pop();

@@ -45,7 +45,10 @@ void CodecParams::setPartitionParams(Params params) {
   this->params = params;
   uint32_t f1 = params[0];
   uint32_t f2 = params[1] + 2;
-  uint32_t f3 = static_cast<uint32_t>(std::pow(10, 3 - params[2] / 5.0));
+  // static_cast<uint32_t>(std::pow(10, 3 - X / 5.0))
+  // pow implementation in WASM is quite fat.
+  static const uint16_t kF3[5] = {1000, 630, 398, 251, 158};
+  uint32_t f3 = kF3[params[2]];
   uint32_t f4 = params[3];
   uint32_t scale = (width * width + height * height) * f2 * f2;
   for (size_t i = 0; i < kMaxLevel; ++i) {
@@ -53,7 +56,7 @@ void CodecParams::setPartitionParams(Params params) {
     scale = (scale * kScaleStepFactor) / f3;
   }
 
-  int32_t bits = SinCos::kMaxAngleBits - f1;
+  int32_t bits = SinCos.kMaxAngleBits - f1;
   for (uint32_t i = 0; i < kMaxLevel; ++i) {
     int32_t level_bits = bits - i - (i * f4) / 2;
     angle_bits[i] = level_bits > 0 ? (static_cast<uint32_t>(level_bits)) : 0;

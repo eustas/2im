@@ -54,7 +54,7 @@ class Fragment {
     if (type != NodeType::HALF_PLANE) return false;
 
     uint32_t angleMax = 1u << cp.angle_bits[level];
-    uint32_t angleMult = (SinCos::kMaxAngle / angleMax);
+    uint32_t angleMult = (SinCos.kMaxAngle / angleMax);
     uint32_t angleCode = XRangeDecoder::readNumber(src, angleMax);
     uint32_t angle = angleCode * angleMult;
     DistanceRange distance_range(*region.get(), angle, cp);

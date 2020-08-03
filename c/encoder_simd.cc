@@ -1,6 +1,8 @@
+#if !defined(__wasm__)
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "encoder_simd.cc"
 #include "hwy/foreach_target.h"
+#endif
 
 #include "codec_params.h"
 #include "distance_range.h"
@@ -44,7 +46,7 @@ void INLINE updateGeHorizontal(Cache* cache, int32_t d) {
   constexpr HWY_FULL(float) df;
   constexpr HWY_FULL(int32_t) di32;
 
-  int32_t ny = SinCos::kCos[0];
+  int32_t ny = SinCos.kCos[0];
   float d_ny = d / (float)ny;  // TODO: precalculate
   size_t count = cache->count;
   int32_t* RESTRICT row_offset = cache->row_offset->data();
@@ -71,8 +73,8 @@ INLINE void updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   constexpr HWY_FULL(float) df;
   constexpr HWY_FULL(int32_t) di32;
 
-  float m_ny_nx = SinCos::kMinusCot[angle];
-  float d_nx = static_cast<float>(d * SinCos::kInvSin[angle] + 0.5);
+  float m_ny_nx = SinCos.kMinusCot[angle];
+  float d_nx = static_cast<float>(d * SinCos.kInvSin[angle] + 0.5);
   int32_t* RESTRICT row_offset = cache->row_offset->data();
   float* RESTRICT region_y = cache->y->data();
   int32_t* RESTRICT region_x0 = cache->x0->data();
@@ -524,40 +526,32 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
 
   float result[3] = {0.0f};
 
-  typedef std::function<void(float* rgb)> ColorTransformer;
-  auto accumulate_score = [&](const ColorTransformer& get_color) {
-    for (size_t i = 0; i < n; ++i) {
-      float orig[3] = {patches_r[i], patches_g[i], patches_b[i]};
-      float color[3] = {orig[0], orig[1], orig[2]};
-      float c = patches_c[i];
-      get_color(color);
+  int32_t v_max = cp.color_quant - 1;
+  const float quant = v_max / 255.0f;
+  const float dequant = 255.0f / ((v_max != 0) ? v_max : 1);
+
+  for (size_t i = 0; i < n; ++i) {
+    float orig[3] = {patches_r[i], patches_g[i], patches_b[i]};
+    float rgb[3] = {orig[0], orig[1], orig[2]};
+    float c = patches_c[i];
+    // Lambdas were nice, but are fatty in WASM.
+    if (m == 0) {
       for (size_t j = 0; j < 3; ++j) {
-        // TODO(eustas): could use non-normalized patch color.
-        result[j] += c * color[j] * (color[j] - 2.0f * orig[j]);
+        int32_t quantized = static_cast<int32_t>(rgb[j] * quant + 0.5f);
+        rgb[j] = std::floorf(quantized * dequant);
       }
-    }
-  };
-  if (m == 0) {
-    int32_t v_max = cp.color_quant - 1;
-    const float quant = v_max / 255.0f;
-    const float dequant = 255.0f / v_max;
-    auto quantizer = [&](float* rgb) {
-      for (size_t i = 0; i < 3; ++i) {
-        int32_t quantized = static_cast<int32_t>(rgb[i] * quant + 0.5f);
-        rgb[i] = std::floorf(quantized * dequant);
-      }
-    };
-    accumulate_score(quantizer);
-  } else {
-    auto color_matcher = [&](float* rgb) {
+    } else {
       float dummy;
       uint32_t index = chooseColor(rgb[0], rgb[1], rgb[2], palette_r, palette_g,
                                    palette_b, m, &dummy);
       rgb[0] = palette_r[index];
       rgb[1] = palette_g[index];
       rgb[2] = palette_b[index];
-    };
-    accumulate_score(color_matcher);
+    }
+    for (size_t j = 0; j < 3; ++j) {
+      // TODO(eustas): could use non-normalized patch color.
+      result[j] += c * rgb[j] * (rgb[j] - 2.0f * orig[j]);
+    }
   }
 
   return result[0] + result[1] + result[2];
@@ -653,7 +647,7 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
   Stats plus;
   Stats minus;
   float* stats_ = cache->stats->data();
-  size_t stats_step = vecSize(CodecParams::kMaxLineLimit * SinCos::kMaxAngle);
+  size_t stats_step = vecSize(CodecParams::kMaxLineLimit * SinCos.kMaxAngle);
   float* RESTRICT stats_r = stats_ + 0 * stats_step;
   float* RESTRICT stats_g = stats_ + 1 * stats_step;
   float* RESTRICT stats_b = stats_ + 2 * stats_step;
@@ -664,7 +658,7 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
   uint32_t level = cp.getLevel(region);
   // TODO(eustas): assert level is not kInvalid.
   uint32_t angle_max = 1u << cp.angle_bits[level];
-  uint32_t angle_mult = (SinCos::kMaxAngle / angle_max);
+  uint32_t angle_mult = (SinCos.kMaxAngle / angle_max);
   prepareCache(cache, &region);
   sumCache(cache, cache->x1->data(), &plus);
   sumCache(cache, cache->x0->data(), &minus);
@@ -748,41 +742,45 @@ const char* targetName() { return hwy::TargetName(HWY_TARGET); }
 #if HWY_ONCE
 namespace twim {
 
+#if defined(__wasm__)
+#define CALL HWY_STATIC_DISPATCH
+#else
+#define CALL HWY_DYNAMIC_DISPATCH
 HWY_EXPORT(simulateEncode)
 HWY_EXPORT(noinlineChooseColor)
 HWY_EXPORT(findBestSubdivision)
 HWY_EXPORT(targetName)
 HWY_EXPORT(gatherPatches)
 HWY_EXPORT(buildPalette)
+#endif
 
 float simulateEncode(const Partition& partition_holder, uint32_t target_size,
                      const CodecParams& cp) {
-  return HWY_DYNAMIC_DISPATCH(simulateEncode)(partition_holder, target_size,
-                                              cp);
+  return CALL(simulateEncode)(partition_holder, target_size, cp);
 }
 
 uint32_t chooseColor(float r, float g, float b, const float* RESTRICT palette_r,
                      const float* RESTRICT palette_g,
                      const float* RESTRICT palette_b, uint32_t palette_size,
                      float* RESTRICT distance2) {
-  return HWY_DYNAMIC_DISPATCH(noinlineChooseColor)(
+  return CALL(noinlineChooseColor)(
       r, g, b, palette_r, palette_g, palette_b, palette_size, distance2);
 }
 
 void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
-  return HWY_DYNAMIC_DISPATCH(findBestSubdivision)(f, cache, cp);
+  return CALL(findBestSubdivision)(f, cache, cp);
 }
 
-const char* targetName() { return HWY_DYNAMIC_DISPATCH(targetName)(); }
+const char* targetName() { return CALL(targetName)(); }
 
 Owned<Vector<float>> gatherPatches(const std::vector<Fragment*>* partition,
                                    uint32_t num_non_leaf) {
-  return HWY_DYNAMIC_DISPATCH(gatherPatches)(partition, num_non_leaf);
+  return CALL(gatherPatches)(partition, num_non_leaf);
 }
 
 Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
                                   uint32_t palette_size) {
-  return HWY_DYNAMIC_DISPATCH(buildPalette)(patches, palette_size);
+  return CALL(buildPalette)(patches, palette_size);
 }
 
 }  // namespace twim

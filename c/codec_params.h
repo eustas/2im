@@ -30,7 +30,7 @@ class CodecParams {
 
   double getTax() const;
 
-  constexpr int32_t getLineQuant() const { return SinCos::kOne; }
+  constexpr int32_t getLineQuant() const { return SinCos.kOne; }
 
   static const uint32_t kInvalid = static_cast<uint32_t>(-1);
   uint32_t getLevel(const Vector<int32_t>& region) const;

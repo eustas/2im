@@ -7,17 +7,23 @@
 
 namespace twim {
 
-class SinCos {
+class SinCosT {
  public:
   static constexpr const int32_t kOne = 1u << 18u;
   static constexpr const uint32_t kMaxAngleBits = 9u;
   static constexpr const int32_t kMaxAngle = 1u << kMaxAngleBits;
 
-  static const std::array<int32_t, kMaxAngle> kSin;
-  static const std::array<double, kMaxAngle> kInvSin;
-  static const std::array<int32_t, kMaxAngle> kCos;
-  static const std::array<float, kMaxAngle> kMinusCot;
+  // round(kOne * sin((kPi * i) / kMaxAngle));
+  std::array<int32_t, kMaxAngle> kSin;
+  // round(kOne * cos((kPi * i) / kMaxAngle));
+  std::array<int32_t, kMaxAngle> kCos;
+  // 1.0 / kSin[i]
+  std::array<double, kMaxAngle> kInvSin;
+  // -kCos[i] / kSin[i]
+  std::array<float, kMaxAngle> kMinusCot;
 };
+
+extern const SinCosT SinCos;
 
 }  // namespace twim
 
