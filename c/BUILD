@@ -89,6 +89,7 @@ cc_library(
     copts = DEFAULT_COPTS,
     deps = [
         ":platform",
+        ":sin_cos",
         ":xrange_code",
     ],
 )

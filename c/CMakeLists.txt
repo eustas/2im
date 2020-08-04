@@ -3,6 +3,7 @@ project(c)
 
 set(CMAKE_CXX_STANDARD 11)
 
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msimd128")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto -fno-exceptions -fno-rtti")
 #set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -fno-exceptions -fno-rtti -g2")
 

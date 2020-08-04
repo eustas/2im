@@ -108,11 +108,6 @@ class Partition {
   std::vector<Fragment*> partition;
 };
 
-float INLINE bitCost(int32_t range) {
-  static float kInvLog2 = 1.0f / std::log(2.0f);
-  return static_cast<float>(std::log(range) * kInvLog2);
-}
-
 }  // namespace twim
 
 #endif  // TWIM_ENCODER_INTERNAL

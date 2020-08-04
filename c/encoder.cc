@@ -10,7 +10,6 @@
 
 #include <memory>
 #include <queue>
-#include <vector>
 
 #include "codec_params.h"
 #include "encoder_internal.h"
@@ -289,7 +288,7 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
                                                size_t size_limit,
                                                const CodecParams& cp,
                                                Cache* cache) {
-  float tax = bitCost(NodeType::COUNT);
+  float tax = SinCos.kLog2[NodeType::COUNT];
   float budget =
       size_limit * 8.0f - tax - cp.getTax();  // Minus flat image cost.
 
@@ -348,12 +347,12 @@ const std::vector<Fragment*>* Partition::getPartition() const {
 uint32_t Partition::subpartition(const CodecParams& cp,
                                  uint32_t target_size) const {
   const std::vector<Fragment*>* partition = getPartition();
-  float node_tax = bitCost(NodeType::COUNT);
+  float node_tax = SinCos.kLog2[NodeType::COUNT];
   float image_tax = cp.getTax();
   if (cp.palette_size == 0) {
-    node_tax += 3.0f * bitCost(cp.color_quant);
+    node_tax += 3.0f * SinCos.kLog2[cp.color_quant];
   } else {
-    node_tax += bitCost(cp.palette_size);
+    node_tax += SinCos.kLog2[cp.palette_size];
     image_tax += cp.palette_size * 3.0f * 8.0f;
   }
   float budget = 8.0f * target_size - 4.0f - image_tax - node_tax;

@@ -10,6 +10,7 @@ const uint8_t* twimEncode(uint32_t width, uint32_t height, uint8_t* rgba,
                           uint32_t lineLimit, uint32_t colorQuantOptions,
                           uint32_t colorPaletteOptions) {
   ::twim::Image src = ::twim::Image::fromRgba(rgba, width, height);
+  if (!src.ok) return nullptr;
   ::twim::Encoder::Params params;
   ::twim::Encoder::Variant variant;
   params.targetSize = targetSize;

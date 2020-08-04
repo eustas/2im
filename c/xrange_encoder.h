@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "sin_cos.h"
 #include "platform.h"
 
 namespace twim {
@@ -17,12 +18,17 @@ class XRangeEncoder {
     if (max > 1) dst->entries.push_back({value, max});
   }
 
-  static double estimateCost(XRangeEncoder* dst) {
-    double cost = 0.0;
+  static float estimateCost(XRangeEncoder* dst) {
+    float cost = 0.0f;
     for (size_t i = 0; i < dst->entries.size(); ++i) {
-      cost += std::log(dst->entries[i].max);
+      uint32_t v = dst->entries[i].max;
+      if (v >= 64) {
+        cost += 6;
+        v >>= 6;
+      }
+      cost += SinCos.kLog2[v];
     }
-    return cost / std::log(2.0);
+    return cost;
   }
 
  private:

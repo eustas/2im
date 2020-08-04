@@ -137,15 +137,17 @@ Image Io::readPng(const std::string& path) {
 
   result.init(width, height);
 
-  for (size_t y = 0; y < height; ++y) {
-    const uint8_t* from = row_pointers[y];
-    uint8_t* to_r = result.r + width * y;
-    uint8_t* to_g = result.g + width * y;
-    uint8_t* to_b = result.b + width * y;
-    for (size_t x = 0; x < width; ++x) {
-      to_r[x] = from[3 * x + 0];
-      to_g[x] = from[3 * x + 1];
-      to_b[x] = from[3 * x + 2];
+  if (result.ok) {
+    for (size_t y = 0; y < height; ++y) {
+      const uint8_t* from = row_pointers[y];
+      uint8_t* to_r = result.r + width * y;
+      uint8_t* to_g = result.g + width * y;
+      uint8_t* to_b = result.b + width * y;
+      for (size_t x = 0; x < width; ++x) {
+        to_r[x] = from[3 * x + 0];
+        to_g[x] = from[3 * x + 1];
+        to_b[x] = from[3 * x + 2];
+      }
     }
   }
 

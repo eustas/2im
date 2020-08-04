@@ -177,7 +177,7 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   }
 
   result.init(width, height);
-  root.render(&result);
+  if (result.ok) root.render(&result);
 
   return result;
 }

@@ -53,6 +53,7 @@ void wrapEncode(const FunctionCallbackInfo<v8::Value>& args) {
       static_cast<uint8_t*>(contents.Data()) + data->ByteOffset();
 
   twim::Image img = twim::Image::fromRgba(src, width, height);
+  // TODO: check img.ok
 
   std::vector<uint8_t> encoded = twim::Encoder::encode(img, 200);
 

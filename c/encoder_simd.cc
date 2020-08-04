@@ -728,8 +728,8 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
     f->best_angle_code = best_angle_code;
     f->best_num_lines = distance_range.num_lines;
     f->best_line = best_line;
-    f->best_cost =
-        bitCost(NodeType::COUNT * angle_max * distance_range.num_lines);
+    f->best_cost = SinCos.kLog2[NodeType::COUNT] + cp.angle_bits[level] +
+                   SinCos.kLog2[distance_range.num_lines];
   }
 }
 
