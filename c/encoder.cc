@@ -430,8 +430,9 @@ Result encode(const Image& src, const Params& params) {
   // Partition partitionHolder(uber, cp, params.targetSize);
   uint32_t numNonLeaf = partitionHolder.subpartition(cp, params.targetSize);
   const std::vector<Fragment*>* partition = partitionHolder.getPartition();
-  Owned<Vector<float>> patches = gatherPatches(partition, numNonLeaf);
-  Owned<Vector<float>> palette = buildPalette(patches, cp.palette_size);
+  std::unique_ptr<Vector<float>> patches = gatherPatches(partition, numNonLeaf);
+  std::unique_ptr<Vector<float>> palette =
+      buildPalette(patches, cp.palette_size);
   float* RESTRICT colors = palette->data();
   result.data = doEncode(numNonLeaf, partition, cp, colors);
   // << Encoder workflow

@@ -16,32 +16,7 @@
 #define NOINLINE __attribute__((noinline))
 #endif
 
-// SSE: 128 bits = 16 bytes = 4 floats / int32_t
-#define ALIGNED_16 alignas(16)
-
 namespace twim {
-
-namespace {
-
-template <typename T>
-using Deleter = void (*)(T*);
-
-template <typename V>
-void destroyVector(V* v) {
-  uintptr_t memory = (uintptr_t)v->data() - v->offset;
-  free((void*)memory);
-}
-
-}  // namespace
-
-#define TRAP()                     \
-  {                                \
-    uint8_t* _trap_ptr_ = nullptr; \
-    _trap_ptr_[0] = 0;             \
-  }
-
-template <typename T>
-using Owned = std::unique_ptr<T, Deleter<T>>;
 
 template <typename T>
 struct Vector {
@@ -54,6 +29,12 @@ struct Vector {
   }
   INLINE const T* RESTRICT data() const {
     return (const T*)((uintptr_t)this + sizeof(Vector<T>));
+  }
+
+  NOINLINE void operator delete(void* ptr) {
+    Vector<T>* v = reinterpret_cast<Vector<T>*>(ptr);
+    uintptr_t memory = (uintptr_t)v->data() - v->offset;
+    free((void*)memory);
   }
 };
 
@@ -68,7 +49,7 @@ static INLINE uint32_t vecSize(uint32_t capacity) {
 }
 
 template <typename T>
-Owned<Vector<T>> allocVector(uint32_t capacity) {
+NOINLINE std::unique_ptr<Vector<T>> allocVector(uint32_t capacity) {
   // In twim only (u)int32_t and float vectors are used.
   constexpr size_t N = kDefaultAlign / 4;
   static_assert(sizeof(T) == 4, "sizeot(T) must be 4");
@@ -82,7 +63,7 @@ Owned<Vector<T>> allocVector(uint32_t capacity) {
   V* v = reinterpret_cast<V*>(aligned_memory - sizeof(V));
   v->offset = static_cast<uint32_t>(aligned_memory - memory);
   v->capacity = vector_capacity;
-  return {v, destroyVector};
+  return std::unique_ptr<Vector<T>>(v);
 }
 
 }  // namespace twim

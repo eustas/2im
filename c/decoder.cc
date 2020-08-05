@@ -33,11 +33,11 @@ class Fragment {
  public:
   int32_t type = NodeType::FILL;
   uint32_t color = 0;
-  Owned<Vector<int32_t>> region;
+  std::unique_ptr<Vector<int32_t>> region;
   std::unique_ptr<Fragment> left_child;
   std::unique_ptr<Fragment> right_child;
 
-  explicit Fragment(Owned<Vector<int32_t>> region)
+  explicit Fragment(std::unique_ptr<Vector<int32_t>> region)
       : region(std::move(region)) {}
 
   bool parse(XRangeDecoder* src, const CodecParams& cp, uint32_t* palette,

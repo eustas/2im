@@ -42,7 +42,7 @@ class UberCache {
   const uint32_t height;
   const uint32_t stride;
   /* Cumulative sums. Extra column with total sum. */
-  Owned<Vector<float>> sum;
+  std::unique_ptr<Vector<float>> sum;
 
   float rgb2[3] = {0.0f};
 
@@ -54,19 +54,19 @@ class Cache {
   const UberCache* uber;
 
   uint32_t count;
-  Owned<Vector<int32_t>> row_offset;
-  Owned<Vector<float>> y;
-  Owned<Vector<int32_t>> x0;
-  Owned<Vector<int32_t>> x1;
-  Owned<Vector<int32_t>> x;
-  Owned<Vector<float>> stats;
+  std::unique_ptr<Vector<int32_t>> row_offset;
+  std::unique_ptr<Vector<float>> y;
+  std::unique_ptr<Vector<int32_t>> x0;
+  std::unique_ptr<Vector<int32_t>> x1;
+  std::unique_ptr<Vector<int32_t>> x;
+  std::unique_ptr<Vector<float>> stats;
 
   explicit Cache(const UberCache& uber);
 };
 
 class Fragment {
  public:
-  Owned<Vector<int32_t>> region;
+  std::unique_ptr<Vector<int32_t>> region;
   std::unique_ptr<Fragment> left_child;
   std::unique_ptr<Fragment> right_child;
 

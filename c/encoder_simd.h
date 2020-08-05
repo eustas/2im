@@ -20,11 +20,11 @@ uint32_t chooseColor(float r, float g, float b, const float* RESTRICT palette_r,
 
 void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp);
 
-Owned<Vector<float>> gatherPatches(const std::vector<Fragment*>* partition,
-                                   uint32_t num_non_leaf);
+std::unique_ptr<Vector<float>> gatherPatches(
+    const std::vector<Fragment*>* partition, uint32_t num_non_leaf);
 
-Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
-                                  uint32_t palette_size);
+std::unique_ptr<Vector<float>> buildPalette(
+    const std::unique_ptr<Vector<float>>& patches, uint32_t palette_size);
 
 }  // namespace twim
 

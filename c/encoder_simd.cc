@@ -427,15 +427,16 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
   }
 }
 
-NOINLINE Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
-                                           uint32_t palette_size) {
+NOINLINE std::unique_ptr<Vector<float>> buildPalette(
+    const std::unique_ptr<Vector<float>>& patches, uint32_t palette_size) {
   uint32_t n = patches->len;
   uint32_t m = palette_size;
   uint32_t padded_m = vecSize(m);
   uint32_t palette_space = 3 * padded_m;
   uint32_t extra_space = std::max(4 * padded_m, ((m > 0) ? n : 1));
-  Owned<Vector<float>> result = allocVector<float>((m > 0) ? palette_space : 1);
-  Owned<Vector<float>> extra = allocVector<float>(extra_space);
+  std::unique_ptr<Vector<float>> result =
+      allocVector<float>((m > 0) ? palette_space : 1);
+  std::unique_ptr<Vector<float>> extra = allocVector<float>(extra_space);
 
   result->len = m;
   if (m > 0) makePalette(patches->data(), result->data(), extra->data(), n, m);
@@ -443,7 +444,7 @@ NOINLINE Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
   return result;
 }
 
-NOINLINE Owned<Vector<float>> gatherPatches(
+NOINLINE std::unique_ptr<Vector<float>> gatherPatches(
     const std::vector<Fragment*>* partition, uint32_t num_non_leaf) {
   constexpr HWY_FULL(float) df;
   const auto kOne = Set(df, 1.0f);
@@ -451,7 +452,7 @@ NOINLINE Owned<Vector<float>> gatherPatches(
   /* In a binary tree the number of leaves is number of nodes plus one. */
   uint32_t n = num_non_leaf + 1;
   uint32_t stats_size = vecSize(n);
-  Owned<Vector<float>> result = allocVector<float>(7 * stats_size);
+  std::unique_ptr<Vector<float>> result = allocVector<float>(7 * stats_size);
   float* RESTRICT stats = result->data();
   float* RESTRICT stats_r = stats + 0 * stats_size;
   float* RESTRICT stats_g = stats + 1 * stats_size;
@@ -499,7 +500,7 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
     // Let's deal with flat image separately.
     return 1e35f;
   }
-  Owned<Vector<float>> patches =
+  std::unique_ptr<Vector<float>> patches =
       gatherPatches(partition_holder.getPartition(), num_non_leaf);
   size_t patches_step = patches->capacity / 7;
   float* RESTRICT stats = patches->data();
@@ -510,7 +511,7 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
 
   size_t n = patches->len;
   const uint32_t m = cp.palette_size;
-  Owned<Vector<float>> palette = buildPalette(patches, m);
+  std::unique_ptr<Vector<float>> palette = buildPalette(patches, m);
   const float* RESTRICT palette_r = palette->data();
   const size_t palette_step = vecSize(m);
   const float* RESTRICT palette_g = palette_r + palette_step;
@@ -717,7 +718,6 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
     // TODO(eustas): why not unreachable?
   } else {
     DistanceRange distance_range(region, best_angle_code * angle_mult, cp);
-    uint32_t child_step = vecSize(region.len);
     f->left_child.reset(new Fragment(region.len));
     f->right_child.reset(new Fragment(region.len));
     Region::splitLine(region, best_angle_code * angle_mult,
@@ -768,13 +768,13 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
   return CALL(findBestSubdivision)(f, cache, cp);
 }
 
-Owned<Vector<float>> gatherPatches(const std::vector<Fragment*>* partition,
-                                   uint32_t num_non_leaf) {
+std::unique_ptr<Vector<float>> gatherPatches(
+    const std::vector<Fragment*>* partition, uint32_t num_non_leaf) {
   return CALL(gatherPatches)(partition, num_non_leaf);
 }
 
-Owned<Vector<float>> buildPalette(const Owned<Vector<float>>& patches,
-                                  uint32_t palette_size) {
+std::unique_ptr<Vector<float>> buildPalette(
+    const std::unique_ptr<Vector<float>>& patches, uint32_t palette_size) {
   return CALL(buildPalette)(patches, palette_size);
 }
 
