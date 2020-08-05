@@ -13,29 +13,6 @@ class CodecParams;
 struct Image;
 class XRangeEncoder;
 
-/*
- * https://xkcd.com/221/
- *
- * Chosen by fair dice roll. Guaranteed to be random.
- */
-constexpr float kRandom[64] = {
-    0.196761043301f, 0.735187971367f, 0.240889315713f, 0.322607869281f,
-    0.042645685482f, 0.100931237742f, 0.436030039105f, 0.949386184145f,
-    0.391385426476f, 0.693787004045f, 0.957348258524f, 0.401165324581f,
-    0.200612435526f, 0.774156296613f, 0.702329904898f, 0.794307087431f,
-    0.913297998115f, 0.418554329021f, 0.305256297017f, 0.447050968372f,
-    0.275901615626f, 0.423281943403f, 0.222083232637f, 0.259557717968f,
-    0.134780340092f, 0.624659579778f, 0.459554804245f, 0.629270576873f,
-    0.728531198516f, 0.270863443275f, 0.730693946899f, 0.958482839910f,
-    0.597229071250f, 0.020570415805f, 0.876483717523f, 0.734546837759f,
-    0.548824137588f, 0.628979430442f, 0.813059781398f, 0.145038174534f,
-    0.174453058546f, 0.195531684379f, 0.127489363209f, 0.878269052109f,
-    0.990909412408f, 0.109277869329f, 0.295625366456f, 0.247012273577f,
-    0.508121083167f, 0.875779718247f, 0.863389034205f, 0.663539415689f,
-    0.069178093049f, 0.859564180486f, 0.560775815455f, 0.039552534504f,
-    0.989061239776f, 0.815374917179f, 0.951061519055f, 0.211362121050f,
-    0.255234747636f, 0.047947586972f, 0.520984579718f, 0.399461090480f};
-
 class UberCache {
  public:
   const uint32_t width;
@@ -67,8 +44,8 @@ class Cache {
 class Fragment {
  public:
   std::unique_ptr<Vector<int32_t>> region;
-  std::unique_ptr<Fragment> left_child;
-  std::unique_ptr<Fragment> right_child;
+  Fragment* leftChild = nullptr;
+  Fragment* rightChild = nullptr;
 
   float stats[4];
 
@@ -85,6 +62,10 @@ class Fragment {
   Fragment& operator=(Fragment&&) = delete;
   Fragment(const Fragment&) = delete;
   Fragment& operator=(const Fragment&) = delete;
+  ~Fragment() {
+    delete leftChild;
+    delete rightChild;
+  }
 
   NOINLINE explicit Fragment(uint32_t height)
       : region(allocVector<int32_t>(3 * vecSize(height))) {}

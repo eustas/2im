@@ -113,17 +113,21 @@ class SimulationTask {
   CodecParams cp;
   float bestSqe = 1e35f;
   uint32_t bestColorCode = (uint32_t)-1;
-  std::unique_ptr<Partition> partitionHolder;
+  Partition* partitionHolder = nullptr;
 
   SimulationTask(uint32_t targetSize, Variant variant, const UberCache& uber)
       : targetSize(targetSize), variant(variant), cp(uber.width, uber.height) {}
+
+  ~SimulationTask() {
+    delete partitionHolder;
+  }
 
   void run(Cache* cache) {
     cp.setPartitionCode(variant.partitionCode);
     cp.line_limit = variant.lineLimit + 1;
     uint64_t colorOptions = variant.colorOptions;
     // TODO: color-options based taxes
-    partitionHolder.reset(new Partition(cache, cp, targetSize));
+    partitionHolder = new Partition(cache, cp, targetSize);
     for (uint32_t colorCode = 0; colorCode < CodecParams::kMaxColorCode;
          ++colorCode) {
       if (!(colorOptions & (1 << colorCode))) continue;
@@ -156,11 +160,13 @@ class TaskExecutor {
       if (task.bestSqe < bestSqe) {
         bestSqe = task.bestSqe;
         if (lastBestTask < myTask) {
-          tasks[lastBestTask].partitionHolder.reset();
+          delete tasks[lastBestTask].partitionHolder;
+          tasks[lastBestTask].partitionHolder = nullptr;
         }
         lastBestTask = myTask;
       } else {
-        task.partitionHolder.reset();
+        delete task.partitionHolder;
+        task.partitionHolder = nullptr;
       }
     }
   }
@@ -199,8 +205,8 @@ NOINLINE void Fragment::encode(XRangeEncoder* dst, const CodecParams& cp,
   uint32_t maxAngle = 1u << cp.angle_bits[level];
   XRangeEncoder::writeNumber(dst, maxAngle, best_angle_code);
   XRangeEncoder::writeNumber(dst, best_num_lines, best_line);
-  children->push_back(left_child.get());
-  children->push_back(right_child.get());
+  children->push_back(leftChild);
+  children->push_back(rightChild);
 }
 
 std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
@@ -311,11 +317,11 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
       budget -= tax + candidate->best_cost;
       candidate->ordinal = static_cast<uint32_t>(result.size());
       result.push_back(candidate);
-      findBestSubdivision(candidate->left_child.get(), cache, cp);
-      queue.emplace_back(candidate->left_child.get());
+      findBestSubdivision(candidate->leftChild, cache, cp);
+      queue.emplace_back(candidate->leftChild);
       rootNode = merge(queue.data(), rootNode, next++);  // push
-      findBestSubdivision(candidate->right_child.get(), cache, cp);
-      queue.emplace_back(candidate->right_child.get());
+      findBestSubdivision(candidate->rightChild, cache, cp);
+      queue.emplace_back(candidate->rightChild);
       rootNode = merge(queue.data(), rootNode, next++);  // push
     }
   }

@@ -339,12 +339,15 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
   }
 #endif
 
+  uint32_t random = 0x23DE605F;
+
   {
     // Choose one center uniformly at random from among the data points.
     float total = 0.0f;
     uint32_t i;
     for (i = 0; i < n; ++i) total += stats_c[i];
-    float target = total * kRandom[0];
+    float r = (random >> 9) / 8388608.0;
+    float target = total * r;
     float partial = 0.0f;
     for (i = 0; i < n; ++i) {
       partial += stats_c[i];
@@ -369,7 +372,13 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
       weights[i] = weight;
       total += weight;
     }
-    float target = total * kRandom[j];
+    /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */ {
+      random ^= random << 13;
+      random ^= random >> 17;
+      random ^= random << 5;
+    }
+    float r = (random >> 9) / 8388608.0;
+    float target = total * r;
     float partial = 0;
     for (i = 0; i < n; ++i) {
       partial += weights[i];
@@ -474,8 +483,8 @@ NOINLINE std::unique_ptr<Vector<float>> gatherPatches(
 
   for (size_t i = 0; i < num_non_leaf; ++i) {
     Fragment* node = partition->at(i);
-    maybe_add_leaf(node->left_child.get());
-    maybe_add_leaf(node->right_child.get());
+    maybe_add_leaf(node->leftChild);
+    maybe_add_leaf(node->rightChild);
   }
 
   for (size_t i = 0; i < n; i += Lanes(df)) {
@@ -718,12 +727,12 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
     // TODO(eustas): why not unreachable?
   } else {
     DistanceRange distance_range(region, best_angle_code * angle_mult, cp);
-    f->left_child.reset(new Fragment(region.len));
-    f->right_child.reset(new Fragment(region.len));
+    f->leftChild = new Fragment(region.len);
+    f->rightChild = new Fragment(region.len);
     Region::splitLine(region, best_angle_code * angle_mult,
                       distance_range.distance(best_line),
-                      f->left_child->region.get(),
-                      f->right_child->region.get());
+                      f->leftChild->region.get(),
+                      f->rightChild->region.get());
 
     f->best_angle_code = best_angle_code;
     f->best_num_lines = distance_range.num_lines;
