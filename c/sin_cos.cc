@@ -22,13 +22,6 @@ static const uint8_t kSinCorrection[] = {
     9,  10, 11, 12, 12, 13, 14, 15, 16, 16, 17, 20, 19, 21, 21, 24, 24, 26, 26,
     29, 30, 31, 33, 34, 36, 36, 38, 40};
 
-static const uint8_t kLogCorrection[] = {
-  160, 32, 76, 160, 194, 32, 32, 76, 229, 160, 128, 194, 204, 32, 88, 32, 48,
-  76, 66, 229, 16, 160, 121, 128, 159, 194, 215, 204, 148, 32, 101, 88, 239, 32,
-  227, 48, 0, 76, 15, 66, 225, 229, 76, 16, 45, 160, 101, 121, 216, 128, 110,
-  159, 18, 194, 175, 215, 54, 204, 150, 148, 194, 32, 172
-};
-
 static SinCosT makeSinCos() {
   SinCosT result;
   const int32_t kOne = result.kOne;
@@ -57,18 +50,19 @@ static SinCosT makeSinCos() {
   }
 
   auto& kLog2 = result.kLog2;
-  kLog2[0] = kLog2[1] = 0.0f;
-  kLog2[2] = 1.0f;
-  float m = 1.00135476f;
-  float v = 2.0f;
-  size_t j = 3;
-  for (size_t i = 512; i <= 3084;) {
-    v = v * m;
-    i++;
-    if (v >= j) {
-      kLog2[j] = (i - (((int32_t)kLogCorrection[j - 3] - 32) / 256.0)) / 512.0;
-      j++;
+  for (size_t j = 1; j <= 65; ++j) {
+    double v = j;
+    double r = 0.0;
+    for (double plus = 1.0; plus > 1e-8;) {
+      if (v >= 2.0) {
+        v /= 2.0;
+        r += plus;
+      } else {
+        v = v * v;
+        plus = plus / 2.0;
+      }
     }
+    kLog2[j] = r;
   }
 
   return result;

@@ -90,11 +90,13 @@ std::vector<uint8_t> XRangeEncoder::finish() {
   }
 
   size_t num_bytes = bits.size() >> 3u;
-  std::vector<uint8_t> bytes(num_bytes);
+  std::vector<uint8_t> bytes;
+  bytes.reserve(num_bytes);
   for (size_t i = 0; i < num_bytes; ++i) {
     uint8_t byte = 0;
+    #pragma nounroll
     for (size_t j = 0; j < 8; ++j) byte |= bits[8u * i + j] << j;
-    bytes[i] = byte;
+    bytes.push_back(byte);
   }
   return bytes;
 }

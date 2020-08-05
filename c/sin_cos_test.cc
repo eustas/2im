@@ -26,7 +26,7 @@ TEST(SinCosTest, Cos) {
 TEST(SinCosTest, Log2) {
   for (size_t i = 1; i < 64; ++i) {
     float diff = (std::log(i) / std::log(2)) - SinCos.kLog2[i];
-    EXPECT_LE(std::abs(diff), 0.000004f) << i;
+    EXPECT_LE(std::abs(diff), 0.00000022f) << i;
   }
 }
 
