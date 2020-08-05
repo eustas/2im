@@ -718,8 +718,8 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
   } else {
     DistanceRange distance_range(region, best_angle_code * angle_mult, cp);
     uint32_t child_step = vecSize(region.len);
-    f->left_child.reset(new Fragment(allocVector<int32_t>(3 * child_step)));
-    f->right_child.reset(new Fragment(allocVector<int32_t>(3 * child_step)));
+    f->left_child.reset(new Fragment(region.len));
+    f->right_child.reset(new Fragment(region.len));
     Region::splitLine(region, best_angle_code * angle_mult,
                       distance_range.distance(best_line),
                       f->left_child->region.get(),
@@ -732,8 +732,6 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
                    SinCos.kLog2[distance_range.num_lines];
   }
 }
-
-const char* targetName() { return hwy::TargetName(HWY_TARGET); }
 
 #include <hwy/end_target-inl.h>
 }  // namespace twim
@@ -749,7 +747,6 @@ namespace twim {
 HWY_EXPORT(simulateEncode)
 HWY_EXPORT(noinlineChooseColor)
 HWY_EXPORT(findBestSubdivision)
-HWY_EXPORT(targetName)
 HWY_EXPORT(gatherPatches)
 HWY_EXPORT(buildPalette)
 #endif
@@ -770,8 +767,6 @@ uint32_t chooseColor(float r, float g, float b, const float* RESTRICT palette_r,
 void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
   return CALL(findBestSubdivision)(f, cache, cp);
 }
-
-const char* targetName() { return CALL(targetName)(); }
 
 Owned<Vector<float>> gatherPatches(const std::vector<Fragment*>* partition,
                                    uint32_t num_non_leaf) {

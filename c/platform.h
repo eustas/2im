@@ -1,7 +1,6 @@
 #ifndef TWIM_PLATFORM
 #define TWIM_PLATFORM
 
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -58,14 +57,6 @@ struct Vector {
   }
 };
 
-template <typename Lane, size_t kLanes>
-struct Desc {
-  constexpr Desc() = default;
-  using T = Lane;
-  static constexpr size_t N = kLanes;
-  static_assert((N & (N - 1)) == 0, "N must be a power of two");
-};
-
 // TODO(eustas): move to common header
 // TODO(eustas): adjust to SIMD implementation
 constexpr size_t kDefaultAlign = 32;
@@ -92,16 +83,6 @@ Owned<Vector<T>> allocVector(uint32_t capacity) {
   v->offset = static_cast<uint32_t>(aligned_memory - memory);
   v->capacity = vector_capacity;
   return {v, destroyVector};
-}
-
-typedef std::chrono::time_point<std::chrono::high_resolution_clock> NanoTime;
-
-INLINE NanoTime now() { return std::chrono::high_resolution_clock::now(); }
-
-INLINE double duration(NanoTime t0, NanoTime t1) {
-  const auto delta =
-      std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0);
-  return delta.count() / 1000000.0;
 }
 
 }  // namespace twim

@@ -20,8 +20,6 @@ uint32_t chooseColor(float r, float g, float b, const float* RESTRICT palette_r,
 
 void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp);
 
-const char* targetName();
-
 Owned<Vector<float>> gatherPatches(const std::vector<Fragment*>* partition,
                                    uint32_t num_non_leaf);
 

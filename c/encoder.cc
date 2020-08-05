@@ -322,22 +322,22 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
   return result;
 }
 
-Fragment makeRoot(uint32_t width, uint32_t height) {
+void initRoot(Fragment* root, uint32_t width, uint32_t height) {
   uint32_t step = vecSize(height);
-  Owned<Vector<int32_t>> root = allocVector<int32_t>(3 * step);
-  int32_t* RESTRICT data = root->data();
+  int32_t* RESTRICT data = root->region->data();
   for (uint32_t y = 0; y < height; ++y) {
     data[y] = y;
     data[step + y] = 0;
     data[2 * step + y] = width;
   }
-  root->len = height;
-  return Fragment(std::move(root));
+  root->region->len = height;
 }
 
 Partition::Partition(Cache* cache, const CodecParams& cp, size_t target_size)
-    : root(makeRoot(cache->uber->width, cache->uber->height)),
-      partition(buildPartition(&root, target_size, cp, cache)) {}
+    : root(cache->uber->height) {
+  initRoot(&root, cache->uber->width, cache->uber->height);
+  partition = buildPartition(&root, target_size, cp, cache);
+}
 
 const std::vector<Fragment*>* Partition::getPartition() const {
   return &partition;
@@ -372,8 +372,6 @@ namespace Encoder {
 
 Result encode(const Image& src, const Params& params) {
   Result result{};
-
-  if (params.debug) log(targetName());
 
   int32_t width = src.width;
   int32_t height = src.height;

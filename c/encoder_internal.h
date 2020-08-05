@@ -81,13 +81,13 @@ class Fragment {
   uint32_t best_num_lines;
   float best_cost;
 
-  Fragment(Fragment&&) = default;
-  Fragment& operator=(Fragment&&) = default;
+  Fragment(Fragment&&) = delete;
+  Fragment& operator=(Fragment&&) = delete;
   Fragment(const Fragment&) = delete;
   Fragment& operator=(const Fragment&) = delete;
 
-  explicit Fragment(Owned<Vector<int32_t>>&& region)
-      : region(std::move(region)) {}
+  NOINLINE explicit Fragment(uint32_t height)
+      : region(allocVector<int32_t>(3 * vecSize(height))) {}
 
   void encode(XRangeEncoder* dst, const CodecParams& cp, bool is_leaf,
               const float* RESTRICT palette, std::vector<Fragment*>* children);

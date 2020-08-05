@@ -8,8 +8,8 @@ namespace twim {
 
 namespace {
 
-size_t encodeNumber(size_t state, size_t value, size_t max,
-                    std::vector<uint8_t>* bits) {
+NOINLINE size_t encodeNumber(size_t state, size_t value, size_t max,
+                             std::vector<uint8_t>* bits) {
   size_t low = value * XRangeCode::kSpace;
   size_t base = low / max;
   size_t freq = (low + XRangeCode::kSpace) / max - base;
