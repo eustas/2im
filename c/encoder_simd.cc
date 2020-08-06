@@ -4,6 +4,8 @@
 #include "hwy/foreach_target.h"
 #endif
 
+#include <algorithm>
+
 #include "codec_params.h"
 #include "distance_range.h"
 #include "encoder_internal.h"
@@ -21,13 +23,6 @@ struct Stats {
   /* sum_r, sum_g, sum_b, pixel_count */
   HWY_ALIGN float values[4];
 };
-
-constexpr const HWY_FULL(uint32_t) kDu32;
-
-HWY_ALIGN static const uint32_t kIotaArray[] = {0, 1, 2,  3,  4,  5,  6,  7,
-                                                8, 9, 10, 11, 12, 13, 14, 15};
-static const U32xN kIota = Load(kDu32, kIotaArray);
-static const U32xN kStep = Set(kDu32, Lanes(kDu32));
 
 INLINE void diff(Stats* diff, const Stats& plus, const Stats& minus) {
 #if HWY_TARGET == HWY_SCALAR
@@ -178,6 +173,12 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
   bool use_scalar = (length < 4);
 #endif
   if (use_scalar) return op.scalarChoose(values, length);
+
+  constexpr const HWY_FULL(uint32_t) kDu32;
+  HWY_ALIGN static const uint32_t kIotaArray[] = {0, 1, 2,  3,  4,  5,  6,  7,
+                                                  8, 9, 10, 11, 12, 13, 14, 15};
+  static const U32xN kIota = Load(kDu32, kIotaArray);
+  static const U32xN kStep = Set(kDu32, static_cast<uint32_t>(Lanes(kDu32)));
 
   auto idx = kIota;
   auto bestIdx = idx;
@@ -548,7 +549,8 @@ NOINLINE float simulateEncode(const Partition& partition_holder,
     if (m == 0) {
       for (size_t j = 0; j < 3; ++j) {
         int32_t quantized = static_cast<int32_t>(rgb[j] * quant + 0.5f);
-        rgb[j] = std::floorf(quantized * dequant);
+        // TODO(eustas): investigate how to use floorf
+        rgb[j] = std::floor(quantized * dequant);
       }
     } else {
       float dummy;
@@ -624,6 +626,9 @@ void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
 }
 
 void INLINE prepareCache(Cache* c, Vector<int32_t>* region) {
+  constexpr HWY_FULL(float) df;
+  const size_t kStrideMask = Lanes(df) - 1;
+
   uint32_t count = region->len;
   uint32_t step = region->capacity / 3;
   uint32_t sum_stride = c->uber->stride;
@@ -639,8 +644,7 @@ void INLINE prepareCache(Cache* c, Vector<int32_t>* region) {
     x1[i] = data[2 * step + i];
     row_offset[i] = row * sum_stride;
   }
-  // TODO(eustas): 3 == kStride - 1
-  while ((count & 3) != 0) {
+  while ((count & kStrideMask) != 0) {
     y[count] = 0;
     x0[count] = 0;
     x1[count] = 0;
@@ -701,6 +705,7 @@ void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
 
   if (num_subdivisions == 0) {
     f->best_cost = -1.0f;
+    f->best_score = 1e-35;
     return;
   }
 

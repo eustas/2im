@@ -59,7 +59,7 @@ TEST(XRangeTest, Optimizer) {
   EXPECT_EQ(0,std::memcmp(expected, data.data(), sizeof(expected)));
 
   XRangeDecoder decoder(std::move(data));
-  EXPECT_EQ(13, XRangeDecoder::readNumber(&decoder, 63));
+  EXPECT_EQ(13u, XRangeDecoder::readNumber(&decoder, 63));
   for (size_t i = 0; i < kLength - 1; ++i) {
     EXPECT_EQ(i + 42, XRangeDecoder::readNumber(&decoder, 256));
   }
