@@ -130,7 +130,7 @@ class SimulationTask {
     partitionHolder = new Partition(cache, cp, targetSize);
     for (uint32_t colorCode = 0; colorCode < CodecParams::kMaxColorCode;
          ++colorCode) {
-      if (!(colorOptions & (1 << colorCode))) continue;
+      if (!(colorOptions & ((uint64_t)1 << colorCode))) continue;
       cp.setColorCode(colorCode);
       float sqe = simulateEncode(*partitionHolder, targetSize, cp);
       if (sqe < bestSqe) {
