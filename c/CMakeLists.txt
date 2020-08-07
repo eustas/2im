@@ -69,6 +69,10 @@ add_library(twimEncoder STATIC
 target_include_directories(twimEncoder PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" ../third_party/highway)
 target_link_libraries(twimEncoder PUBLIC twimBase)
 
+add_library(simpleAlloc STATIC
+  simple_alloc.cc
+)
+
 if (NOT "${TWIM_WASM}")
   add_library(twimIo STATIC
     io.cc
@@ -100,7 +104,7 @@ if ("${TWIM_WASM}")
 
   add_executable("${TWIM_MODULE}" encoder_wasm.cc)
   target_include_directories("${TWIM_MODULE}" PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-  target_link_libraries("${TWIM_MODULE}" PUBLIC twimEncoder)
+  target_link_libraries("${TWIM_MODULE}" PUBLIC twimEncoder simpleAlloc)
 
   set_target_properties("${TWIM_MODULE}" PROPERTIES LINK_FLAGS "\
     ${WASM_FLAGS} \
