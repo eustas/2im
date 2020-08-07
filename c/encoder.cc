@@ -178,7 +178,7 @@ class TaskExecutor {
 
 NOINLINE void Fragment::encode(XRangeEncoder* dst, const CodecParams& cp,
                                bool is_leaf, const float* RESTRICT palette,
-                               std::vector<Fragment*>* children) {
+                               Fragment** children, size_t* numChildren) {
   if (is_leaf) {
     XRangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
     float inv_c = 1.0f / stats[3];
@@ -205,8 +205,8 @@ NOINLINE void Fragment::encode(XRangeEncoder* dst, const CodecParams& cp,
   uint32_t maxAngle = 1u << cp.angle_bits[level];
   XRangeEncoder::writeNumber(dst, maxAngle, best_angle_code);
   XRangeEncoder::writeNumber(dst, best_num_lines, best_line);
-  children->push_back(leftChild);
-  children->push_back(rightChild);
+  children[(*numChildren)++] = leftChild;
+  children[(*numChildren)++] = rightChild;
 }
 
 std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
@@ -214,11 +214,13 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
                               const CodecParams& cp,
                               const float* RESTRICT palette) {
   const uint32_t m = cp.palette_size;
-  uint32_t n = num_non_leaf + 1;
+  uint32_t n = 2 * num_non_leaf + 1;
 
-  std::vector<Fragment*> queue;
-  queue.reserve(n);
-  queue.push_back(partition->at(0));
+  Fragment** queue =
+      reinterpret_cast<Fragment**>(malloc(n * sizeof(Fragment*)));
+  size_t queueSize = 0;
+
+  queue[queueSize++] = partition->at(0);
 
   XRangeEncoder dst;
   cp.write(&dst);
@@ -233,11 +235,13 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
   }
 
   size_t encoded = 0;
-  while (encoded < queue.size()) {
+  while (encoded < queueSize) {
     Fragment* node = queue[encoded++];
     bool is_leaf = (node->ordinal >= num_non_leaf);
-    node->encode(&dst, cp, is_leaf, palette, &queue);
+    node->encode(&dst, cp, is_leaf, palette, queue, &queueSize);
   }
+
+  free(queue);
 
   return dst.finish();
 }

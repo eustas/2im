@@ -71,7 +71,8 @@ class Fragment {
       : region(allocVector<int32_t>(3 * vecSize(height))) {}
 
   void encode(XRangeEncoder* dst, const CodecParams& cp, bool is_leaf,
-              const float* RESTRICT palette, std::vector<Fragment*>* children);
+              const float* RESTRICT palette, Fragment** children,
+              size_t* numChildren);
 };
 
 class Partition {
