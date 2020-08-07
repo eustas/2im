@@ -5,33 +5,43 @@
 
 extern "C" {
 
-/*
 static uint32_t freeHeads[32] = {0};
+static uint32_t freePages = 0;
+static uint32_t freeStart = 0;
 
 NOINLINE void* malloc(size_t size) {
   size_t storageSize = (size < 65535) ? size : (size + 4);
   uint32_t bucket = (__builtin_clz(storageSize) ^ 31) + 1;
-  if (bucket < 16) bucket = 16;  // 4..7 bytes
+  if (bucket < 3) bucket = 3;  // 4..7 bytes
   if (freeHeads[bucket] == 0) {
-    uint32_t freeSpace = __builtin_wasm_memory_size(0) << 16;
+    uint32_t wantPages = (bucket <= 16) ? 1 : (1 << (bucket - 16));
+    if (freePages < wantPages) {
+      uint32_t currentPages = __builtin_wasm_memory_size(0);
+      if (freePages == 0) freeStart = currentPages << 16;
+      uint32_t plusPages = currentPages;  // Double the memory...
+      if (plusPages < 32) plusPages = 32;  // ... not less than +2MB
+      if (plusPages > 256) plusPages = 256;  // ... not more than +16MB
+      if (plusPages < wantPages - freePages) plusPages = wantPages - freePages;
+      if (__builtin_wasm_memory_grow(0, plusPages) == -1) __builtin_trap();
+      freePages += plusPages;
+    }
     if (bucket <= 16) {
-      if (__builtin_wasm_memory_grow(0, 1) == -1) __builtin_trap();
       size_t step = 1 << bucket;
       size_t count = 1 << (16 - bucket);
-      size_t address = freeSpace;
+      size_t address = freeStart;
       for (size_t i = 0; i < count - 1; ++i) {
         reinterpret_cast<uint32_t*>(address)[0] = address + step;
         address += step;
       }
-      freeHeads[bucket] = freeSpace;
-      reinterpret_cast<uint32_t*>(freeSpace + (count - 1) * step)[0] = 0;
-      reinterpret_cast<uint8_t*>(freeSpace | 0xFFFF)[0] = bucket;
+      freeHeads[bucket] = freeStart;
+      reinterpret_cast<uint32_t*>(freeStart + (count - 1) * step)[0] = 0;
+      reinterpret_cast<uint8_t*>(freeStart | 0xFFFF)[0] = bucket;
     } else {
-      size_t numPages = 1 << (bucket - 16);
-      if (__builtin_wasm_memory_grow(0, numPages) == -1) __builtin_trap();
-      freeHeads[bucket] = freeSpace + 4;
-      reinterpret_cast<uint8_t*>(freeSpace + 3)[0] = bucket;
+      freeHeads[bucket] = freeStart + 4;
+      reinterpret_cast<uint8_t*>(freeStart + 3)[0] = bucket;
     }
+    freeStart += wantPages << 16;
+    freePages -= wantPages;
   }
   uint32_t result = freeHeads[bucket];
   freeHeads[bucket] = reinterpret_cast<uint32_t*>(result)[0];
@@ -51,7 +61,6 @@ NOINLINE void free(void* ptr) {
   reinterpret_cast<uint32_t*>(p)[0] = freeHeads[bucket];
   freeHeads[bucket] = p;
 }
-*/
 
 const uint8_t* twimEncode(uint32_t width, uint32_t height, uint8_t* rgba,
                           uint32_t targetSize, uint32_t partitionCode,
