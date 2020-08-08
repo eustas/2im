@@ -91,7 +91,7 @@ if ("${TWIM_WASM}")
     -s ALLOW_MEMORY_GROWTH=1 \
     -s DISABLE_EXCEPTION_CATCHING=1 \
     -s STANDALONE_WASM=1 \
-    -s TOTAL_MEMORY=128kb \
+    -s TOTAL_MEMORY=384kb \
     -s TOTAL_STACK=64kb \
     -s FILESYSTEM=0 \
   ")
