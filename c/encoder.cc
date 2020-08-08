@@ -247,14 +247,18 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
 }
 
 struct PqNode {
-  PqNode(Fragment* v = nullptr) : v(v) {}
-
   Fragment* v;
-  uint32_t leftChild = 0;
-  uint32_t nextSibling = 0;
+  uint32_t leftChild;
+  uint32_t nextSibling;
 };
 
-void addChild(PqNode* storage, uint32_t node, uint32_t child) {
+static void initPqNode(PqNode* node, Fragment* v) {
+  node->v = v;
+  node->leftChild = 0;
+  node->nextSibling = 0;
+}
+
+static void addChild(PqNode* storage, uint32_t node, uint32_t child) {
   uint32_t leftChild = storage[node].leftChild;
   if (leftChild != 0) {
     storage[child].nextSibling = leftChild;
@@ -262,7 +266,7 @@ void addChild(PqNode* storage, uint32_t node, uint32_t child) {
   storage[node].leftChild = child;
 }
 
-NOINLINE uint32_t merge(PqNode* storage, uint32_t a, uint32_t b) {
+static NOINLINE uint32_t merge(PqNode* storage, uint32_t a, uint32_t b) {
   if (a == 0) return b;
   if (b == 0) return a;
 
@@ -276,8 +280,9 @@ NOINLINE uint32_t merge(PqNode* storage, uint32_t a, uint32_t b) {
   return a;
 }
 
-// TODO(eustas): turn to loop
-uint32_t fold(PqNode* storage, uint32_t node) {
+// TODO(eustas): turn to loop? in WASM it does not use data-stack,
+//               so deep recursion is safe...
+static uint32_t fold(PqNode* storage, uint32_t node) {
   if (node == 0) return 0;
   uint32_t sibling = storage[node].nextSibling;
   if (sibling == 0) return node;
@@ -306,29 +311,35 @@ NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
 
   findBestSubdivision(root, cache, cp);
 
-  std::vector<PqNode> queue;
+  size_t maxQueueSize = 2 * 8 * size_limit + 2;
+  PqNode* queue =
+      reinterpret_cast<PqNode*>(malloc(maxQueueSize * sizeof(PqNode)));
+  size_t queueSize = 0;
   // 0-th node is a "nullptr"
-  queue.emplace_back(nullptr);
-  queue.emplace_back(root);
-  uint32_t rootNode = 1;
-  uint32_t next = 2;
+  initPqNode(queue + queueSize++, nullptr);
+  uint32_t rootNode = queueSize;
+  initPqNode(queue + queueSize++, root);
 
   while (rootNode != 0) {
     Fragment* candidate = queue[rootNode].v;
-    rootNode = fold(queue.data(), queue[rootNode].leftChild);  // pop
-    if (candidate->best_score < 0.0 || candidate->best_cost < 0.0) break;
-    if (tax + candidate->best_cost <= budget) {
-      budget -= tax + candidate->best_cost;
+    rootNode = fold(queue, queue[rootNode].leftChild);  // pop
+    // TODO: simply don't add those to the queue?
+    if (candidate->best_score < 0.0f || candidate->best_cost < 0.0f) break;
+    float cost = tax + candidate->best_cost;
+    if (cost <= budget) {
+      budget -= cost;
       candidate->ordinal = static_cast<uint32_t>(result.size());
       result.push_back(candidate);
       findBestSubdivision(candidate->leftChild, cache, cp);
-      queue.emplace_back(candidate->leftChild);
-      rootNode = merge(queue.data(), rootNode, next++);  // push
+      initPqNode(queue + queueSize, candidate->leftChild);
+      rootNode = merge(queue, rootNode, queueSize++);  // push
       findBestSubdivision(candidate->rightChild, cache, cp);
-      queue.emplace_back(candidate->rightChild);
-      rootNode = merge(queue.data(), rootNode, next++);  // push
+      initPqNode(queue + queueSize, candidate->rightChild);
+      rootNode = merge(queue, rootNode, queueSize++);  // push
     }
   }
+
+  free(queue);
   return result;
 }
 
