@@ -19,6 +19,22 @@
 namespace twim {
 
 template <typename T>
+struct Array {
+  inline Array(size_t capacity) : capacity(capacity), size(0) {
+    data = reinterpret_cast<T*>(malloc(capacity * sizeof(T)));
+  }
+
+  INLINE ~Array() { free(data); }
+
+  T* data;
+  size_t capacity;
+  size_t size;
+};
+
+#define CHECK_ARRAY_CAN_GROW(A)
+//#define CHECK_ARRAY_CAN_GROW(A) if ((A).size >= (A).capacity) __builtin_trap();
+
+template <typename T>
 struct Vector {
   uint32_t offset;
   uint32_t capacity;

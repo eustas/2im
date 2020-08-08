@@ -178,7 +178,7 @@ class TaskExecutor {
 
 NOINLINE void Fragment::encode(XRangeEncoder* dst, const CodecParams& cp,
                                bool is_leaf, const float* RESTRICT palette,
-                               Fragment** children, size_t* numChildren) {
+                               Array<Fragment*>* children) {
   if (is_leaf) {
     XRangeEncoder::writeNumber(dst, NodeType::COUNT, NodeType::FILL);
     float inv_c = 1.0f / stats[3];
@@ -205,22 +205,22 @@ NOINLINE void Fragment::encode(XRangeEncoder* dst, const CodecParams& cp,
   uint32_t maxAngle = 1u << cp.angle_bits[level];
   XRangeEncoder::writeNumber(dst, maxAngle, best_angle_code);
   XRangeEncoder::writeNumber(dst, best_num_lines, best_line);
-  children[(*numChildren)++] = leftChild;
-  children[(*numChildren)++] = rightChild;
+  CHECK_ARRAY_CAN_GROW(*children);
+  children->data[children->size++] = leftChild;
+  CHECK_ARRAY_CAN_GROW(*children);
+  children->data[children->size++] = rightChild;
 }
 
-std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
-                              const std::vector<Fragment*>* partition,
+std::vector<uint8_t> doEncode(uint32_t num_non_leaf, Fragment* root,
                               const CodecParams& cp,
                               const float* RESTRICT palette) {
   const uint32_t m = cp.palette_size;
   uint32_t n = 2 * num_non_leaf + 1;
 
-  Fragment** queue =
-      reinterpret_cast<Fragment**>(malloc(n * sizeof(Fragment*)));
-  size_t queueSize = 0;
+  Array<Fragment*> queue(n);
 
-  queue[queueSize++] = partition->at(0);
+  CHECK_ARRAY_CAN_GROW(queue);
+  queue.data[queue.size++] = root;
 
   XRangeEncoder dst;
   cp.write(&dst);
@@ -235,13 +235,11 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf,
   }
 
   size_t encoded = 0;
-  while (encoded < queueSize) {
-    Fragment* node = queue[encoded++];
+  while (encoded < queue.size) {
+    Fragment* node = queue.data[encoded++];
     bool is_leaf = (node->ordinal >= num_non_leaf);
-    node->encode(&dst, cp, is_leaf, palette, queue, &queueSize);
+    node->encode(&dst, cp, is_leaf, palette, &queue);
   }
-
-  free(queue);
 
   return dst.finish();
 }
@@ -299,48 +297,45 @@ static uint32_t fold(PqNode* storage, uint32_t node) {
  * Partition could be used to try multiple color quantization to see, which one
  * gives the best result.
  */
-NOINLINE std::vector<Fragment*> buildPartition(Fragment* root,
-                                               size_t size_limit,
-                                               const CodecParams& cp,
-                                               Cache* cache) {
+NOINLINE void buildPartition(Fragment* root, size_t size_limit,
+                             const CodecParams& cp, Cache* cache,
+                             Array<Fragment*>* result) {
   float tax = SinCos.kLog2[NodeType::COUNT];
   float budget =
       size_limit * 8.0f - tax - cp.getTax();  // Minus flat image cost.
 
-  std::vector<Fragment*> result;
-
   findBestSubdivision(root, cache, cp);
 
   size_t maxQueueSize = 2 * 8 * size_limit + 2;
-  PqNode* queue =
-      reinterpret_cast<PqNode*>(malloc(maxQueueSize * sizeof(PqNode)));
-  size_t queueSize = 0;
+  Array<PqNode> queue(maxQueueSize);
   // 0-th node is a "nullptr"
-  initPqNode(queue + queueSize++, nullptr);
-  uint32_t rootNode = queueSize;
-  initPqNode(queue + queueSize++, root);
+  CHECK_ARRAY_CAN_GROW(queue);
+  initPqNode(queue.data + queue.size++, nullptr);
+  uint32_t rootNode = queue.size;
+  CHECK_ARRAY_CAN_GROW(queue);
+  initPqNode(queue.data + queue.size++, root);
 
   while (rootNode != 0) {
-    Fragment* candidate = queue[rootNode].v;
-    rootNode = fold(queue, queue[rootNode].leftChild);  // pop
+    Fragment* candidate = queue.data[rootNode].v;
+    rootNode = fold(queue.data, queue.data[rootNode].leftChild);  // pop
     // TODO: simply don't add those to the queue?
     if (candidate->best_score < 0.0f || candidate->best_cost < 0.0f) break;
     float cost = tax + candidate->best_cost;
     if (cost <= budget) {
       budget -= cost;
-      candidate->ordinal = static_cast<uint32_t>(result.size());
-      result.push_back(candidate);
+      candidate->ordinal = static_cast<uint32_t>(result->size);
+      CHECK_ARRAY_CAN_GROW(*result);
+      result->data[result->size++] = candidate;
       findBestSubdivision(candidate->leftChild, cache, cp);
-      initPqNode(queue + queueSize, candidate->leftChild);
-      rootNode = merge(queue, rootNode, queueSize++);  // push
+      CHECK_ARRAY_CAN_GROW(queue);
+      initPqNode(queue.data + queue.size, candidate->leftChild);
+      rootNode = merge(queue.data, rootNode, queue.size++);  // push
       findBestSubdivision(candidate->rightChild, cache, cp);
-      initPqNode(queue + queueSize, candidate->rightChild);
-      rootNode = merge(queue, rootNode, queueSize++);  // push
+      CHECK_ARRAY_CAN_GROW(queue);
+      initPqNode(queue.data + queue.size, candidate->rightChild);
+      rootNode = merge(queue.data, rootNode, queue.size++);  // push
     }
   }
-
-  free(queue);
-  return result;
 }
 
 void initRoot(Fragment* root, uint32_t width, uint32_t height) {
@@ -354,20 +349,20 @@ void initRoot(Fragment* root, uint32_t width, uint32_t height) {
   root->region->len = height;
 }
 
-Partition::Partition(Cache* cache, const CodecParams& cp, size_t target_size)
-    : root(cache->uber->height) {
+Partition::Partition(Cache* cache, const CodecParams& cp, size_t targetSize)
+    : root(cache->uber->height), partition(targetSize * 4) {
   initRoot(&root, cache->uber->width, cache->uber->height);
-  partition = buildPartition(&root, target_size, cp, cache);
+  buildPartition(&root, targetSize, cp, cache, &partition);
 }
 
-const std::vector<Fragment*>* Partition::getPartition() const {
+const Array<Fragment*>* Partition::getPartition() const {
   return &partition;
 }
 
 /* Returns the index of the first leaf node in partition. */
 uint32_t Partition::subpartition(const CodecParams& cp,
                                  uint32_t target_size) const {
-  const std::vector<Fragment*>* partition = getPartition();
+  const Array<Fragment*>* partition = getPartition();
   float node_tax = SinCos.kLog2[NodeType::COUNT];
   float image_tax = cp.getTax();
   if (cp.palette_size == 0) {
@@ -377,10 +372,10 @@ uint32_t Partition::subpartition(const CodecParams& cp,
     image_tax += cp.palette_size * 3.0f * 8.0f;
   }
   float budget = 8.0f * target_size - 4.0f - image_tax - node_tax;
-  uint32_t limit = static_cast<uint32_t>(partition->size());
+  uint32_t limit = static_cast<uint32_t>(partition->size);
   uint32_t i;
   for (i = 0; i < limit; ++i) {
-    Fragment* node = partition->at(i);
+    Fragment* node = partition->data[i];
     if (node->best_cost < 0.0f) break;
     float cost = node->best_cost + node_tax;
     if (budget < cost) break;
@@ -450,12 +445,12 @@ Result encode(const Image& src, const Params& params) {
   // Encoder workflow >>
   // Partition partitionHolder(uber, cp, params.targetSize);
   uint32_t numNonLeaf = partitionHolder.subpartition(cp, params.targetSize);
-  const std::vector<Fragment*>* partition = partitionHolder.getPartition();
+  const Array<Fragment*>* partition = partitionHolder.getPartition();
   std::unique_ptr<Vector<float>> patches = gatherPatches(partition, numNonLeaf);
   std::unique_ptr<Vector<float>> palette =
       buildPalette(patches, cp.palette_size);
   float* RESTRICT colors = palette->data();
-  result.data = doEncode(numNonLeaf, partition, cp, colors);
+  result.data = doEncode(numNonLeaf, partition->data[0], cp, colors);
   // << Encoder workflow
 
   result.variant = bestTask.variant;

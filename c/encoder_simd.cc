@@ -455,7 +455,7 @@ NOINLINE std::unique_ptr<Vector<float>> buildPalette(
 }
 
 NOINLINE std::unique_ptr<Vector<float>> gatherPatches(
-    const std::vector<Fragment*>* partition, uint32_t num_non_leaf) {
+    const Array<Fragment*>* partition, uint32_t num_non_leaf) {
   constexpr HWY_FULL(float) df;
   const auto kOne = Set(df, 1.0f);
 
@@ -483,7 +483,7 @@ NOINLINE std::unique_ptr<Vector<float>> gatherPatches(
   };
 
   for (size_t i = 0; i < num_non_leaf; ++i) {
-    Fragment* node = partition->at(i);
+    Fragment* node = partition->data[i];
     maybe_add_leaf(node->leftChild);
     maybe_add_leaf(node->rightChild);
   }
@@ -783,7 +783,7 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
 }
 
 std::unique_ptr<Vector<float>> gatherPatches(
-    const std::vector<Fragment*>* partition, uint32_t num_non_leaf) {
+    const Array<Fragment*>* partition, uint32_t num_non_leaf) {
   return CALL(gatherPatches)(partition, num_non_leaf);
 }
 

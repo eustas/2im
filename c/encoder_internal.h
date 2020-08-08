@@ -71,15 +71,14 @@ class Fragment {
       : region(allocVector<int32_t>(3 * vecSize(height))) {}
 
   void encode(XRangeEncoder* dst, const CodecParams& cp, bool is_leaf,
-              const float* RESTRICT palette, Fragment** children,
-              size_t* numChildren);
+              const float* RESTRICT palette, Array<Fragment*>* children);
 };
 
 class Partition {
  public:
-  Partition(Cache* cache, const CodecParams& cp, size_t target_size);
+  Partition(Cache* cache, const CodecParams& cp, size_t targetSize);
 
-  const std::vector<Fragment*>* getPartition() const;
+  const Array<Fragment*>* getPartition() const;
 
   // CodecParams should be the same as passed to constructor; only color code
   // is allowed to be different.
@@ -87,7 +86,7 @@ class Partition {
 
  private:
   Fragment root;
-  std::vector<Fragment*> partition;
+  Array<Fragment*> partition;
 };
 
 }  // namespace twim
