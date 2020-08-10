@@ -93,7 +93,7 @@ INLINE void updateGeGeneric(Cache* cache, int32_t angle, int32_t d) {
   }
 }
 
-NOINLINE void updateGe(Cache* cache, int angle, int d) {
+INLINE void updateGe(Cache* cache, int angle, int d) {
   if (angle == 0) {
     updateGeHorizontal(cache, d);
   } else {
@@ -106,9 +106,9 @@ NOINLINE void updateGe(Cache* cache, int angle, int d) {
  * -left_avg*whole_avg) left_pc* (whole_avg^2 - 2 *  whole_avg * left_avg +
  * left_avg^2) = (whole_avg - left_avg) ^ 2 * left_pc
  */
-NOINLINE void score(const Stats& whole, size_t n, const float* RESTRICT r,
-                    const float* RESTRICT g, const float* RESTRICT b,
-                    const float* RESTRICT c, float* RESTRICT s) {
+void score(const Stats& whole, size_t n, const float* RESTRICT r,
+           const float* RESTRICT g, const float* RESTRICT b,
+           const float* RESTRICT c, float* RESTRICT s) {
   constexpr HWY_FULL(float) df;
 
   const auto k1 = Set(df, 1.0f);
@@ -266,11 +266,12 @@ INLINE uint32_t chooseMax(const float* RESTRICT values, size_t length) {
   return choose(OpMax(), values, length);
 }
 
-INLINE uint32_t chooseColor(float r, float g, float b,
-                            const float* RESTRICT palette_r,
-                            const float* RESTRICT palette_g,
-                            const float* RESTRICT palette_b,
-                            uint32_t palette_size, float* RESTRICT distance2) {
+NOINLINE uint32_t chooseColor(float r, float g, float b,
+                              const float* RESTRICT palette_r,
+                              const float* RESTRICT palette_g,
+                              const float* RESTRICT palette_b,
+                              uint32_t palette_size,
+                              float* RESTRICT distance2) {
   constexpr HWY_FULL(float) df;
   const size_t m = palette_size;
 
@@ -290,16 +291,6 @@ INLINE uint32_t chooseColor(float r, float g, float b,
   uint32_t best = chooseMin(d2, m);
   *distance2 = d2[best];
   return best;
-}
-
-NOINLINE uint32_t noinlineChooseColor(float r, float g, float b,
-                                      const float* RESTRICT palette_r,
-                                      const float* RESTRICT palette_g,
-                                      const float* RESTRICT palette_b,
-                                      uint32_t palette_size,
-                                      float* RESTRICT distance2) {
-  return chooseColor(r, g, b, palette_r, palette_g, palette_b, palette_size,
-                     distance2);
 }
 
 INLINE void makePalette(const float* stats, float* RESTRICT palette,
@@ -503,8 +494,8 @@ NOINLINE std::unique_ptr<Vector<float>> gatherPatches(
   return result;
 }
 
-NOINLINE float simulateEncode(const Partition& partition_holder,
-                              uint32_t target_size, const CodecParams& cp) {
+float simulateEncode(const Partition& partition_holder, uint32_t target_size,
+                     const CodecParams& cp) {
   uint32_t num_non_leaf = partition_holder.subpartition(cp, target_size);
   if (num_non_leaf <= 1) {
     // Let's deal with flat image separately.
@@ -595,7 +586,8 @@ void sumCache(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
 #endif
 }
 
-void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
+INLINE void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x,
+                        Stats* dst) {
   size_t count = c->count;
   const float* RESTRICT sum = c->uber->sum->data();
 
@@ -654,8 +646,7 @@ void INLINE prepareCache(Cache* c, Vector<int32_t>* region) {
   c->count = count;
 }
 
-void NOINLINE findBestSubdivision(Fragment* f, Cache* cache,
-                                  const CodecParams& cp) {
+void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
   Vector<int32_t>& region = *f->region;
   Stats stats;
   Stats plus;
@@ -759,7 +750,7 @@ namespace twim {
 #else
 #define CALL HWY_DYNAMIC_DISPATCH
 HWY_EXPORT(simulateEncode)
-HWY_EXPORT(noinlineChooseColor)
+HWY_EXPORT(chooseColor)
 HWY_EXPORT(findBestSubdivision)
 HWY_EXPORT(gatherPatches)
 HWY_EXPORT(buildPalette)
@@ -774,7 +765,7 @@ uint32_t chooseColor(float r, float g, float b, const float* RESTRICT palette_r,
                      const float* RESTRICT palette_g,
                      const float* RESTRICT palette_b, uint32_t palette_size,
                      float* RESTRICT distance2) {
-  return CALL(noinlineChooseColor)(
+  return CALL(chooseColor)(
       r, g, b, palette_r, palette_g, palette_b, palette_size, distance2);
 }
 
