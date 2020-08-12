@@ -169,7 +169,7 @@ int main(int argc, char* argv[]) {
       }
       std::stringstream out;
       out << std::fixed << std::setprecision(2);
-      out << "size=" << result.data.size() << ", PSNR=" << psnr
+      out << "size=" << result.data.size << ", PSNR=" << psnr
           << ", variant=" << kBase64Abc[partitionCode >> 6]
           << kBase64Abc[partitionCode & 0x3F] << ":" << kBase64Abc[lineLimit]
           << ":" << kBase64Abc[colorCode];
