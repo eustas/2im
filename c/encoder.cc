@@ -211,9 +211,8 @@ NOINLINE void Fragment::encode(XRangeEncoder* dst, const CodecParams& cp,
   children->data[children->size++] = rightChild;
 }
 
-std::vector<uint8_t> doEncode(uint32_t num_non_leaf, Fragment* root,
-                              const CodecParams& cp,
-                              const float* RESTRICT palette) {
+void doEncode(uint32_t num_non_leaf, Fragment* root, const CodecParams& cp,
+              const float* RESTRICT palette, Array<uint8_t>* out) {
   const uint32_t m = cp.palette_size;
   uint32_t n = 2 * num_non_leaf + 1;
 
@@ -241,7 +240,7 @@ std::vector<uint8_t> doEncode(uint32_t num_non_leaf, Fragment* root,
     node->encode(&dst, cp, is_leaf, palette, &queue);
   }
 
-  return dst.finish();
+  dst.finish(out);
 }
 
 struct PqNode {
@@ -446,17 +445,18 @@ Result encode(const Image& src, const Params& params) {
   // Partition partitionHolder(uber, cp, params.targetSize);
   uint32_t numNonLeaf = partitionHolder.subpartition(cp, params.targetSize);
   const Array<Fragment*>* partition = partitionHolder.getPartition();
-  std::unique_ptr<Vector<float>> patches = gatherPatches(partition, numNonLeaf);
-  std::unique_ptr<Vector<float>> palette =
-      buildPalette(patches, cp.palette_size);
+  Vector<float>* patches = gatherPatches(partition, numNonLeaf);
+  Vector<float>* palette = buildPalette(patches, cp.palette_size);
   float* RESTRICT colors = palette->data();
-  result.data = doEncode(numNonLeaf, partition->data[0], cp, colors);
+  doEncode(numNonLeaf, partition->data[0], cp, colors, &result.data);
+  delete patches;
+  delete palette;
   // << Encoder workflow
 
   result.variant = bestTask.variant;
   result.variant.colorOptions = (uint64_t)1 << bestColorCode;
   result.mse = (bestSqe + uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2]) /
-               static_cast<float>(width * height);
+                static_cast<float>(width * height);
   return result;
 }
 

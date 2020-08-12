@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
           << ":" << kBase64Abc[colorCode];
       fprintf(stderr, "%s\n", out.str().c_str());
       path += ".2im";
-      Io::writeFile(path, result.data);
+      Io::writeFile(path, result.data.data, result.data.size);
     }
     if (!encode || roundtrip) {
       auto data = Io::readFile(path);

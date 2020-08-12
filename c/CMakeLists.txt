@@ -39,6 +39,7 @@ add_library(twimBase STATIC
   distance_range.h
   image.cc
   image.h
+  platform.cc
   platform.h
   xrange_code.h
   region.cc

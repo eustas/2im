@@ -25,9 +25,10 @@ void TestRandom(size_t num_rounds, size_t num_items, size_t seed) {
       items[i] = val;
       items[i + 1] = total;
     }
-    auto data = encoder.finish();
+    Array<uint8_t> data(1024);
+    encoder.finish(&data);
 
-    XRangeDecoder decoder(std::move(data));
+    XRangeDecoder decoder(std::vector<uint8_t>(data.data, data.data + data.size));
     for (size_t i = 0; i < num_items * 2; i += 2) {
       uint32_t val = XRangeDecoder::readNumber(&decoder, items[i + 1]);
       ASSERT_EQ(items[i], val);
@@ -50,15 +51,16 @@ TEST(XRangeTest, Optimizer) {
   for (uint32_t i = 0; i < kLength - 1; ++i) {
     XRangeEncoder::writeNumber(&encoder, 256, i + 42);
   }
-  auto data = encoder.finish();
+  Array<uint8_t> data(1024);
+  encoder.finish(&data);
 
   int8_t expected[] = {-78, -15, 81, -45, -48, -46, -47, 51, 48, 50, 49, -77};
   const size_t expected_size = sizeof(expected) / sizeof(expected[0]);
   ASSERT_EQ(kLength, expected_size);
-  EXPECT_EQ(expected_size, data.size());
-  EXPECT_EQ(0,std::memcmp(expected, data.data(), sizeof(expected)));
+  EXPECT_EQ(expected_size, data.size);
+  EXPECT_EQ(0, std::memcmp(expected, data.data, sizeof(expected)));
 
-  XRangeDecoder decoder(std::move(data));
+  XRangeDecoder decoder(std::vector<uint8_t>(data.data, data.data + data.size));
   EXPECT_EQ(13u, XRangeDecoder::readNumber(&decoder, 63));
   for (size_t i = 0; i < kLength - 1; ++i) {
     EXPECT_EQ(i + 42, XRangeDecoder::readNumber(&decoder, 256));

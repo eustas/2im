@@ -13,7 +13,7 @@ class Io {
  public:
   static std::vector<uint8_t> readFile(const std::string& path);
   static bool writeFile(const std::string& path,
-                        const std::vector<uint8_t>& data);
+                        const uint8_t* data, size_t size);
 
   static Image readPng(const std::string& path);
   static bool writePng(const std::string& path, const Image& img);

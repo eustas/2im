@@ -32,14 +32,14 @@ const uint8_t* twimEncode(uint32_t width, uint32_t height, uint8_t* rgba,
                           << ::twim::CodecParams::kNumColorQuantOptions);
   ::twim::Encoder::Result result = ::twim::Encoder::encode(src, params);
 
-  size_t size = result.data.size();
+  size_t size = result.data.size;
   if (size == 0) return nullptr;
   void* output = malloc(8 + size);
   if (output == nullptr) return nullptr;
   uint8_t* output_bytes = reinterpret_cast<uint8_t*>(output);
   reinterpret_cast<uint32_t*>(output)[0] = static_cast<uint32_t>(size);
   reinterpret_cast<float*>(output)[1] = result.mse;
-  memcpy(output_bytes + 8, result.data.data(), size);
+  memcpy(output_bytes + 8, result.data.data, size);
   return output_bytes;
 }
 

@@ -428,32 +428,32 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
   }
 }
 
-NOINLINE std::unique_ptr<Vector<float>> buildPalette(
-    const std::unique_ptr<Vector<float>>& patches, uint32_t palette_size) {
+NOINLINE Vector<float>* buildPalette(
+    const Vector<float>* patches, uint32_t palette_size) {
   uint32_t n = patches->len;
   uint32_t m = palette_size;
   uint32_t padded_m = vecSize(m);
   uint32_t palette_space = 3 * padded_m;
   uint32_t extra_space = std::max(4 * padded_m, ((m > 0) ? n : 1));
-  std::unique_ptr<Vector<float>> result =
-      allocVector<float>((m > 0) ? palette_space : 1);
-  std::unique_ptr<Vector<float>> extra = allocVector<float>(extra_space);
+  Vector<float>* result = allocVector<float>((m > 0) ? palette_space : 1);
+  Vector<float>* extra = allocVector<float>(extra_space);
 
   result->len = m;
   if (m > 0) makePalette(patches->data(), result->data(), extra->data(), n, m);
+  delete extra;
 
   return result;
 }
 
-NOINLINE std::unique_ptr<Vector<float>> gatherPatches(
-    const Array<Fragment*>* partition, uint32_t num_non_leaf) {
+NOINLINE Vector<float>* gatherPatches(const Array<Fragment*>* partition,
+                                      uint32_t num_non_leaf) {
   constexpr HWY_FULL(float) df;
   const auto kOne = Set(df, 1.0f);
 
   /* In a binary tree the number of leaves is number of nodes plus one. */
   uint32_t n = num_non_leaf + 1;
   uint32_t stats_size = vecSize(n);
-  std::unique_ptr<Vector<float>> result = allocVector<float>(7 * stats_size);
+  Vector<float>* result = allocVector<float>(7 * stats_size);
   float* RESTRICT stats = result->data();
   float* RESTRICT stats_r = stats + 0 * stats_size;
   float* RESTRICT stats_g = stats + 1 * stats_size;
@@ -501,7 +501,7 @@ float simulateEncode(const Partition& partition_holder, uint32_t target_size,
     // Let's deal with flat image separately.
     return 1e35f;
   }
-  std::unique_ptr<Vector<float>> patches =
+  Vector<float>* patches =
       gatherPatches(partition_holder.getPartition(), num_non_leaf);
   size_t patches_step = patches->capacity / 7;
   float* RESTRICT stats = patches->data();
@@ -512,7 +512,7 @@ float simulateEncode(const Partition& partition_holder, uint32_t target_size,
 
   size_t n = patches->len;
   const uint32_t m = cp.palette_size;
-  std::unique_ptr<Vector<float>> palette = buildPalette(patches, m);
+  Vector<float>* palette = buildPalette(patches, m);
   const float* RESTRICT palette_r = palette->data();
   const size_t palette_step = vecSize(m);
   const float* RESTRICT palette_g = palette_r + palette_step;
@@ -556,6 +556,8 @@ float simulateEncode(const Partition& partition_holder, uint32_t target_size,
       result[j] += c * rgb[j] * (rgb[j] - 2.0f * orig[j]);
     }
   }
+  delete patches;
+  delete palette;
 
   return result[0] + result[1] + result[2];
 }
@@ -727,8 +729,8 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
     f->rightChild = new Fragment(region.len);
     Region::splitLine(region, best_angle_code * angle_mult,
                       distance_range.distance(best_line),
-                      f->leftChild->region.get(),
-                      f->rightChild->region.get());
+                      f->leftChild->region,
+                      f->rightChild->region);
 
     f->best_angle_code = best_angle_code;
     f->best_num_lines = distance_range.num_lines;
@@ -773,13 +775,13 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
   return CALL(findBestSubdivision)(f, cache, cp);
 }
 
-std::unique_ptr<Vector<float>> gatherPatches(
-    const Array<Fragment*>* partition, uint32_t num_non_leaf) {
+Vector<float>* gatherPatches(const Array<Fragment*>* partition,
+                             uint32_t num_non_leaf) {
   return CALL(gatherPatches)(partition, num_non_leaf);
 }
 
-std::unique_ptr<Vector<float>> buildPalette(
-    const std::unique_ptr<Vector<float>>& patches, uint32_t palette_size) {
+Vector<float>* buildPalette(const Vector<float>* patches,
+                            uint32_t palette_size) {
   return CALL(buildPalette)(patches, palette_size);
 }
 

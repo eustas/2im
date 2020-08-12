@@ -25,7 +25,9 @@ struct Params {
 };
 
 struct Result {
-  std::vector<uint8_t> data;
+  Result() : data(1024) {}
+
+  Array<uint8_t> data;
   Variant variant;
   float mse;
 };

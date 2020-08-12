@@ -41,33 +41,34 @@ void ExpectEq(const std::array<int32_t, N>& expected,
 
 TEST(RegionTest, HorizontalSplit) {
   int32_t step1 = vecSize(1);
-  auto region = allocVector<int32_t>(3 * step1);
-  Set<3>(region.get(), {0, 0, 4});
+  Vector<int32_t>* region = allocVector<int32_t>(3 * step1);
+  Set<3>(region, {0, 0, 4});
 
   int32_t angle = SinCos.kMaxAngle / 2;
   CodecParams cp(4, 4);
-  DistanceRange distanceRange(*region.get(), angle, cp);
+  DistanceRange distanceRange(*region, angle, cp);
   EXPECT_EQ(3, distanceRange.num_lines);
-  auto left = allocVector<int32_t>(3 * step1);
-  auto right = allocVector<int32_t>(3 * step1);
+  Vector<int32_t>* left = allocVector<int32_t>(3 * step1);
+  Vector<int32_t>* right = allocVector<int32_t>(3 * step1);
 
   // 1/3
-  Region::splitLine(*region.get(), angle, distanceRange.distance(0), left.get(),
-                    right.get());
-  ExpectEq<3>({0, 1, 4}, left.get());
-  ExpectEq<3>({0, 0, 1}, right.get());
+  Region::splitLine(*region, angle, distanceRange.distance(0), left, right);
+  ExpectEq<3>({0, 1, 4}, left);
+  ExpectEq<3>({0, 0, 1}, right);
 
   // 2/3
-  Region::splitLine(*region.get(), angle, distanceRange.distance(1), left.get(),
-                    right.get());
-  ExpectEq<3>({0, 2, 4}, left.get());
-  ExpectEq<3>({0, 0, 2}, right.get());
+  Region::splitLine(*region, angle, distanceRange.distance(1), left, right);
+  ExpectEq<3>({0, 2, 4}, left);
+  ExpectEq<3>({0, 0, 2}, right);
 
   // 3/3
-  Region::splitLine(*region.get(), angle, distanceRange.distance(2), left.get(),
-                    right.get());
-  ExpectEq<3>({0, 3, 4}, left.get());
-  ExpectEq<3>({0, 0, 3}, right.get());
+  Region::splitLine(*region, angle, distanceRange.distance(2), left, right);
+  ExpectEq<3>({0, 3, 4}, left);
+  ExpectEq<3>({0, 0, 3}, right);
+
+  delete region;
+  delete left;
+  delete right;
 }
 
 TEST(RegionTest, VerticalSplit) {
@@ -75,37 +76,43 @@ TEST(RegionTest, VerticalSplit) {
   int32_t step2 = vecSize(2);
   int32_t step3 = vecSize(3);
   int32_t step4 = vecSize(4);
-  auto region = allocVector<int32_t>(3 * step4);
-  Set<12>(region.get(), {0, 0, 1, /**/ 1, 0, 1, /**/ 2, 0, 1, /**/ 3, 0, 1});
+  Vector<int32_t>* region = allocVector<int32_t>(3 * step4);
+  Set<12>(region, {0, 0, 1, /**/ 1, 0, 1, /**/ 2, 0, 1, /**/ 3, 0, 1});
   int32_t angle = 0;
   CodecParams cp(4, 4);
   cp.line_limit = 63;
-  DistanceRange distanceRange(*region.get(), angle, cp);
+  DistanceRange distanceRange(*region, angle, cp);
   EXPECT_EQ(3, distanceRange.num_lines);
 
   // 1/3
-  auto left = allocVector<int32_t>(3 * step3);
-  auto right = allocVector<int32_t>(3 * step1);
-  Region::splitLine(*region.get(), angle, distanceRange.distance(0), left.get(),
-                    right.get());
-  ExpectEq<9>({1, 0, 1, /**/ 2, 0, 1, /**/ 3, 0, 1}, left.get());
-  ExpectEq<3>({0, 0, 1}, right.get());
+  Vector<int32_t>* left = allocVector<int32_t>(3 * step3);
+  Vector<int32_t>* right = allocVector<int32_t>(3 * step1);
+  Region::splitLine(*region, angle, distanceRange.distance(0), left, right);
+  ExpectEq<9>({1, 0, 1, /**/ 2, 0, 1, /**/ 3, 0, 1}, left);
+  ExpectEq<3>({0, 0, 1}, right);
+  delete left;
+  delete right;
 
   // 2/3
   left = allocVector<int32_t>(3 * step2);
   right = allocVector<int32_t>(3 * step2);
-  Region::splitLine(*region.get(), angle, distanceRange.distance(1), left.get(),
-                    right.get());
-  ExpectEq<6>({2, 0, 1, /**/ 3, 0, 1}, left.get());
-  ExpectEq<6>({0, 0, 1, /**/ 1, 0, 1}, right.get());
+  Region::splitLine(*region, angle, distanceRange.distance(1), left, right);
+  ExpectEq<6>({2, 0, 1, /**/ 3, 0, 1}, left);
+  ExpectEq<6>({0, 0, 1, /**/ 1, 0, 1}, right);
+  delete left;
+  delete right;
 
   // 3/3
   left = allocVector<int32_t>(3 * step1);
   right = allocVector<int32_t>(3 * step3);
-  Region::splitLine(*region.get(), angle, distanceRange.distance(2), left.get(),
-                    right.get());
-  ExpectEq<3>({3, 0, 1}, left.get());
-  ExpectEq<9>({0, 0, 1, /**/ 1, 0, 1, /**/ 2, 0, 1}, right.get());
+  Region::splitLine(*region, angle, distanceRange.distance(2), left,
+                    right);
+  ExpectEq<3>({3, 0, 1}, left);
+  ExpectEq<9>({0, 0, 1, /**/ 1, 0, 1, /**/ 2, 0, 1}, right);
+  delete left;
+  delete right;
+
+  delete region;
 }
 
 }  // namespace twim

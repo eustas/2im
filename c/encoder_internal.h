@@ -15,11 +15,15 @@ class XRangeEncoder;
 
 class UberCache {
  public:
+  ~UberCache() {
+    delete sum;
+  }
+
   const uint32_t width;
   const uint32_t height;
   const uint32_t stride;
   /* Cumulative sums. Extra column with total sum. */
-  std::unique_ptr<Vector<float>> sum;
+  Vector<float>* sum;
 
   float rgb2[3] = {0.0f};
 
@@ -28,22 +32,30 @@ class UberCache {
 
 class Cache {
  public:
+  ~Cache() {
+    delete row_offset;
+    delete y;
+    delete x0;
+    delete x1;
+    delete x;
+    delete stats;
+  }
   const UberCache* uber;
 
   uint32_t count;
-  std::unique_ptr<Vector<int32_t>> row_offset;
-  std::unique_ptr<Vector<float>> y;
-  std::unique_ptr<Vector<int32_t>> x0;
-  std::unique_ptr<Vector<int32_t>> x1;
-  std::unique_ptr<Vector<int32_t>> x;
-  std::unique_ptr<Vector<float>> stats;
+  Vector<int32_t>* row_offset;
+  Vector<float>* y;
+  Vector<int32_t>* x0;
+  Vector<int32_t>* x1;
+  Vector<int32_t>* x;
+  Vector<float>* stats;
 
   explicit Cache(const UberCache& uber);
 };
 
 class Fragment {
  public:
-  std::unique_ptr<Vector<int32_t>> region;
+  Vector<int32_t>* region;
   Fragment* leftChild = nullptr;
   Fragment* rightChild = nullptr;
 
@@ -63,6 +75,7 @@ class Fragment {
   Fragment(const Fragment&) = delete;
   Fragment& operator=(const Fragment&) = delete;
   ~Fragment() {
+    delete region;
     delete leftChild;
     delete rightChild;
   }

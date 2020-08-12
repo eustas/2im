@@ -36,11 +36,11 @@ std::vector<uint8_t> Io::readFile(const std::string& path) {
   return result;
 }
 
-bool Io::writeFile(const std::string& path, const std::vector<uint8_t>& data) {
+bool Io::writeFile(const std::string& path, const uint8_t* data, size_t size) {
   auto f = openFile(path, "wb");
   if (!f) return false;
-  size_t written = fwrite(data.data(), 1, data.size(), f.get());
-  return written == data.size();
+  size_t written = fwrite(data, 1, size, f.get());
+  return written == size;
 }
 
 struct Png {
@@ -190,7 +190,7 @@ bool Io::writePng(const std::string& path, const Image& img) {
 
   png_write_end(png->png_ptr, nullptr);
 
-  return writeFile(path, data);
+  return writeFile(path, data.data(), data.size());
 }
 
 }  // namespace twim

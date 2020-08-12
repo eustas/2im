@@ -31,14 +31,18 @@ uint32_t readColor(XRangeDecoder* src, const CodecParams& cp,
 
 class Fragment {
  public:
+  ~Fragment() {
+    delete region;
+  }
+
   int32_t type = NodeType::FILL;
   uint32_t color = 0;
-  std::unique_ptr<Vector<int32_t>> region;
+  Vector<int32_t>* region;
   std::unique_ptr<Fragment> left_child;
   std::unique_ptr<Fragment> right_child;
 
-  explicit Fragment(std::unique_ptr<Vector<int32_t>> region)
-      : region(std::move(region)) {}
+  explicit Fragment(Vector<int32_t>* /* takes ownership */ region)
+      : region(region) {}
 
   bool parse(XRangeDecoder* src, const CodecParams& cp, uint32_t* palette,
              std::vector<Fragment*>* children) {
@@ -48,7 +52,7 @@ class Fragment {
       return true;
     }
 
-    uint32_t level = cp.getLevel(*region.get());
+    uint32_t level = cp.getLevel(*region);
     if (level == CodecParams::kInvalid) return false;  // corrupted input
 
     if (type != NodeType::HALF_PLANE) return false;
@@ -57,19 +61,19 @@ class Fragment {
     uint32_t angleMult = (SinCos.kMaxAngle / angleMax);
     uint32_t angleCode = XRangeDecoder::readNumber(src, angleMax);
     uint32_t angle = angleCode * angleMult;
-    DistanceRange distance_range(*region.get(), angle, cp);
+    DistanceRange distance_range(*region, angle, cp);
     if (distance_range.num_lines == DistanceRange::kInvalid) return false;
     uint32_t line = XRangeDecoder::readNumber(src, distance_range.num_lines);
 
     // Cutting with half-planes does not increase the number of scans.
     uint32_t step = vecSize(region->len);
-    auto inner = allocVector<int32_t>(3 * step);
-    auto outer = allocVector<int32_t>(3 * step);
-    Region::splitLine(*region.get(), angle, distance_range.distance(line),
-                      inner.get(), outer.get());
-    left_child.reset(new Fragment(std::move(inner)));
+    Vector<int32_t>* inner = allocVector<int32_t>(3 * step);
+    Vector<int32_t>* outer = allocVector<int32_t>(3 * step);
+    Region::splitLine(*region, angle, distance_range.distance(line),
+                      inner, outer);
+    left_child.reset(new Fragment(inner));
     children->push_back(left_child.get());
-    right_child.reset(new Fragment(std::move(outer)));
+    right_child.reset(new Fragment(outer));
     children->push_back(right_child.get());
     return true;
   }
@@ -150,7 +154,7 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   }
 
   uint32_t step = vecSize(height);
-  auto root_region = allocVector<int32_t>(3 * step);
+  Vector<int32_t>* root_region = allocVector<int32_t>(3 * step);
   int32_t* RESTRICT y = root_region->data();
   int32_t* RESTRICT x0 = y + step;
   int32_t* RESTRICT x1 = x0 + step;
@@ -161,7 +165,7 @@ Image Decoder::decode(std::vector<uint8_t>&& encoded) {
   }
   root_region->len = height;
 
-  Fragment root(std::move(root_region));
+  Fragment root(root_region);
   std::vector<Fragment*> children;
   children.push_back(&root);
 

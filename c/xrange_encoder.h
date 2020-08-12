@@ -12,16 +12,24 @@ namespace twim {
 
 class XRangeEncoder {
  public:
-  std::vector<uint8_t> finish();
+  XRangeEncoder() : entries(1024) {}
+  void finish(Array<uint8_t>* out);
 
-  static void writeNumber(XRangeEncoder* dst, uint32_t max, uint32_t value) {
-    if (max > 1) dst->entries.push_back({value, max});
+  NOINLINE static void writeNumber(XRangeEncoder* dst, uint32_t max, uint32_t value) {
+    if (max > 1) {
+      Array<Entry>& entries = dst->entries;
+      MAYBE_GROW_ARRAY(entries);
+      Entry& next = entries.data[entries.size++];
+      next.value = value;
+      next.max = max;
+    }
   }
 
   static float estimateCost(XRangeEncoder* dst) {
     float cost = 0.0f;
-    for (size_t i = 0; i < dst->entries.size(); ++i) {
-      uint32_t v = dst->entries[i].max;
+    Array<Entry>& entries = dst->entries;
+    for (size_t i = 0; i < entries.size; ++i) {
+      uint32_t v = entries.data[i].max;
       if (v >= 64) {
         cost += 6;
         v >>= 6;
@@ -37,7 +45,7 @@ class XRangeEncoder {
     uint32_t max;
   };
 
-  std::vector<Entry> entries;
+  Array<Entry> entries;
 };
 
 }  // namespace twim

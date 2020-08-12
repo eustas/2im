@@ -8,6 +8,7 @@ TEST_COPTS = DEFAULT_COPTS + ["-Iexternal/gtest/include"]
 
 cc_library(
     name = "platform",
+    srcs = ["platform.cc"],
     hdrs = ["platform.h"],
     copts = DEFAULT_COPTS,
 )
