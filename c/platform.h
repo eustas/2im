@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 
 #ifdef _MSC_VER
 #include <intrin.h>
