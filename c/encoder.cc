@@ -319,6 +319,7 @@ NOINLINE void buildPartition(Fragment* root, size_t size_limit,
     rootNode = fold(queue.data, queue.data[rootNode].leftChild);  // pop
     // TODO: simply don't add those to the queue?
     if (candidate->best_score < 0.0f || candidate->best_cost < 0.0f) break;
+    // TODO(eustas): add color tax!!!
     float cost = tax + candidate->best_cost;
     if (cost <= budget) {
       budget -= cost;

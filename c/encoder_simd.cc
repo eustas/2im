@@ -698,7 +698,7 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
 
   if (num_subdivisions == 0) {
     f->best_cost = -1.0f;
-    f->best_score = 1e-35;
+    f->best_score = -1.0f;
     return;
   }
 
