@@ -80,6 +80,8 @@ class Fragment {
     delete rightChild;
   }
 
+  static void* operator new(size_t sz) {return malloc(sz);}
+
   NOINLINE explicit Fragment(uint32_t height)
       : region(allocVector<int32_t>(3 * vecSize(height))) {}
 
@@ -89,6 +91,7 @@ class Fragment {
 
 class Partition {
  public:
+  static void* operator new(size_t sz) {return malloc(sz);}
   Partition(Cache* cache, const CodecParams& cp, size_t targetSize);
 
   const Array<Fragment*>* getPartition() const;

@@ -66,7 +66,7 @@ struct Vector {
 // TODO(eustas): adjust to SIMD implementation
 constexpr size_t kDefaultAlign = 32;
 
-static INLINE uint32_t vecSize(uint32_t capacity) {
+static NOINLINE uint32_t vecSize(uint32_t capacity) {
   // In twim only (u)int32_t and float vectors are used.
   constexpr size_t N = kDefaultAlign / 4;
   return static_cast<uint32_t>((capacity + N - 1) & ~(N - 1));

@@ -1,0 +1,7 @@
+[ 
+  {"export": "twimEncode", "name": "a", "root": true},
+  {"export": "malloc", "name": "b", "root": true},
+  {"export": "free", "name": "c", "root": true},
+  {"export": "memory", "name": "d", "root": true},
+  {"export": "_initialize", "name": "e", "root": true},
+]
