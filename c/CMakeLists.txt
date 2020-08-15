@@ -88,6 +88,8 @@ if (NOT "${TWIM_WASM}")
 endif()
 
 if ("${TWIM_WASM}")
+  set(CMAKE_EXECUTABLE_SUFFIX ".wasm")
+
   set(WASM_FLAGS "\
     -s ALLOW_MEMORY_GROWTH=1 \
     -s DISABLE_EXCEPTION_CATCHING=1 \
@@ -112,4 +114,10 @@ if ("${TWIM_WASM}")
     -s EXPORT_NAME=\"TwimEncoderModule\" \
     -s EXPORTED_FUNCTIONS='[\"_malloc\",\"_free\", \"_twimEncode\"]' \
   ")
+
+  add_custom_command(TARGET "${TWIM_MODULE}" POST_BUILD
+    COMMAND wasm-metadce ARGS --enable-simd $<TARGET_FILE:${TWIM_MODULE}> -o $<TARGET_FILE:${TWIM_MODULE}> -f twim-exports.json
+    COMMAND wasm-opt ARGS -Oz --enable-simd $<TARGET_FILE:${TWIM_MODULE}> -o $<TARGET_FILE:${TWIM_MODULE}>
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  )
 endif()
