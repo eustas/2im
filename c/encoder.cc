@@ -401,6 +401,13 @@ Result encode(const Image& src, const Params& params) {
     return result;
   }
 
+  for (size_t i = 0; i < numVariants; ++i) {
+    if (variants[i].colorOptions == 0) {
+      if (params.debug) log("varinat without colorOptions is requested");
+      return result;
+    }
+  }
+
   TaskExecutor executor(uber, numVariants);
   SimulationTask* tasks = executor.tasks.data;
   for (size_t i = 0; i < numVariants; ++i) {
