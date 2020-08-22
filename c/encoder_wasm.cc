@@ -13,29 +13,44 @@ void* memcpy(void* destination, const void* source, size_t num) {
   return destination;
 }
 
+/**
+ * |variants| should point to 9 * |numVariants| bytes; each byte position in
+ * 5-byte group corresponds to:
+ *   0: partitionCode
+ *   1: lineLimit
+ *   2..8: (little-endian) color palette / quantization bits
+ */
 const uint8_t* twimEncode(uint32_t width, uint32_t height, uint8_t* rgba,
-                          uint32_t targetSize, uint32_t partitionCode,
-                          uint32_t lineLimit, uint32_t colorQuantOptions,
-                          uint32_t colorPaletteOptions) {
-  ::twim::Image src = ::twim::Image::fromRgba(rgba, width, height);
+                          uint32_t targetSize, size_t numVariants,
+                          const uint8_t* variants) {
+  using namespace ::twim;
+  using namespace ::twim::Encoder;
+  Image src = Image::fromRgba(rgba, width, height);
   if (!src.ok) return nullptr;
-  ::twim::Encoder::Params params;
-  ::twim::Encoder::Variant variant;
+  Variant* parsedVariants =
+      reinterpret_cast<Variant*>(mallocOrDie(numVariants * sizeof(Variant)));
+  Params params;
   params.targetSize = targetSize;
   params.numThreads = 1;
-  params.variants = &variant;
-  params.numVariants = 1;
-  variant.partitionCode = partitionCode;
-  variant.lineLimit = lineLimit;
-  variant.colorOptions = colorQuantOptions & 0x1FFFF |
-                         ((colorPaletteOptions & 0xFFFF)
-                          << ::twim::CodecParams::kNumColorQuantOptions);
-  ::twim::Encoder::Result result = ::twim::Encoder::encode(src, params);
+  params.variants = parsedVariants;
+  params.numVariants = numVariants;
+  for (size_t i = 0; i < numVariants; ++i) {
+    Variant& variant = parsedVariants[i];
+    const uint8_t* record = variants + 9 * i;
+    variant.partitionCode = record[0];
+    variant.lineLimit = record[1];
+    uint64_t colorOptions = 0;
+    for (size_t j = 0; j < 7; ++j) {
+      colorOptions |= uint64_t(record[2 + j]) << (8 * j);
+    }
+    variant.colorOptions = colorOptions;
+  }
+  Result result = encode(src, params);
+  free(parsedVariants);
 
   size_t size = result.data.size;
   if (size == 0) return nullptr;
-  void* output = malloc(8 + size);
-  if (output == nullptr) return nullptr;
+  void* output = mallocOrDie(8 + size);
   uint8_t* output_bytes = reinterpret_cast<uint8_t*>(output);
   reinterpret_cast<uint32_t*>(output)[0] = static_cast<uint32_t>(size);
   reinterpret_cast<float*>(output)[1] = result.mse;

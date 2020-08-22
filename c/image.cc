@@ -1,4 +1,5 @@
 #include "image.h"
+#include "platform.h"
 
 namespace twim {
 
@@ -13,9 +14,9 @@ void Image::init(uint32_t width, uint32_t height) {
   this->width = width;
   this->height = height;
 
-  this->r = static_cast<uint8_t*>(malloc(width * height));
-  this->g = static_cast<uint8_t*>(malloc(width * height));
-  this->b = static_cast<uint8_t*>(malloc(width * height));
+  this->r = static_cast<uint8_t*>(mallocOrDie(width * height));
+  this->g = static_cast<uint8_t*>(mallocOrDie(width * height));
+  this->b = static_cast<uint8_t*>(mallocOrDie(width * height));
 
   this->ok =
       (this->r != nullptr) && (this->g != nullptr) && (this->b != nullptr);

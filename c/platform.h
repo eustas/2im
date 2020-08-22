@@ -16,12 +16,23 @@
 #define NOINLINE __attribute__((noinline))
 #endif
 
+#if defined(__wasm__)
+// malloc from simple_alloc.cc will already die on failure
+#define mallocOrDie malloc
+#else
+static INLINE void* mallocOrDie(size_t size) {
+  void* result = malloc(size);
+  if (!result) __builtin_trap();
+  return result;
+}
+#endif
+
 namespace twim {
 
 template <typename T>
 struct Array {
   Array(size_t capacity) : capacity(capacity), size(0) {
-    data = reinterpret_cast<T*>(malloc(capacity * sizeof(T)));
+    data = reinterpret_cast<T*>(mallocOrDie(capacity * sizeof(T)));
   }
 
   INLINE ~Array() { free(data); }
@@ -66,11 +77,7 @@ struct Vector {
 // TODO(eustas): adjust to SIMD implementation
 constexpr size_t kDefaultAlign = 32;
 
-static NOINLINE uint32_t vecSize(uint32_t capacity) {
-  // In twim only (u)int32_t and float vectors are used.
-  constexpr size_t N = kDefaultAlign / 4;
-  return static_cast<uint32_t>((capacity + N - 1) & ~(N - 1));
-}
+uint32_t vecSize(uint32_t capacity);
 
 template <typename T>
 NOINLINE Vector<T>* allocVector(uint32_t capacity) {
@@ -81,7 +88,7 @@ NOINLINE Vector<T>* allocVector(uint32_t capacity) {
   const uint32_t vector_capacity = vecSize(capacity);
   const uint32_t size = sizeof(V) + vector_capacity * sizeof(T);
   constexpr const size_t alignment = N * sizeof(T);
-  uintptr_t memory = reinterpret_cast<uintptr_t>(malloc(size + alignment));
+  uintptr_t memory = reinterpret_cast<uintptr_t>(mallocOrDie(size + alignment));
   uintptr_t aligned_memory =
       (memory + sizeof(V) + alignment - 1) & ~(alignment - 1);
   V* v = reinterpret_cast<V*>(aligned_memory - sizeof(V));

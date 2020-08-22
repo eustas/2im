@@ -1,8 +1,6 @@
 #ifndef TWIM_ENCODER
 #define TWIM_ENCODER
 
-#include <vector>
-
 #include "image.h"
 #include "platform.h"
 

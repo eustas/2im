@@ -2,14 +2,9 @@
 
 #include "encoder.h"
 
-#include <hwy/highway.h>
-
-#if !defined(__EMSCRIPTEN__)
+#if !defined(__wasm__)
 #include <future>
 #endif
-
-#include <memory>
-#include <queue>
 
 #include "codec_params.h"
 #include "encoder_internal.h"
@@ -23,7 +18,7 @@ namespace twim {
 using ::twim::Encoder::Result;
 using ::twim::Encoder::Variant;
 
-#if defined(__EMSCRIPTEN__)
+#if defined(__wasm__)
 static void log(const char* message) {(void)message;}
 #else
 static void log(const char* message) {
@@ -143,9 +138,8 @@ class SimulationTask {
 
 class TaskExecutor {
  public:
-  explicit TaskExecutor(const UberCache& uber, size_t max_tasks) : uber(&uber) {
-    tasks.reserve(max_tasks);
-  }
+  explicit TaskExecutor(const UberCache& uber, size_t maxTasks)
+      : uber(&uber), tasks(maxTasks) {}
 
   void run() {
     float bestSqe = 1e35f;
@@ -154,14 +148,14 @@ class TaskExecutor {
 
     while (true) {
       size_t myTask = nextTask++;
-      if (myTask >= tasks.size()) return;
-      SimulationTask& task = tasks[myTask];
+      if (myTask >= tasks.size) return;
+      SimulationTask& task = tasks.data[myTask];
       task.run(&cache);
       if (task.bestSqe < bestSqe) {
         bestSqe = task.bestSqe;
         if (lastBestTask < myTask) {
-          delete tasks[lastBestTask].partitionHolder;
-          tasks[lastBestTask].partitionHolder = nullptr;
+          delete tasks.data[lastBestTask].partitionHolder;
+          tasks.data[lastBestTask].partitionHolder = nullptr;
         }
         lastBestTask = myTask;
       } else {
@@ -172,8 +166,12 @@ class TaskExecutor {
   }
 
   const UberCache* uber;
+#if defined(__wasm__)
+  size_t nextTask = 0;
+#else
   std::atomic<size_t> nextTask{0};
-  std::vector<SimulationTask> tasks;
+#endif
+  Array<SimulationTask> tasks;
 };
 
 NOINLINE void Fragment::encode(XRangeEncoder* dst, const CodecParams& cp,
@@ -403,19 +401,17 @@ Result encode(const Image& src, const Params& params) {
     return result;
   }
 
-#if defined(__EMSCRIPTEN__)
-  SimulationTask bestTask(params.targetSize, variants[0], uber);
-  Cache cache(uber);
-  bestTask.run(&cache);
-  float bestSqe = bestTask.bestSqe;
-#else
   TaskExecutor executor(uber, numVariants);
-  std::vector<SimulationTask>& tasks = executor.tasks;
+  SimulationTask* tasks = executor.tasks.data;
   for (size_t i = 0; i < numVariants; ++i) {
-    tasks.emplace_back(params.targetSize, variants[i], uber);
+    new(tasks + i) SimulationTask(params.targetSize, variants[i], uber);
   }
-  std::vector<std::future<void>> futures;
+  executor.tasks.size = numVariants;
+#if defined(__wasm__)
+  executor.run();
+#else
   size_t numThreads = std::min<size_t>(params.numThreads, numVariants);
+  std::vector<std::future<void>> futures;
   futures.reserve(numThreads);
   bool singleThreaded = (numThreads == 1);
   for (uint32_t i = 0; i < numThreads; ++i) {
@@ -424,9 +420,10 @@ Result encode(const Image& src, const Params& params) {
                    &TaskExecutor::run, &executor));
   }
   for (uint32_t i = 0; i < numThreads; ++i) futures[i].get();
+#endif
   size_t bestTaskIndex = 0;
   float bestSqe = 1e35f;
-  for (size_t taskIndex = 0; taskIndex < tasks.size(); ++taskIndex) {
+  for (size_t taskIndex = 0; taskIndex < numVariants; ++taskIndex) {
     const SimulationTask& task = tasks[taskIndex];
     if (!task.partitionHolder) continue;
     if (task.bestSqe < bestSqe) {
@@ -435,7 +432,6 @@ Result encode(const Image& src, const Params& params) {
     }
   }
   SimulationTask& bestTask = tasks[bestTaskIndex];
-#endif
 
   CodecParams& cp = bestTask.cp;
   uint32_t bestColorCode = bestTask.bestColorCode;
@@ -458,6 +454,9 @@ Result encode(const Image& src, const Params& params) {
   result.variant.colorOptions = (uint64_t)1 << bestColorCode;
   result.mse = (bestSqe + uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2]) /
                 static_cast<float>(width * height);
+
+  for (size_t i = 0; i < numVariants; ++i) tasks[i].~SimulationTask();
+
   return result;
 }
 
