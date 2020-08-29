@@ -97,6 +97,7 @@ if ("${TWIM_WASM}")
     -s TOTAL_MEMORY=384kb \
     -s TOTAL_STACK=64kb \
     -s FILESYSTEM=0 \
+    -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
   ")
 
   if ("${TWIM_WASM_SIMD}")

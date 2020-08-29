@@ -16,9 +16,9 @@ void* memcpy(void* destination, const void* source, size_t num) {
 /**
  * |variants| should point to 9 * |numVariants| bytes; each byte position in
  * 5-byte group corresponds to:
- *   0: partitionCode
- *   1: lineLimit
- *   2..8: (little-endian) color palette / quantization bits
+ *   0..1: (little-endian) partitionCode
+ *   2: lineLimit
+ *   3..9: (little-endian) color palette / quantization bits
  */
 const uint8_t* twimEncode(uint32_t width, uint32_t height, uint8_t* rgba,
                           uint32_t targetSize, size_t numVariants,
@@ -36,12 +36,12 @@ const uint8_t* twimEncode(uint32_t width, uint32_t height, uint8_t* rgba,
   params.numVariants = numVariants;
   for (size_t i = 0; i < numVariants; ++i) {
     Variant& variant = parsedVariants[i];
-    const uint8_t* record = variants + 9 * i;
-    variant.partitionCode = record[0];
-    variant.lineLimit = record[1];
+    const uint8_t* record = variants + 10 * i;
+    variant.partitionCode = record[0] | (record[1] << 8);
+    variant.lineLimit = record[2];
     uint64_t colorOptions = 0;
     for (size_t j = 0; j < 7; ++j) {
-      colorOptions |= uint64_t(record[2 + j]) << (8 * j);
+      colorOptions |= uint64_t(record[3 + j]) << (8 * j);
     }
     variant.colorOptions = colorOptions;
   }

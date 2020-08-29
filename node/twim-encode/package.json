@@ -4,7 +4,7 @@
   "description": "twim encoder",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"No test specified\""
+    "test": "node src/test.js"
   },
   "repository": {
     "type": "git",

@@ -28,34 +28,116 @@
  */
 
 /**
- * Encoder the image.
+ * Encoder instance.
  *
- * @param {!Image} image original image
- * @param {number} targetSize desired size of encoded image
- * @param {!Variant[]} variants encoding options to try
- * @returns {!Result} result
+ * @typedef {Object} Encoder
+ * @property {xxx} setTargetSize xxx
+ * @property {yyy} setVariants yyy
+ * @property {zzz} encodeImage zzz
  */
-let twimEncode = (() => {
-  let simdCode = Uint32Array.from([1836278016, 1, 1610679297, 33751040, 201981953, 1090521601, 4244652288, 186259985]);
-  let simdWorks = WebAssembly.validate(simdCode.buffer);
-  let binaryName = simdWorks ? 'simd-twim.wasm' : 'twim.wasm';
-  let binaryPath = require('path').resolve(__dirname, binaryName);
-  var binary = require('fs').readFileSync(binaryPath);
 
-  let twimEncoder = null;
-  (async function() {
-    let { instance } = await WebAssembly.instantiate(binary, {});
-    instance.exports._initialize();
-    twimEncoder = instance;
-  }());
+/**
+ * Create encoder instance.
+ *
+ * @returns {!Encoder} encoder
+ */
+let createEncoder = async () => {
+  let encoder_ = null;
+  let targetSize_ =  0;
+  let variants_ = 0;
+  let numVariants_ = 0;
 
-  return function(image, targetSize, variants) {
+  let wrap = (fn) => {
+    if (encoder_) {
+      try {
+        fn(encoder_);
+      } catch (ex) {
+        console.log(ex);
+        encoder_ = null;
+      }
+    }
+    if (!encoder_) throw "twim encoder is broken";
+  }
+
+  let setTargetSize = (targetSize) => {
+    targetSize_ = targetSize | 0;
+  };
+
+  let invArgEx = "invalid argument";
+
+  let setVariants = (variants) => {
+    let n = variants.length | 0;
+    numVariants_ = n;
+    if (!n) throw invArgEx;
+    let bytes = new Uint8Array(10 * n);
+    for (let i = 0; i < n; ++i) {
+      let variant = variants[i];
+      let offset = i * 10;
+      bytes[offset + 0] = variant.partitionCode & 0xFF;
+      bytes[offset + 1] = variant.partitionCode >> 8;
+      bytes[offset + 2] = variant.lineLimit;
+      let colorOptions = variant.colorOptions;
+      let m = colorOptions.length | 0;
+      if (!m) throw invArgEx;
+      for (let j = 0; j < m; ++j) {
+        let option = colorOptions[j];
+        if (option >= 0 && option < 17 + 32) {
+          bytes[offset + 3 + (option >> 3)] |= 1 << (option & 7);
+        } else {
+          throw invArgEx;
+        }
+      }
+    }
+    wrap((e) => {
+      if (variants_) e.free(variants_);
+      variants_ = e.malloc(10 * n);
+      new Uint8Array(e.memory.buffer).set(bytes, variants_);
+    });
+  };
+
+  let encodeImage = (image) => {
     let result = {
       mse: 0,
       data: null,
     };
+    let w = image.width | 0;
+    let h = image.height | 0;
+    if (targetSize_ < 4 || !numVariants_ || w < 8 || h < 8) return result;
+    wrap((e) => {
+      let pixels = e.malloc(w * h * 4);
+      new Uint8Array(e.memory.buffer).set(image.rgba, pixels);
+      let data = e.twimEncode(w, h, pixels, targetSize_, numVariants_, variants_);
+      if (data) {
+        let m = e.memory.buffer;
+        let size = new Uint32Array(m)[data >> 2];
+        result.mse = new Float32Array(m)[(data + 4) >> 2];
+        result.data = Uint8Array.from(new Uint8Array(m, data + 8, size));
+        e.free(data);
+      }
+    });
     return result;
-  }
-})();
+  };
 
-module.exports = twimEncode;
+  let initialize = async () => {
+    let simdCode = Uint32Array.of(1836278016, 1, 1610679297, 33751040, 201981953, 1090521601, 4244652288, 186259985);
+    let simdWorks = WebAssembly.validate(simdCode.buffer);
+    let binaryName = (simdWorks ? 'simd-' : '') + 'twim.wasm';
+    let binaryPath = require('path').resolve(__dirname, binaryName);
+    let binary = require('fs').readFileSync(binaryPath);
+    let env = {
+      debugInt: (x) => {console.log("i " + x);},
+      debugFloat: (x) => {console.log("f " + x);},
+    };
+    let bundle = await WebAssembly.instantiate(binary, {"env": env});
+    encoder_ = bundle.instance.exports;
+    encoder_._initialize();
+  };
+  await initialize();
+  return {
+    setTargetSize: setTargetSize,
+    setVariants: setVariants,
+    encodeImage: encodeImage,
+  };
+};
+
+module.exports = createEncoder;

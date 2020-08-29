@@ -15,6 +15,11 @@
 
 #include "hwy/targets.h"  // SupportedAndGeneratedTargets
 
+/*extern "C" {
+void debugInt(uint32_t i);
+void debugFloat(float f);
+}*/
+
 #include <hwy/before_namespace-inl.h>
 namespace twim {
 #include <hwy/begin_target-inl.h>
@@ -165,31 +170,32 @@ void score(const Stats& whole, size_t n, const float* RESTRICT r,
 template <typename Op>
 INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
   constexpr HWY_FULL(float) df;
-  constexpr HWY_FULL(uint32_t) du32;
+  constexpr HWY_FULL(int32_t) di32;
 
 #if HWY_TARGET == HWY_SCALAR
   bool use_scalar = true;
 #else
-  bool use_scalar = (length < 4);
+  // TODO(eustas): could be less, but more workaround code is required.
+  bool use_scalar = true;//(length < Lanes(df));
 #endif
   if (use_scalar) return op.scalarChoose(values, length);
 
-  constexpr const HWY_FULL(uint32_t) kDu32;
-  HWY_ALIGN static const uint32_t kIotaArray[] = {0, 1, 2,  3,  4,  5,  6,  7,
+  constexpr const HWY_FULL(int32_t) kDi32;
+  HWY_ALIGN static const int32_t kIotaArray[] = {0, 1, 2,  3,  4,  5,  6,  7,
                                                   8, 9, 10, 11, 12, 13, 14, 15};
-  static const U32xN kIota = Load(kDu32, kIotaArray);
-  static const U32xN kStep = Set(kDu32, static_cast<uint32_t>(Lanes(kDu32)));
+  static const I32xN kIota = Load(kDi32, kIotaArray);
+  static const I32xN kStep = Set(kDi32, static_cast<int32_t>(Lanes(kDi32)));
 
+  auto limit = Set(di32, static_cast<uint32_t>(length));
   auto idx = kIota;
   auto bestIdx = idx;
   auto bestValue = Load(df, values);
   for (size_t i = Lanes(df); i < length; i += Lanes(df)) {
     idx = idx + kStep;
     const auto value = Load(df, values + i);
-    const auto selector = op.select(value, bestValue);
-    bestValue = IfThenElse(selector, value, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))), idx,
-                         bestIdx);
+    const auto selector = BitCast(di32, VecFromMask(op.select(value, bestValue))) & VecFromMask(idx < limit);
+    bestValue = IfThenElse(MaskFromVec(BitCast(df, selector)), value, bestValue);
+    bestIdx = IfThenElse(MaskFromVec(selector), idx, bestIdx);
   }
 
 #if HWY_TARGET == HWY_AVX3
@@ -198,13 +204,13 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
     const decltype(bestValue) shuffledValue1{Blocks2301(bestValue.raw)};
     const auto selector1 = op.select(shuffledValue1, bestValue);
     bestValue = IfThenElse(selector1, shuffledValue1, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector1))),
+    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector1))),
                          shuffledIdx1, bestIdx);
     const decltype(bestIdx) shuffledIdx2{Blocks1032(bestIdx.raw)};
     const decltype(bestValue) shuffledValue2{Blocks1032(bestValue.raw)};
     const auto selector2 = op.select(shuffledValue2, bestValue);
     bestValue = IfThenElse(selector2, shuffledValue2, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector2))),
+    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector2))),
                          shuffledIdx2, bestIdx);
   }
 #elif HWY_TARGET == HWY_AVX2
@@ -213,7 +219,7 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
     const auto shuffledValue = ConcatLowerUpper(bestValue, bestValue);
     const auto selector = op.select(shuffledValue, bestValue);
     bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector))),
                          shuffledIdx, bestIdx);
   }
 #endif
@@ -223,7 +229,7 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
     const auto shuffledValue = Shuffle1032(bestValue);
     const auto selector = op.select(shuffledValue, bestValue);
     bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector))),
                          shuffledIdx, bestIdx);
   }
   {
@@ -231,7 +237,7 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
     const auto shuffledValue = Shuffle0321(bestValue);
     const auto selector = op.select(shuffledValue, bestValue);
     // bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(du32, VecFromMask(selector))),
+    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector))),
                          shuffledIdx, bestIdx);
   }
 #endif
@@ -320,16 +326,6 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
   const float* RESTRICT stats_wb = stats + 6 * stats_step;
   const auto k0 = Zero(df);
   const auto kOne = Set(df, 1.0f);
-
-#if HWY_TARGET != HWY_SCALAR
-  // Fill palette with nonsence for vectorized "chooseColor".
-  const auto kInf = Set(df, 1024.0f);
-  for (size_t j = 0; j < m; j += Lanes(df)) {
-    Store(kInf, df, centers_r + j);
-    Store(kInf, df, centers_g + j);
-    Store(kInf, df, centers_b + j);
-  }
-#endif
 
   uint32_t random = 0x23DE605F;
 
@@ -720,7 +716,8 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
   f->level = level;
   f->best_score = best_score;
 
-  if (best_score < 0.0f) {
+  if (best_score < 0.5f) {
+    f->best_score = -1.0f;
     f->best_cost = -1.0f;
     // TODO(eustas): why not unreachable?
   } else {
@@ -745,6 +742,17 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
 #include <hwy/after_namespace-inl.h>
 
 #if HWY_ONCE
+
+/*extern "C" {
+#if defined(__wasm__)
+extern void debugInt(uint32_t i);
+extern void debugFloat(float f);
+#else
+void debugInt(uint32_t i) { fprintf(stderr, "i %u\n", i); }
+void debugFloat(float f) { fprintf(stderr, "f %f\n", f); }
+#endif
+}*/
+
 namespace twim {
 
 #if defined(__wasm__)

@@ -16,6 +16,7 @@ class XRangeEncoder {
   void finish(Array<uint8_t>* out);
 
   NOINLINE static void writeNumber(XRangeEncoder* dst, uint32_t max, uint32_t value) {
+    // if (value >= max) __builtin_trap();
     if (max > 1) {
       Array<Entry>& entries = dst->entries;
       MAYBE_GROW_ARRAY(entries);

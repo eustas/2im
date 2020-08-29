@@ -67,7 +67,7 @@ static const char* fileName(const char* path) {
 
 const uint32_t kMinTargetSize = 16;
 const uint32_t kDefaultTargetSize = 287;
-const uint32_t kMaxTargetSize = 65536;
+const uint32_t kMaxTargetSize = 1024 * 1024;
 
 void printHelp(const char* name, bool error) {
   FILE* media = error ? stderr : stdout;
@@ -170,9 +170,8 @@ int main(int argc, char* argv[]) {
       std::stringstream out;
       out << std::fixed << std::setprecision(2);
       out << "size=" << result.data.size << ", PSNR=" << psnr
-          << ", variant=" << kBase64Abc[partitionCode >> 6]
-          << kBase64Abc[partitionCode & 0x3F] << ":" << kBase64Abc[lineLimit]
-          << ":" << kBase64Abc[colorCode];
+          << ", variant=" << partitionCode << ":" << lineLimit
+          << ":" << colorCode;
       fprintf(stderr, "%s\n", out.str().c_str());
       path += ".2im";
       Io::writeFile(path, result.data.data, result.data.size);
