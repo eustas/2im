@@ -345,7 +345,7 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
       partial += stats_c[i];
       if (partial >= target) break;
     }
-    i = std::max(i, n - 1);
+    i = std::min(i, n - 1);
     centers_r[0] = stats_r[i];
     centers_g[0] = stats_g[i];
     centers_b[0] = stats_b[i];
@@ -376,7 +376,7 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
       partial += weights[i];
       if (partial >= target) break;
     }
-    i = std::max(i, n - 1);
+    i = std::min(i, n - 1);
     centers_r[j] = stats_r[i];
     centers_g[j] = stats_g[i];
     centers_b[j] = stats_b[i];
