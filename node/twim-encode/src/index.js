@@ -28,20 +28,46 @@
  */
 
 /**
- * Encoder instance.
+ * @callback SetTatgetSize specify desired output size in bytes
  *
- * @typedef {Object} Encoder
- * @property {xxx} setTargetSize xxx
- * @property {yyy} setVariants yyy
- * @property {zzz} encodeImage zzz
+ * @param {number} targetSize target outpus size
  */
 
 /**
- * Create encoder instance.
+ * @callback SetVariants specify encoder settings to try during encoding
  *
- * @returns {!Encoder} encoder
+ * @param {Variaant[]} variants settings array
  */
-let createEncoder = async () => {
+
+/**
+ * @callback EncodeImage encode image (with previously set options)
+ *
+ * @param {Image} original image
+ * @result {Result} encoder output
+ */
+
+/**
+ * @callback CreateEncoder creates the encoder instance
+ *
+ * It is recommended to reuse instance. However, concurrent usage will likely
+ * "Break" the instance.
+ *
+ * If any instance method throws an error, then instance is considered "broken"
+ * and should not be used any longer.
+ * 
+ * @return {Encoder} new encoder instance
+ */
+
+/**
+ * Encoder instance.
+ *
+ * @typedef {Object} Encoder
+ * @property {SetTatgetSize} setTargetSize 
+ * @property {SetVariants} setVariants
+ * @property {EncodeImage} encodeImage
+ */
+
+module.exports = /** @type {CreateEncoder} */ async () => {
   let encoder_ = null;
   let targetSize_ =  0;
   let variants_ = 0;
@@ -139,5 +165,3 @@ let createEncoder = async () => {
     encodeImage: encodeImage,
   };
 };
-
-module.exports = createEncoder;

@@ -1,0 +1,26 @@
+{
+  "name": "twim-decode",
+  "version": "1.0.0",
+  "description": "twin decoder",
+  "main": "index.js",
+  "scripts": {
+    "test": "node src/test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eustas/2im.git"
+  },
+  "keywords": [
+    "decompress",
+    "decode",
+    "image",
+    "preview",
+    "twim"
+  ],
+  "author": "Evgenii Kliuchnikov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/eustas/2im/issues"
+  },
+  "homepage": "https://eustas.github.io/2im/"
+}

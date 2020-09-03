@@ -75,18 +75,6 @@ closure_js_library(
 )
 
 closure_js_library(
-    name = "RangeDecoder",
-    srcs = ["RangeDecoder.js"],
-    suppress = ["moduleLoad"],
-    deps = [":Mini"],
-)
-
-closure_js_library(
-    name = "RangeEncoder",
-    srcs = ["RangeEncoder.js"],
-)
-
-closure_js_library(
     name = "Region",
     srcs = ["Region.js"],
     suppress = ["moduleLoad"],
@@ -163,18 +151,6 @@ closure_js_test(
         ":DistanceRange",
         ":Region",
         ":SinCos",
-        "@io_bazel_rules_closure//closure/library:testing",
-    ],
-)
-
-closure_js_test(
-    name = "RangeTest",
-    srcs = ["Range_test.js"],
-    entry_points = ["Range_test.js"],
-    suppress = ["moduleLoad"],
-    deps = [
-        ":RangeDecoder",
-        ":RangeEncoder",
         "@io_bazel_rules_closure//closure/library:testing",
     ],
 )
