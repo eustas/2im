@@ -36,7 +36,7 @@
 /**
  * @callback SetVariants specify encoder settings to try during encoding
  *
- * @param {Variaant[]} variants settings array
+ * @param {Variant[]} variants settings array
  */
 
 /**

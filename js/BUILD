@@ -106,6 +106,13 @@ closure_js_library(
     deps = [":Decoder"],
 )
 
+closure_js_library(
+    name = "twim-module",
+    srcs = ["twim-module.js"],
+    suppress = ["moduleLoad"],
+    deps = [":Decoder"],
+)
+
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_binary")
 
 closure_js_binary(
@@ -114,6 +121,14 @@ closure_js_binary(
     deps = [":twim-lib"],
     language = "ECMASCRIPT_NEXT",
     output_wrapper = "((zis)=>{%output%})(window);",
+)
+
+closure_js_binary(
+    name = "index",
+    entry_points = ["twim-module.js"],
+    deps = [":twim-module"],
+    language = "ECMASCRIPT_NEXT",
+    output_wrapper = "((zis)=>{%output%})(module);",
 )
 
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_test")

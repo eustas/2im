@@ -17,27 +17,6 @@ namespace twim {
 using ::twim::Encoder::Result;
 using ::twim::Encoder::Variant;
 
-static const std::string kBase64Abc =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-static const size_t kSupBitPosition = 53;
-static const int kBitPosition[kSupBitPosition] = {
-    -1, 0,  1,  17, 2,  47, 18, 14, 3,  34, 48, 6,  19, 24, 15, 12, 4,  10,
-    35, 37, 49, 31, 7,  39, 20, 42, 25, 51, 16, 46, 13, 33, 5,  23, 11, 9,
-    36, 30, 38, 41, 50, 45, 32, 22, 8,  29, 40, 44, 21, 28, 43, 27, 26};
-
-/* Inefficient, but won't be used much. */
-int parseBase64(char c) {
-  size_t pos = kBase64Abc.find(c);
-  if (pos >= 64) return -1;
-  return pos;
-}
-
-uint32_t getBitPosition(uint64_t bit) {
-  if ((bit & (bit - 1)) != 0) return kBitPosition[0];
-  return kBitPosition[bit % kSupBitPosition];
-}
-
 bool parseInt(const char* str, uint32_t min, uint32_t max, uint32_t* result) {
   uint32_t val = 0;
   size_t len = 0;
@@ -54,6 +33,25 @@ bool parseInt(const char* str, uint32_t min, uint32_t max, uint32_t* result) {
   if (val < min) return false;
   *result = val;
   return true;
+}
+
+size_t parseHex(const char* str, uint64_t* result, char t1, char t2) {
+  uint64_t val = 0;
+  size_t len = 0;
+  while (true) {
+    char c = str[len++];
+    if ((c == t1) || (c == t2)) break;
+    if (len > 13) return 0;
+    bool ok = false;
+    uint64_t d = 0;
+    if ((c >= '0') && (c <= '9')) { d = c - '0'; ok = true; }
+    if ((c >= 'a') && (c <= 'f')) { d = c - 'a' + 10; ok = true; }
+    if ((c >= 'A') && (c <= 'F')) { d = c - 'A' + 10; ok = true; }
+    if (!ok) return 0;
+    val = (val << 4) + d;
+  }
+  *result = val;
+  return len;
 }
 
 /* Returns "base file name" or its tail, if it contains '/' or '\'. */
@@ -78,13 +76,21 @@ void printHelp(const char* name, bool error) {
 "Options:\n"
 "  -d     decode\n"
 "  -e     encode\n"
-"  -j     set number of threads (1..256); default: 1\n"
+"  -j###  set number of threads (1..256); default: 1\n"
 "  -h     display this help and exit\n"
+"  -p###  encoding parameters (see below); default: all possible combinations\n"
 "  -r     decode after encoding\n");
   fprintf(media,
 "  -t###  set target encoded size in bytes (%d..%d); default: %d\n",
           kMinTargetSize, kMaxTargetSize, kDefaultTargetSize);
   fprintf(media,
+"\n"
+"Encoding parameters (-p option) should match the following pattern:\n"
+"  (PARTITION_CODE:LINE_LIMIT:COLOR_SCHEMES,)+\n"
+"where each part is a hexadecimal number; encoder dumps chosen triplet when\n"
+"encoding is done; COLOR_SCHEMES is a bitfield: multiple schemes could be\n"
+"combined via bitwise \"or\"; trailing comma could be omitted.\n"
+"\n"
 "Options and files could be mixed, e.g '-d a.2im -e b.png -t42 c.png' will\n"
 "decode a.2im, endode b.png, set target size to 42 and encode c.png\n");
 }
@@ -104,6 +110,36 @@ void fillAllVariants(std::vector<Variant>* variants) {
   variants->resize(idx);
 }
 
+bool parseVariants(std::vector<Variant>* variants, const char* params) {
+  variants->resize(CodecParams::kMaxPartitionCode * CodecParams::kMaxLineLimit);
+  size_t idx = 0;
+  size_t offset = 0;
+  while (true) {
+    uint64_t partitionCode;
+    uint64_t lineLimit;
+    uint64_t colorOptions;
+    size_t plus = parseHex(params + offset, &partitionCode, ':', ':');
+    if (plus < 2) return false;
+    if (partitionCode >= CodecParams::kMaxPartitionCode) return false;
+    offset += plus;
+    plus = parseHex(params + offset, &lineLimit, ':', ':');
+    if (plus < 2) return false;
+    if (lineLimit >= CodecParams::kMaxLineLimit) return false;
+    offset += plus;
+    plus = parseHex(params + offset, &colorOptions, ',', 0);
+    if (plus < 2) return false;
+    if ((colorOptions >> CodecParams::kMaxColorCode) > 0) return false;
+    offset += plus;
+    Variant& v = variants->at(idx++);
+    v.partitionCode = static_cast<uint32_t>(partitionCode);
+    v.lineLimit = static_cast<uint32_t>(lineLimit);
+    v.colorOptions = colorOptions;
+    if (params[offset - 1] == 0) break;
+  }
+  variants->resize(idx);
+  return true;
+}
+
 int main(int argc, char* argv[]) {
   bool encode = false;
   bool roundtrip = false;
@@ -113,7 +149,6 @@ int main(int argc, char* argv[]) {
   std::vector<Variant> variants;
   fillAllVariants(&variants);
   params.variants = variants.data();
-  params.numVariants = variants.size();
 
   if (argc < 2) {
     printHelp(fileName(argv[0]), false);
@@ -136,6 +171,9 @@ int main(int argc, char* argv[]) {
       } else if (cmd == 'h') {
         printHelp(fileName(argv[0]), true);
         exit(EXIT_SUCCESS);
+      } else if (cmd == 'p') {
+        bool ok = parseVariants(&variants, val);
+        if (ok) continue;
       } else if (cmd == 'r') {
         roundtrip = true;
         continue;
@@ -153,6 +191,7 @@ int main(int argc, char* argv[]) {
     }
     std::string path(argv[i]);
     if (encode) {
+      params.numVariants = variants.size();
       const Image src = Io::readPng(path);
       if (!src.ok) {
         fprintf(stderr, "Failed to read PNG image [%s].\n", path.c_str());
@@ -162,16 +201,16 @@ int main(int argc, char* argv[]) {
       Variant variant = result.variant;
       uint32_t partitionCode = variant.partitionCode;
       uint32_t lineLimit = variant.lineLimit;
-      uint32_t colorCode = getBitPosition(variant.colorOptions);
+      uint64_t colorCode = variant.colorOptions;
       float psnr = INFINITY;
       if (result.mse > 0.01f) {
         psnr = 10.0 * std::log10(255.0f * 255.0f / result.mse);
       }
       std::stringstream out;
-      out << std::fixed << std::setprecision(2);
-      out << "size=" << result.data.size << ", PSNR=" << psnr
-          << ", variant=" << partitionCode << ":" << lineLimit
-          << ":" << colorCode;
+      out << std::fixed << std::setprecision(2) << std::setfill('0');
+      out << "size=" << result.data.size << ", PSNR=" << psnr << std::uppercase
+          << std::hex << ", variant=" << std::setw(3) << partitionCode << ":"
+          << std::setw(2) << lineLimit << ":" << std::setw(13) << colorCode;
       fprintf(stderr, "%s\n", out.str().c_str());
       path += ".2im";
       Io::writeFile(path, result.data.data, result.data.size);
