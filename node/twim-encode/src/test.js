@@ -3,7 +3,7 @@ function createSampleImage() {
   for (let i = 0; i < 400; i++) {
     let x = (i % 20) >> 2;
     let y = (i / 20) >> 2;
-    rgba.set((0x23880 >> (x + 5 * y) & 1) ? [255, 255, 255] : [255], i * 4);
+    rgba.set((0x23880 >> (x + 5 * y) & 1) ? [255, 255, 255, 255] : [255, 0, 0, 255], i * 4);
   }
   return rgba;
 }

@@ -77,9 +77,18 @@ let parse = (region, children, width, rgba) => {
 };
 
 /**
+ * The output image.
+ *
+ * @typedef {Object} Image
+ * @property {!Uint8ClampedArray} rgba pixel data
+ * @property {number} width width in pixels
+ * @property {number} height height in pixels
+ */
+
+/**
  * @noinline
  * @param{!Uint8Array} encoded
- * @return{!ImageData}
+ * @return{!Image}
  */
 export let decode = (encoded) => {
   EntropyDecoder.init(encoded);
@@ -105,5 +114,5 @@ export let decode = (encoded) => {
     }
   }
 
-  return new ImageData(rgba, getWidth(), getHeight());
+  return /** @type {!Image} */({"rgba": rgba, "width": getWidth(), "height": getHeight()});
 };
