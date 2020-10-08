@@ -10,7 +10,7 @@ See also: [interactive demo page](https://eustas.github.io/2im/) and [twim vs SQ
 
 ### Coming soon
  - [ ] add build / use manual
- - [ ] better CLI (set number of therads, "fast" encoding mode)
- - [ ] publish decoder as NPM module
- - [ ] publish encoder module
+ - [x] better CLI (set number of therads, "fast" encoding mode)
+ - [x] publish decoder as NPM module
+ - [x] publish encoder module
  - [ ] synchronize Java and C++ implementations
