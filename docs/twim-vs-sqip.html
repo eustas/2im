@@ -35,17 +35,17 @@
 
 <script type="text/javascript">
 let items = [
-  {name: "aaron-burden-unsplash", sqipSize: 1101},
-  {name: "anthony-esau-unsplash", sqipSize: 1108},
-  {name: "aron-visuals-unsplash", sqipSize: 1114},
-  {name: "beach", sqipSize: 1084},
-  {name: "charles-unsplash", sqipSize: 1092},
-  {name: "eric-marty-unsplash", sqipSize: 1131},
-  {name: "ian-dooley-unsplash", sqipSize: 1122},
-  {name: "meric-dagli-unsplash", sqipSize: 1118},
-  {name: "mona-lisa", sqipSize: 1105},
-  {name: "quino-al-unsplash", sqipSize: 1041},
-  {name: "shane-young-unsplash", sqipSize: 1114}
+  {name: "aaron-burden-unsplash", sqipSize: 1101, height: 225},
+  {name: "anthony-esau-unsplash", sqipSize: 1108, height: 225},
+  {name: "aron-visuals-unsplash", sqipSize: 1114, height: 375},
+  {name: "beach", sqipSize: 1084, height: 188},
+  {name: "charles-unsplash", sqipSize: 1092, height: 418},
+  {name: "eric-marty-unsplash", sqipSize: 1131, height: 300},
+  {name: "ian-dooley-unsplash", sqipSize: 1122, height: 450},
+  {name: "meric-dagli-unsplash", sqipSize: 1118, height: 450},
+  {name: "mona-lisa", sqipSize: 1105, height: 447},
+  {name: "quino-al-unsplash", sqipSize: 1041, height: 200},
+  {name: "shane-young-unsplash", sqipSize: 1114, height: 300}
 ];
 
 function appendElement(parent, type) {
@@ -94,11 +94,15 @@ function onLoad() {
     let tr = document.createElement("tr");
     let tdThumbnail = appendElement(tr, "td");
     let imgThumbnail = appendElement(tdThumbnail, "img");
+    imgThumbnail.width = 300;
+    imgThumbnail.height = item.height;
     imgThumbnail.src = "sqip/" + item.name + ".png";
     let tdSqip = appendElement(tr, "td");
     let imgSqip = appendElement(tdSqip, "img");
     let divSqip = appendElement(tdSqip, "div");
     appendText(divSqip, "Size: " + item.sqipSize + " bytes");
+    imgSqip.width = 300;
+    imgSqip.height = item.height;
     imgSqip.src = "sqip/" + item.name + ".svg";
     let tdTwim = appendElement(tr, "td");
     loadTwim(tdTwim, "sqip/" + item.name + ".2im");

@@ -6,6 +6,11 @@
   "scripts": {
     "test": "node src/test.js"
   },
+  "files": [
+    "index.js",
+    "simd-twim.wasm",
+    "twim.wasm"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/eustas/2im.git"

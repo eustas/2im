@@ -1,11 +1,14 @@
 {
   "name": "twim-decode",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "twin decoder",
   "main": "index.js",
   "scripts": {
     "test": "node src/test.js"
   },
+  "files": [
+    "index.js"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/eustas/2im.git"
