@@ -33,7 +33,7 @@
 </div>
 
 
-<script type="text/javascript">
+<script>
 let items = [
   {name: "aaron-burden-unsplash", sqipSize: 1101},
   {name: "anthony-esau-unsplash", sqipSize: 1108},
@@ -94,11 +94,15 @@ function onLoad() {
     let tr = document.createElement("tr");
     let tdThumbnail = appendElement(tr, "td");
     let imgThumbnail = appendElement(tdThumbnail, "img");
+    imgThumbnail.width = 300;
+    imgThumbnail.height = 225;
     imgThumbnail.src = "sqip/" + item.name + ".png";
     let tdSqip = appendElement(tr, "td");
     let imgSqip = appendElement(tdSqip, "img");
     let divSqip = appendElement(tdSqip, "div");
     appendText(divSqip, "Size: " + item.sqipSize + " bytes");
+    imgThumbnail.width = 300;
+    imgThumbnail.height = 225;
     imgSqip.src = "sqip/" + item.name + ".svg";
     let tdTwim = appendElement(tr, "td");
     loadTwim(tdTwim, "sqip/" + item.name + ".2im");
