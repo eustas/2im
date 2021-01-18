@@ -26,7 +26,7 @@ export let init = (data) => {
   //_state = 1;
   //_pos = 0;
   //for (let /** @type{number} */ i = 0; i < 16; ++i) _state = (_state * 2) + readBit();
-  _state = b16 + _data[0] + data[1] * b8;
+  _state = ((_data[0] + _data[1] * b8) | 0) + b16;
   _pos = 16;
 };
 
