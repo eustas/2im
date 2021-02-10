@@ -14,7 +14,7 @@ class XRangeDecoder {
   static uint32_t readNumber(XRangeDecoder* src, size_t max);
 
  private:
-  size_t readBit();
+  size_t nextBit();
 
   std::vector<uint8_t> data;
   size_t state;

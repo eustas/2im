@@ -2,10 +2,8 @@ package ru.eustas.twim;
 
 import java.util.Arrays;
 
-import static ru.eustas.twim.RangeDecoder.readNumber;
-import static ru.eustas.twim.RangeDecoder.readSize;
-import static ru.eustas.twim.RangeEncoder.writeNumber;
-import static ru.eustas.twim.RangeEncoder.writeSize;
+import static ru.eustas.twim.XRangeDecoder.readNumber;
+import static ru.eustas.twim.XRangeEncoder.writeNumber;
 
 class CodecParams {
   private static final int MAX_LEVEL = 7;
@@ -29,6 +27,33 @@ class CodecParams {
   static int dequantizeColor(int v, int q) {
     int vMax = q - 1;
     return 255 * v / vMax;
+  }
+
+  static int readSize(XRangeDecoder src) {
+    int plus = -1;
+    int bits = 0;
+    while ((plus <= 0) || (readNumber(src, 2) == 1)) {
+      plus = (plus + 1) << 3;
+      int extra = readNumber(src, 8);
+      bits = (bits << 3) + extra;
+    }
+    return bits + plus;
+  }
+
+  static void writeSize(XRangeEncoder dst, int value) {
+    value -= 8;
+    int chunks = 2;
+    while (value > (1 << (chunks * 3))) {
+      value -= (1 << (chunks * 3));
+      chunks++;
+    }
+    for (int i = 0; i < chunks; ++i) {
+      if (i > 1) {
+        writeNumber(dst, 2, 1);
+      }
+      writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7);
+    }
+    writeNumber(dst, 2, 0);
   }
 
   private static final int SCALE_STEP_FACTOR = 40;
@@ -111,7 +136,7 @@ class CodecParams {
         + ", l: " + lineLimit + ", c: " + colorCode;
   }
 
-  static CodecParams read(RangeDecoder src) {
+  static CodecParams read(XRangeDecoder src) {
     int width = readSize(src);
     int height = readSize(src);
     CodecParams cp = new CodecParams(width, height);
@@ -122,7 +147,7 @@ class CodecParams {
     return cp;
   }
 
-  void write(RangeEncoder dst) {
+  void write(XRangeEncoder dst) {
     writeSize(dst, width);
     writeSize(dst, height);
     writeNumber(dst, MAX_F1, params[0]);

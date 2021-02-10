@@ -5,11 +5,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static ru.eustas.twim.CodecParams.NODE_FILL;
-import static ru.eustas.twim.RangeDecoder.readNumber;
+import static ru.eustas.twim.XRangeDecoder.readNumber;
 
 public class Decoder {
 
-  private static int readColor(RangeDecoder src, CodecParams cp, int[] palette) {
+  private static int readColor(XRangeDecoder src, CodecParams cp, int[] palette) {
     if (cp.paletteSize == 0) {
       int argb = 0xFF;  // alpha = 1
       for (int c = 0; c < 3; ++c) {
@@ -33,7 +33,7 @@ public class Decoder {
       this.region = region;
     }
 
-    void parse(RangeDecoder src, CodecParams cp, int[] palette, List<Fragment> children, DistanceRange distanceRange) {
+    void parse(XRangeDecoder src, CodecParams cp, int[] palette, List<Fragment> children, DistanceRange distanceRange) {
       type = readNumber(src, CodecParams.NODE_TYPE_COUNT);
 
       if (type == NODE_FILL) {
@@ -96,7 +96,7 @@ public class Decoder {
   }
 
   static BufferedImage decode(byte[] encoded) {
-    RangeDecoder src = new RangeDecoder(encoded);
+    XRangeDecoder src = new XRangeDecoder(encoded);
     CodecParams cp = CodecParams.read(src);
     int[] palette = new int[cp.paletteSize];
     int width = cp.width;

@@ -11,7 +11,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static ru.eustas.twim.RangeEncoder.writeNumber;
+import static ru.eustas.twim.XRangeEncoder.writeNumber;
 
 public class Encoder {
 
@@ -404,7 +404,7 @@ public class Encoder {
       }
     }
 
-    void encode(RangeEncoder dst, CodecParams cp, boolean isLeaf, List<Fragment> children) {
+    void encode(XRangeEncoder dst, CodecParams cp, boolean isLeaf, List<Fragment> children) {
       if (isLeaf) {
         writeNumber(dst, CodecParams.NODE_TYPE_COUNT, CodecParams.NODE_FILL);
         for (int c = 0; c < 3; ++c) {
@@ -544,7 +544,7 @@ public class Encoder {
     List<Fragment> queue = new ArrayList<>(2 * nonLeaf.size() + 1);
     queue.add(partition.get(0));
 
-    RangeEncoder dst = new RangeEncoder();
+    XRangeEncoder dst = new XRangeEncoder();
     cp.write(dst);
 
     int encoded = 0;
@@ -601,7 +601,6 @@ public class Encoder {
     CachePool cachePool = new CachePool(cache);
     List<SimulationTask> tasks = new ArrayList<>();
     for (int lineLimit = 0; lineLimit < CodecParams.MAX_LINE_LIMIT; ++lineLimit) {
-      //if (lineLimit != 17) continue;
       for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
         CodecParams cp = new CodecParams(width, height);
         cp.setPartitionCode(partitionCode);
@@ -611,7 +610,6 @@ public class Encoder {
     }
     int numCores = Runtime.getRuntime().availableProcessors();
     ExecutorService executor = Executors.newFixedThreadPool(numCores);
-    long t0 = System.nanoTime();
     executor.invokeAll(tasks);
     executor.shutdownNow();
     SimulationTask bestResult = tasks.get(0);
@@ -625,9 +623,6 @@ public class Encoder {
     bestResult.cp.setColorCode(bestResult.bestColorCode);
     List<Fragment> partition = buildPartition(targetSize, bestResult.cp, cache);
     byte[] data = encode(targetSize, partition, bestResult.cp);
-    long t1 = System.nanoTime();
-    System.out.println("time: " + (((t1 - t0) / 1000000) / 1000.0) + "s, size: " + data.length +
-        ", cp: [" + bestResult.cp + "], error: " + Math.sqrt(bestSqe / (width * height)));
     return data;
   }
 }

@@ -13,7 +13,7 @@ uint32_t XRangeDecoder::readNumber(XRangeDecoder* src, size_t max) {
   size_t base = low / max;
   size_t freq = (low + XRangeCode::kSpace) / max - base;
   state = freq * (state / XRangeCode::kSpace) + offset - base;
-  while (state < XRangeCode::kMin) state = (state << 1u) | src->readBit();
+  while (state < XRangeCode::kMin) state = (state << 1u) | src->nextBit();
   src->state = state;
   return result;
 }
@@ -25,12 +25,12 @@ XRangeDecoder::XRangeDecoder(std::vector<uint8_t>&& data)
     , pos(0)
     {
   for (size_t i = 0; i < XRangeCode::kBits; ++i) {
-    // state = (state << 1u) | readBit();
-    state |= readBit() << i;
+    // state = (state << 1u) | nextBit();
+    state |= nextBit() << i;
   }
 }
 
-size_t XRangeDecoder::readBit() {
+size_t XRangeDecoder::nextBit() {
   size_t offset = pos >> 3u;
   if (offset >= data.size()) return 0;
   return (data[offset] >> (pos++ & 7u)) & 1u;

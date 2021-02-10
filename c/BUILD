@@ -37,35 +37,6 @@ cc_library(
 )
 
 cc_library(
-    name = "range_code",
-    hdrs = ["range_code.h"],
-    copts = DEFAULT_COPTS,
-    deps = [":platform"],
-)
-
-cc_library(
-    name = "range_decoder",
-    srcs = ["range_decoder.cc"],
-    hdrs = ["range_decoder.h"],
-    copts = DEFAULT_COPTS,
-    deps = [
-        ":platform",
-        ":range_code",
-    ],
-)
-
-cc_library(
-    name = "range_encoder",
-    srcs = ["range_encoder.cc"],
-    hdrs = ["range_encoder.h"],
-    copts = DEFAULT_COPTS,
-    deps = [
-        ":platform",
-        ":range_code",
-    ],
-)
-
-cc_library(
     name = "xrange_code",
     hdrs = ["xrange_code.h"],
     copts = DEFAULT_COPTS,
@@ -189,18 +160,6 @@ cc_test(
         ":crc64",
         "@gtest//:main",
     ],
-)
-
-cc_test(
-    name = "range_test",
-    srcs = ["range_test.cc"],
-    copts = TEST_COPTS,
-    deps = [
-        ":range_decoder",
-        ":range_encoder",
-        "@gtest//:main",
-    ],
-    shard_count = 10,
 )
 
 cc_test(
