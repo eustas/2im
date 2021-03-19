@@ -10,8 +10,8 @@ class CodecParams;
 class Fragment;
 class Partition;
 
-float simulateEncode(const Partition& partition_holder, uint32_t target_size,
-                     const CodecParams& cp);
+float simulateEncode(float imageTax, const Partition& partition_holder,
+                     uint32_t target_size, const CodecParams& cp);
 
 uint32_t chooseColor(float r, float g, float b, const float* RESTRICT palette_r,
                      const float* RESTRICT palette_g,

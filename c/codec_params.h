@@ -28,8 +28,6 @@ class CodecParams {
 
   void write(XRangeEncoder* dst) const;
 
-  double getTax() const;
-
   constexpr int32_t getLineQuant() const { return SinCos.kOne; }
 
   static const uint32_t kInvalid = static_cast<uint32_t>(-1);

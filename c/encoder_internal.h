@@ -23,9 +23,10 @@ class UberCache {
   const uint32_t height;
   const uint32_t stride;
   /* Cumulative sums. Extra column with total sum. */
-  Vector<float>* sum;
+  Vector<int32_t>* sum;
 
-  float rgb2[3] = {0.0f};
+  float imageTax;
+  float sqeBase = 0.0f;
 
   explicit UberCache(const Image& src);
 };
@@ -98,7 +99,8 @@ class Partition {
 
   // CodecParams should be the same as passed to constructor; only color code
   // is allowed to be different.
-  uint32_t subpartition(const CodecParams& cp, uint32_t target_size) const;
+  uint32_t subpartition(float imageTax, const CodecParams& cp,
+                        uint32_t target_size) const;
 
  private:
   Fragment root;

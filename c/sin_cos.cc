@@ -27,7 +27,7 @@ static SinCosT makeSinCos() {
   }
 
   auto& kLog2 = result.kLog2;
-  for (size_t j = 1; j <= 65; ++j) {
+  for (size_t j = 1; j < kLog2.size(); ++j) {
     double v = j;
     double r = 0.0;
     for (double plus = 1.0; plus > 1e-8;) {

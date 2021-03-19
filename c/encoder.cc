@@ -42,6 +42,19 @@ void writeSize(XRangeEncoder* dst, uint32_t value) {
   XRangeEncoder::writeNumber(dst, 2, 0);
 }
 
+// NB: keep in sync with writeSize
+// TODO(eustas): use simple ranges?
+uint32_t simulateWriteSize(uint32_t value) {
+  value -= 8;
+  uint32_t chunks = 2;
+  while (value > (1u << (chunks * 3))) {
+    value -= (1u << (chunks * 3));
+    chunks++;
+  }
+  return chunks * 4 - 2;
+}
+
+// NB: keep in sync with "getTax".
 void CodecParams::write(XRangeEncoder* dst) const {
   writeSize(dst, width);
   writeSize(dst, height);
@@ -53,10 +66,14 @@ void CodecParams::write(XRangeEncoder* dst) const {
   XRangeEncoder::writeNumber(dst, kMaxColorCode, color_code);
 }
 
-NOINLINE double CodecParams::getTax() const {
-  XRangeEncoder fakeEncoder;
-  write(&fakeEncoder);
-  return XRangeEncoder::estimateCost(&fakeEncoder);
+// TODO(eustas): write a test that checks that this function does not lie.
+// Simulates CodecParams::write
+// TODO(eustas): remove "NB: sync"
+INLINE float calculateImageTax(const Image& src) {
+  // F1..F4 + line limit + color code
+  constexpr const double kFlatTax = 20.5577740523;
+  return kFlatTax + simulateWriteSize(src.width) +
+      simulateWriteSize(src.height);
 }
 
 UberCache::UberCache(const Image& src)
@@ -64,8 +81,10 @@ UberCache::UberCache(const Image& src)
       height(src.height),
       // 4 == [r, g, b, count].length
       stride(vecSize(4 * (src.width + 1))),
-      sum(allocVector<float>(stride * src.height)) {
-  float* RESTRICT sum = this->sum->data();
+      sum(allocVector<int32_t>(stride * src.height)),
+      imageTax(calculateImageTax(src)) {
+  int32_t* RESTRICT sum = this->sum->data();
+  float sum2 = 0.0f;
   for (size_t y = 0; y < src.height; ++y) {
     float row_rgb2[3] = {0.0f};
     size_t src_row_offset = y * src.width;
@@ -76,19 +95,20 @@ UberCache::UberCache(const Image& src)
     for (size_t i = 0; i < 4; ++i) sum[dstRowOffset + i] = 0.0f;
     for (size_t x = 0; x < src.width; ++x) {
       size_t dstOffset = dstRowOffset + 4 * x;
-      float r = r_row[x];
-      float g = g_row[x];
-      float b = b_row[x];
+      int32_t r = r_row[x];
+      int32_t g = g_row[x];
+      int32_t b = b_row[x];
       sum[dstOffset + 4] = sum[dstOffset + 0] + r;
       sum[dstOffset + 5] = sum[dstOffset + 1] + g;
       sum[dstOffset + 6] = sum[dstOffset + 2] + b;
-      sum[dstOffset + 7] = sum[dstOffset + 3] + 1.0f;
+      sum[dstOffset + 7] = sum[dstOffset + 3] + 1;
       row_rgb2[0] += r * r;
       row_rgb2[1] += g * g;
       row_rgb2[2] += b * b;
     }
-    for (size_t c = 0; c < 3; ++c) this->rgb2[c] += row_rgb2[c];
+    for (size_t c = 0; c < 3; ++c) sum2 += row_rgb2[c];
   }
+  this->sqeBase = sum2;
 }
 
 Cache::Cache(const UberCache& uber)
@@ -109,13 +129,15 @@ class SimulationTask {
   float bestSqe = 1e35f;
   uint32_t bestColorCode = (uint32_t)-1;
   Partition* partitionHolder = nullptr;
+  float imageTax;
 
   SimulationTask(uint32_t targetSize, Variant variant, const UberCache& uber)
-      : targetSize(targetSize), variant(variant), cp(uber.width, uber.height) {}
+      : targetSize(targetSize),
+        variant(variant),
+        cp(uber.width, uber.height),
+        imageTax(uber.imageTax) {}
 
-  ~SimulationTask() {
-    delete partitionHolder;
-  }
+  ~SimulationTask() { delete partitionHolder; }
 
   void run(Cache* cache) {
     cp.setPartitionCode(variant.partitionCode);
@@ -123,11 +145,12 @@ class SimulationTask {
     uint64_t colorOptions = variant.colorOptions;
     // TODO: color-options based taxes
     partitionHolder = new Partition(cache, cp, targetSize);
+    float imageTax = cache->uber->imageTax;
     for (uint32_t colorCode = 0; colorCode < CodecParams::kMaxColorCode;
          ++colorCode) {
       if (!(colorOptions & ((uint64_t)1 << colorCode))) continue;
       cp.setColorCode(colorCode);
-      float sqe = simulateEncode(*partitionHolder, targetSize, cp);
+      float sqe = simulateEncode(imageTax, *partitionHolder, targetSize, cp);
       if (sqe < bestSqe) {
         bestSqe = sqe;
         bestColorCode = colorCode;
@@ -298,8 +321,18 @@ NOINLINE void buildPartition(Fragment* root, size_t size_limit,
                              const CodecParams& cp, Cache* cache,
                              Array<Fragment*>* result) {
   float tax = SinCos.kLog2[NodeType::COUNT];
-  float budget =
-      size_limit * 8.0f - tax - cp.getTax();  // Minus flat image cost.
+  float budget = size_limit * 8.0f - tax - cache->uber->imageTax;
+
+  uint32_t width = cache->uber->width;
+  uint32_t height = cache->uber->height;
+  uint32_t step = vecSize(height);
+  int32_t* RESTRICT data = root->region->data();
+  for (uint32_t y = 0; y < height; ++y) {
+    data[y] = y;
+    data[step + y] = 0;
+    data[2 * step + y] = width;
+  }
+  root->region->len = height;
 
   findBestSubdivision(root, cache, cp);
 
@@ -336,46 +369,31 @@ NOINLINE void buildPartition(Fragment* root, size_t size_limit,
   }
 }
 
-void initRoot(Fragment* root, uint32_t width, uint32_t height) {
-  uint32_t step = vecSize(height);
-  int32_t* RESTRICT data = root->region->data();
-  for (uint32_t y = 0; y < height; ++y) {
-    data[y] = y;
-    data[step + y] = 0;
-    data[2 * step + y] = width;
-  }
-  root->region->len = height;
-}
-
 Partition::Partition(Cache* cache, const CodecParams& cp, size_t targetSize)
     : root(cache->uber->height), partition(targetSize * 4) {
-  initRoot(&root, cache->uber->width, cache->uber->height);
   buildPartition(&root, targetSize, cp, cache, &partition);
 }
 
-const Array<Fragment*>* Partition::getPartition() const {
-  return &partition;
-}
+const Array<Fragment*>* Partition::getPartition() const { return &partition; }
 
 /* Returns the index of the first leaf node in partition. */
-uint32_t Partition::subpartition(const CodecParams& cp,
-                                 uint32_t target_size) const {
+uint32_t Partition::subpartition(float imageTax, const CodecParams& cp,
+                                 uint32_t targetSize) const {
   const Array<Fragment*>* partition = getPartition();
-  float node_tax = SinCos.kLog2[NodeType::COUNT];
-  float image_tax = cp.getTax();
+  float nodeTax = SinCos.kLog2[NodeType::COUNT];
   if (cp.palette_size == 0) {
-    node_tax += 3.0f * SinCos.kLog2[cp.color_quant];
+    nodeTax += 3.0f * SinCos.kLog2[cp.color_quant];
   } else {
-    node_tax += SinCos.kLog2[cp.palette_size];
-    image_tax += cp.palette_size * 3.0f * 8.0f;
+    nodeTax += SinCos.kLog2[cp.palette_size];
+    imageTax += cp.palette_size * 3.0f * 8.0f;
   }
-  float budget = 8.0f * target_size - 4.0f - image_tax - node_tax;
+  float budget = 8.0f * targetSize - 4.0f - imageTax - nodeTax;
   uint32_t limit = static_cast<uint32_t>(partition->size);
   uint32_t i;
   for (i = 0; i < limit; ++i) {
     Fragment* node = partition->data[i];
     if (node->best_cost < 0.0f) break;
-    float cost = node->best_cost + node_tax;
+    float cost = node->best_cost + nodeTax;
     if (budget < cost) break;
     budget -= cost;
   }
@@ -447,8 +465,10 @@ Result encode(const Image& src, const Params& params) {
 
   // Encoder workflow >>
   // Partition partitionHolder(uber, cp, params.targetSize);
-  uint32_t numNonLeaf = partitionHolder.subpartition(cp, params.targetSize);
+  uint32_t numNonLeaf =
+      partitionHolder.subpartition(uber.imageTax, cp, params.targetSize);
   const Array<Fragment*>* partition = partitionHolder.getPartition();
+  // TODO(eustas): gather patches only if going to build palette.
   Vector<float>* patches = gatherPatches(partition, numNonLeaf);
   Vector<float>* palette = buildPalette(patches, cp.palette_size);
   float* RESTRICT colors = palette->data();
@@ -459,8 +479,7 @@ Result encode(const Image& src, const Params& params) {
 
   result.variant = bestTask.variant;
   result.variant.colorOptions = (uint64_t)1 << bestColorCode;
-  result.mse = (bestSqe + uber.rgb2[0] + uber.rgb2[1] + uber.rgb2[2]) /
-                static_cast<float>(width * height);
+  result.mse = (bestSqe + uber.sqeBase) / static_cast<float>(width * height);
 
   for (size_t i = 0; i < numVariants; ++i) tasks[i].~SimulationTask();
 

@@ -26,20 +26,6 @@ class XRangeEncoder {
     }
   }
 
-  static float estimateCost(XRangeEncoder* dst) {
-    float cost = 0.0f;
-    Array<Entry>& entries = dst->entries;
-    for (size_t i = 0; i < entries.size; ++i) {
-      uint32_t v = entries.data[i].max;
-      if (v >= 64) {
-        cost += 6;
-        v >>= 6;
-      }
-      cost += SinCos.kLog2[v];
-    }
-    return cost;
-  }
-
  private:
   struct Entry {
     uint32_t value;

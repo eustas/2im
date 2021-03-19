@@ -347,6 +347,7 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
     centers_b[0] = stats_b[i];
   }
 
+  // Warning: O(MN)
   for (uint32_t j = 1; j < m; ++j) {
     // D(x) is the distance to the nearest center.
     // Choose next with probability proportional to D(x)^2.
@@ -360,7 +361,8 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
       weights[i] = weight;
       total += weight;
     }
-    /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */ {
+    // Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs"
+    {
       random ^= random << 13;
       random ^= random >> 17;
       random ^= random << 5;
@@ -460,19 +462,16 @@ NOINLINE Vector<float>* gatherPatches(const Array<Fragment*>* partition,
   float* RESTRICT stats_wb = stats + 6 * stats_size;
 
   size_t pos = 0;
-  const auto maybe_add_leaf = [&](Fragment* leaf) {
-    if (leaf->ordinal < num_non_leaf) return;
-    stats_wr[pos] = leaf->stats[0];
-    stats_wg[pos] = leaf->stats[1];
-    stats_wb[pos] = leaf->stats[2];
-    stats_c[pos] = leaf->stats[3];
-    pos++;
-  };
-
   for (size_t i = 0; i < num_non_leaf; ++i) {
     Fragment* node = partition->data[i];
-    maybe_add_leaf(node->leftChild);
-    maybe_add_leaf(node->rightChild);
+    for (Fragment* leaf : {node->leftChild, node->rightChild}) {
+      if (leaf->ordinal < num_non_leaf) continue;
+      stats_wr[pos] = leaf->stats[0];
+      stats_wg[pos] = leaf->stats[1];
+      stats_wb[pos] = leaf->stats[2];
+      stats_c[pos] = leaf->stats[3];
+      pos++;
+    }
   }
 
   for (size_t i = 0; i < n; i += Lanes(df)) {
@@ -490,13 +489,15 @@ NOINLINE Vector<float>* gatherPatches(const Array<Fragment*>* partition,
   return result;
 }
 
-float simulateEncode(const Partition& partition_holder, uint32_t target_size,
-                     const CodecParams& cp) {
-  uint32_t num_non_leaf = partition_holder.subpartition(cp, target_size);
+float simulateEncode(float imageTax, const Partition& partition_holder,
+                     uint32_t target_size, const CodecParams& cp) {
+  uint32_t num_non_leaf =
+      partition_holder.subpartition(imageTax, cp, target_size);
   if (num_non_leaf <= 1) {
-    // Let's deal with flat image separately.
+    // Let's deal with a flat image separately.
     return 1e35f;
   }
+  // TODO(eustas): why patches storage is not cached?
   Vector<float>* patches =
       gatherPatches(partition_holder.getPartition(), num_non_leaf);
   size_t patches_step = patches->capacity / 7;
@@ -522,7 +523,7 @@ float simulateEncode(const Partition& partition_holder, uint32_t target_size,
   // score = sum(patch_score)
   // sum(sum(orig^2)) is a constant => could be omitted from calculations
 
-  float result[3] = {0.0f};
+  float result = 0.0f;
 
   int32_t v_max = cp.color_quant - 1;
   const float quant = v_max / 255.0f;
@@ -549,69 +550,72 @@ float simulateEncode(const Partition& partition_holder, uint32_t target_size,
     }
     for (size_t j = 0; j < 3; ++j) {
       // TODO(eustas): could use non-normalized patch color.
-      result[j] += c * rgb[j] * (rgb[j] - 2.0f * orig[j]);
+      result += c * rgb[j] * (rgb[j] - 2.0f * orig[j]);
     }
   }
   delete patches;
   delete palette;
 
-  return result[0] + result[1] + result[2];
+  return result;
 }
 
 void sumCache(const Cache* c, const int32_t* RESTRICT region_x, Stats* dst) {
   size_t count = c->count;
   const int32_t* RESTRICT row_offset = c->row_offset->data();
-  const float* RESTRICT sum = c->uber->sum->data();
+  const int32_t* RESTRICT sum = c->uber->sum->data();
 
 #if HWY_TARGET == HWY_SCALAR
-  Stats tmp = {0.0, 0.0, 0.0, 0.0};
+  int32_t tmp[4] = {0};
   for (size_t i = 0; i < count; i++) {
     int32_t offset = row_offset[i] + 4 * region_x[i];
-    tmp.values[0] += sum[offset + 0];
-    tmp.values[1] += sum[offset + 1];
-    tmp.values[2] += sum[offset + 2];
-    tmp.values[3] += sum[offset + 3];
+    tmp[0] += sum[offset + 0];
+    tmp[1] += sum[offset + 1];
+    tmp[2] += sum[offset + 2];
+    tmp[3] += sum[offset + 3];
   }
-  *dst = tmp;
+  for (size_t j = 0; j < 4; ++j) dst->values[j] = tmp[j];
 #else
   constexpr HWY_CAPPED(float, 4) df;
-  auto tmp = Zero(df);
+  constexpr HWY_CAPPED(int32_t, 4) di32;
+  auto tmp = Zero(di32);
   for (size_t i = 0; i < count; i++) {
     int32_t offset = row_offset[i] + 4 * region_x[i];
-    tmp = tmp + Load(df, sum + offset);
+    tmp = tmp + Load(di32, sum + offset);
   }
-  Store(tmp, df, dst->values);
+  Store(ConvertTo(df, tmp), df, dst->values);
 #endif
 }
 
 INLINE void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x,
                         Stats* dst) {
   size_t count = c->count;
-  const float* RESTRICT sum = c->uber->sum->data();
+  const int32_t* RESTRICT sum = c->uber->sum->data();
+  // TODO(eustas): fix scalar version
 
 #if HWY_TARGET == HWY_SCALAR
-  Stats tmp = {0.0, 0.0, 0.0, 0.0};
+  int32_t tmp[4] = {0};
   for (size_t i = 0; i < count; i++) {
     int32_t offset = region_x[i];
-    tmp.values[0] += sum[offset + 0];
-    tmp.values[1] += sum[offset + 1];
-    tmp.values[2] += sum[offset + 2];
-    tmp.values[3] += sum[offset + 3];
+    tmp[0] += sum[offset + 0];
+    tmp[1] += sum[offset + 1];
+    tmp[2] += sum[offset + 2];
+    tmp[3] += sum[offset + 3];
   }
-  *dst = tmp;
+  for (size_t j = 0; j < 4; ++j) dst->values[j] = tmp[j];
 #else
   constexpr HWY_CAPPED(float, 4) df;
-  auto tmp1 = Zero(df);
-  auto tmp2 = Zero(df);
-  auto tmp3 = Zero(df);
-  auto tmp4 = Zero(df);
-  for (size_t i = 0; i < count; i += 4) {
-    tmp1 = tmp1 + Load(df, sum + region_x[i + 0]);
-    tmp2 = tmp2 + Load(df, sum + region_x[i + 1]);
-    tmp3 = tmp3 + Load(df, sum + region_x[i + 2]);
-    tmp4 = tmp4 + Load(df, sum + region_x[i + 3]);
+  constexpr HWY_CAPPED(int32_t, 4) di32;
+  auto tmp1 = Load(di32, sum + region_x[0]);
+  auto tmp2 = Load(di32, sum + region_x[1]);
+  auto tmp3 = Load(di32, sum + region_x[2]);
+  auto tmp4 = Load(di32, sum + region_x[3]);
+  for (size_t i = 4; i < count; i += 4) {
+    tmp1 = tmp1 + Load(di32, sum + region_x[i + 0]);
+    tmp2 = tmp2 + Load(di32, sum + region_x[i + 1]);
+    tmp3 = tmp3 + Load(di32, sum + region_x[i + 2]);
+    tmp4 = tmp4 + Load(di32, sum + region_x[i + 3]);
   }
-  Store((tmp1 + tmp2) + (tmp3 + tmp4), df, dst->values);
+  Store(ConvertTo(df, (tmp1 + tmp2) + (tmp3 + tmp4)), df, dst->values);
 #endif
 }
 
@@ -766,9 +770,9 @@ HWY_EXPORT(gatherPatches)
 HWY_EXPORT(buildPalette)
 #endif
 
-float simulateEncode(const Partition& partition_holder, uint32_t target_size,
-                     const CodecParams& cp) {
-  return CALL(simulateEncode)(partition_holder, target_size, cp);
+float simulateEncode(float imageTax, const Partition& partition_holder,
+                     uint32_t target_size, const CodecParams& cp) {
+  return CALL(simulateEncode)(imageTax, partition_holder, target_size, cp);
 }
 
 uint32_t chooseColor(float r, float g, float b, const float* RESTRICT palette_r,
