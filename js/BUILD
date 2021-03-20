@@ -18,27 +18,8 @@ closure_js_library(
 )
 
 closure_js_library(
-    name = "CjkDecoder",
-    srcs = ["CjkDecoder.js"],
-    suppress = ["moduleLoad"],
-    deps = [":CjkTransform"],
-)
-
-closure_js_library(
     name = "Crc64",
     srcs = ["Crc64.js"],
-)
-
-closure_js_library(
-    name = "CjkEncoder",
-    srcs = ["CjkEncoder.js"],
-    suppress = ["moduleLoad"],
-    deps = [":CjkTransform"],
-)
-
-closure_js_library(
-    name = "CjkTransform",
-    srcs = ["CjkTransform.js"],
 )
 
 closure_js_library(
@@ -140,18 +121,6 @@ closure_js_test(
     suppress = ["moduleLoad"],
     deps = [
         ":Crc64",
-        "@io_bazel_rules_closure//closure/library:testing",
-    ],
-)
-
-closure_js_test(
-    name = "CjkTest",
-    srcs = ["Cjk_test.js"],
-    entry_points = ["Cjk_test.js"],
-    suppress = ["moduleLoad"],
-    deps = [
-        ":CjkDecoder",
-        ":CjkEncoder",
         "@io_bazel_rules_closure//closure/library:testing",
     ],
 )
