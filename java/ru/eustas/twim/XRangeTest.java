@@ -40,11 +40,6 @@ public class XRangeTest {
   }
 
   @Test
-  public void testCoverage() {
-    new XRangeCode();
-  }
-
-  @Test
   public void testRandom10() {
     checkRandom(1000, 10, 42);
   }
@@ -87,7 +82,6 @@ public class XRangeTest {
 
     byte[] expected = {-78, -15, 81, -45, -48, -46, -47, 51, 48, 50, 49, -77};
 
-    int expectedSize = expected.length;
     assertArrayEquals(data, expected);
 
     XRangeDecoder decoder = new XRangeDecoder(data);

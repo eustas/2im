@@ -590,7 +590,6 @@ INLINE void sumCacheAbs(const Cache* c, const int32_t* RESTRICT region_x,
                         Stats* dst) {
   size_t count = c->count;
   const int32_t* RESTRICT sum = c->uber->sum->data();
-  // TODO(eustas): fix scalar version
 
 #if HWY_TARGET == HWY_SCALAR
   int32_t tmp[4] = {0};

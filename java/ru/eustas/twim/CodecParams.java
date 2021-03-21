@@ -56,13 +56,25 @@ class CodecParams {
     writeNumber(dst, 2, 0);
   }
 
+  // TODO(eustas): use range-match
+  // TODO(eustas): test simulation
+  static int simulateWriteSize(int value) {
+    value -= 8;
+    int chunks = 2;
+    while (value > (1 << (chunks * 3))) {
+      value -= (1 << (chunks * 3));
+      chunks++;
+    }
+    return chunks * 4 - 2;
+  }
+
   private static final int SCALE_STEP_FACTOR = 40;
   private static final int BASE_SCALE_FACTOR = 36;
 
   // Not the best place, but OK for prototype.
-  final static int NODE_FILL = 0;
-  final static int NODE_HALF_PLANE = 1;
-  final static int NODE_TYPE_COUNT = 2;
+  static final int NODE_FILL = 0;
+  static final int NODE_HALF_PLANE = 1;
+  static final int NODE_TYPE_COUNT = 2;
 
   private final int[] levelScale = new int[MAX_LEVEL];
   final int[] angleBits = new int[MAX_LEVEL];
@@ -72,7 +84,7 @@ class CodecParams {
   // Actually, that is image params...
   final int width;
   final int height;
-  int lineLimit = 63;
+  int lineLimit = MAX_LINE_LIMIT;
 
   private int[] params;
   private int colorCode;
@@ -158,6 +170,12 @@ class CodecParams {
     writeNumber(dst, MAX_COLOR_CODE, colorCode);
   }
 
+  // TODO(eustas): test simulation
+  /** Simulates {@code write}. */
+  static float calculateImageTax(int width, int height) {
+    return 20.5577740523f + simulateWriteSize(width) + simulateWriteSize(height);
+  }
+
   int getLevel(int[] region) {
     final int step = region.length / 3;
     final int count = region[region.length - 1];
@@ -166,22 +184,22 @@ class CodecParams {
     }
 
     // TODO(eustas): perhaps box area is not the best value for level calculation.
-    int min_y = height + 1;
-    int max_y = -1;
-    int min_x = width + 1;
-    int max_x = -1;
+    int minY = height + 1;
+    int maxY = -1;
+    int minX = width + 1;
+    int maxX = -1;
     for (int i = 0; i < count; i++) {
       int y = region[i];
       int x0 = region[step + i];
       int x1 = region[2 * step + i];
-      min_y = Math.min(min_y, y);
-      max_y = Math.max(max_y, y);
-      min_x = Math.min(min_x, x0);
-      max_x = Math.max(max_x, x1);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      minX = Math.min(minX, x0);
+      maxX = Math.max(maxX, x1);
     }
 
-    int dx = max_x - min_x;
-    int dy = max_y + 1 - min_y;
+    int dx = maxX - minX;
+    int dy = maxY + 1 - minY;
     int d = dx * dx + dy * dy;
     for (int i = 0; i < MAX_LEVEL; ++i) {
       if (d >= levelScale[i]) {

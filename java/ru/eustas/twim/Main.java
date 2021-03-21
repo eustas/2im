@@ -14,13 +14,23 @@ public class Main {
     ENCODE_DECODE,
   }
 
-  public static void main(String... args) throws IOException, InterruptedException {
-    int target = 200;
+  public static void main(String... args) throws IOException {
     Mode mode = Mode.ENCODE;
-    boolean appendSize = false;
+    Encoder.Params params = new Encoder.Params();
+    for (int lineLimit = 0; lineLimit < CodecParams.MAX_LINE_LIMIT; ++lineLimit) {
+      for (int partitionCode = 0; partitionCode < CodecParams.MAX_PARTITION_CODE; ++partitionCode) {
+        Encoder.Variant variant = new Encoder.Variant();
+        variant.lineLimit = lineLimit;
+        variant.partitionCode = partitionCode;
+        variant.colorOptions = ~0L;
+        params.variants.add(variant);
+      }
+    }
+    params.targetSize = 287;
+    params.numThreads = 1;
     for (String arg : args) {
       if (arg.startsWith("-t")) {
-        target = Integer.parseInt(arg.substring(2));
+        params.targetSize = Integer.parseInt(arg.substring(2));
         continue;
       } else if (arg.equals("-d")) {
         mode = Mode.DECODE;
@@ -31,21 +41,18 @@ public class Main {
       } else if (arg.equals("-e")) {
         mode = Mode.ENCODE;
         continue;
-      } else if (arg.equals("-s")) {
-        appendSize = true;
-        continue;
       }
-
+      // TODO(eustas): add "-j"
       String path = arg;
 
       if (mode == Mode.ENCODE || mode == Mode.ENCODE_DECODE) {
+        long t0 = System.nanoTime();
         BufferedImage image = ImageIO.read(new File(path));
-        byte[] data = Encoder.encode(image, target);
-        if (appendSize) {
-          path = path + "." + data.length;
-        }
+        Encoder.Result result = Encoder.encode(image, params);
+        long t1 = System.nanoTime();
+        System.out.println("Time elapsed: " + (t1 - t0) / 1000000 + "ms");
         path = path + ".2im";
-        Files.write(FileSystems.getDefault().getPath(path), data);
+        Files.write(FileSystems.getDefault().getPath(path), result.data);
       }
 
       if (mode == Mode.DECODE || mode == Mode.ENCODE_DECODE) {

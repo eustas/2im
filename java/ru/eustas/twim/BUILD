@@ -80,6 +80,7 @@ java_binary(
     srcs = ["Main.java"],
     main_class = "ru.eustas.twim.Main",
     deps = [
+        ":codec_params",
         ":decoder",
         ":encoder",
     ],
