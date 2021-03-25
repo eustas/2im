@@ -56,16 +56,9 @@ class CodecParams {
     writeNumber(dst, 2, 0);
   }
 
-  // TODO(eustas): use range-match
   // TODO(eustas): test simulation
   static int simulateWriteSize(int value) {
-    value -= 8;
-    int chunks = 2;
-    while (value > (1 << (chunks * 3))) {
-      value -= (1 << (chunks * 3));
-      chunks++;
-    }
-    return chunks * 4 - 2;
+    return (value >= 585) ? 15 : (value >= 73) ? 11 : 7;
   }
 
   private static final int SCALE_STEP_FACTOR = 40;
@@ -183,7 +176,6 @@ class CodecParams {
       return -1;
     }
 
-    // TODO(eustas): perhaps box area is not the best value for level calculation.
     int minY = height + 1;
     int maxY = -1;
     int minX = width + 1;

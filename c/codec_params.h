@@ -39,9 +39,9 @@ class CodecParams {
   static constexpr const uint32_t kMaxLineLimit = 63;
 
   static constexpr const uint32_t kNumColorQuantOptions = 17;
-  static constexpr const uint32_t kMaxColorPaletteSize = 32;
+  static constexpr const uint32_t kNumPaletteOptions = 32;
   static constexpr const uint32_t kMaxColorCode =
-      kNumColorQuantOptions + kMaxColorPaletteSize;
+      kNumColorQuantOptions + kNumPaletteOptions;
 
   static constexpr uint32_t makeColorQuant(uint32_t code) {
     return 1u + ((4u + (code & 3u)) << (code >> 2u));

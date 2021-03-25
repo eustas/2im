@@ -16,7 +16,7 @@ class XRangeEncoder {
   void finish(Array<uint8_t>* out);
 
   NOINLINE static void writeNumber(XRangeEncoder* dst, uint32_t max, uint32_t value) {
-    // if (value >= max) __builtin_trap();
+    // if (value >= max || value == 0) __builtin_trap();
     if (max > 1) {
       Array<Entry>& entries = dst->entries;
       MAYBE_GROW_ARRAY(entries);
@@ -27,6 +27,7 @@ class XRangeEncoder {
   }
 
  private:
+  friend class XRangeEncoderFriend;
   struct Entry {
     uint32_t value;
     uint32_t max;

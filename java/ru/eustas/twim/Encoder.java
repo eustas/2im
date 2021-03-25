@@ -14,7 +14,16 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Encoder {
+  private static boolean checkSimdEnabled() {
+    try {
+      Class.forName("jdk.incubator.vector.Vector");
+    } catch (ClassNotFoundException ex) {
+      return false;
+    }
+    return Boolean.parseBoolean(System.getProperty("twim.encoder.use_simd"));
+  }
 
+  private static final boolean USE_SIMD = checkSimdEnabled();
 
   private Encoder() {}
 
@@ -45,7 +54,7 @@ public class Encoder {
     final int stride;
 
     final float sqeBase;
-    final float imageTax;
+    private final float imageTax;
 
     UberCache(int[] intRgb, int width) {
       int height = intRgb.length / width;
@@ -82,6 +91,10 @@ public class Encoder {
       this.sqeBase = sum2;
       this.imageTax = CodecParams.calculateImageTax(width, height);
     }
+
+    float bitBudget(int targetSize) {
+      return 8.0f * targetSize - 4.0f - imageTax;
+    }
   }
 
   private static class Patches {
@@ -105,7 +118,6 @@ public class Encoder {
 
   static class Cache {
     final UberCache uber;
-    // TODO(eustas): proxy uber fields?
 
     final DistanceRange distanceRange = new DistanceRange();
 
@@ -113,6 +125,9 @@ public class Encoder {
     final int[] plus = new int[4];
     final int[] minus = new int[8];
     final float[] left = new float[4];
+
+    final float[] orig = new float[3];
+    final float[] rgb = new float[3];
 
     static final int STATS_SIZE = CodecParams.MAX_LINE_LIMIT * SinCos.MAX_ANGLE;
     float[] statsR = new float[STATS_SIZE + 15];
@@ -133,6 +148,8 @@ public class Encoder {
     final float[] x1f;
     final float[] xf;
 
+    private Patches patches = new Patches(1);
+
     Cache(UberCache uber) {
       this.uber = uber;
       this.rowOffset = new int[uber.height + 15];
@@ -144,6 +161,15 @@ public class Encoder {
       this.x0f = new float[uber.height + 15];
       this.x1f = new float[uber.height + 15];
       this.xf = new float[uber.height + 15];
+    }
+
+    Patches getPatches(int n) {
+      int len = patches.r.length;
+      if (len < n) {
+        n = Math.max(n, 2 * len);
+        patches = new Patches(n);
+      }
+      return patches;
     }
 
     void prepare(int[] region) {
@@ -451,9 +477,8 @@ public class Encoder {
    * Minimal color data cost is used.
    * Partition could be used to try multiple color quantizations to see, which one gives the best result.
    */
-  static List<Fragment> buildPartition(int sizeLimit, CodecParams cp, Cache cache) {
+  static List<Fragment> buildPartition(float bitBudget, CodecParams cp, Cache cache) {
     float tax = bitCost(CodecParams.NODE_TYPE_COUNT);
-    float budget = sizeLimit * 8.0f - tax - cache.uber.imageTax;
 
     int width = cp.width;
     int height = cp.height;
@@ -477,8 +502,8 @@ public class Encoder {
       Fragment candidate = queue.poll();
       if (candidate.bestScore < 0.0 || candidate.bestCost < 0.0) break;
       float cost = tax + candidate.bestCost;
-      if (cost <= budget) {
-        budget -= cost;
+      if (cost <= bitBudget) {
+        bitBudget -= cost;
         candidate.ordinal = result.size();
         result.add(candidate);
         candidate.leftChild.findBestSubdivision(cache, cp);
@@ -490,23 +515,24 @@ public class Encoder {
     return result;
   }
 
-  private static int subpartition(int targetSize, float imageTax, List<Fragment> partition, CodecParams cp) {
+  private static int subpartition(float bitBudget, List<Fragment> partition, CodecParams cp) {
     float nodeTax = 1.0f;  // log2(CodecParams.NODE_TYPE_COUNT)
     if (cp.paletteSize == 0) {
       nodeTax += 3.0f * bitCost(cp.colorQuant);
     } else {
       nodeTax += bitCost(cp.paletteSize);
-      imageTax += 24.0f * cp.paletteSize;  // 3 x 8 bit
+      bitBudget -= 24.0f * cp.paletteSize;  // 3 x 8 bit
     }
-    float budget = 8.0f * targetSize - 4.0f - imageTax - nodeTax;
+    bitBudget -= nodeTax;
     int limit = partition.size();
     int i;
     for (i = 0; i < limit; ++i) {
       Fragment node = partition.get(i);
       if (node.bestCost < 0.0f) break;
       float cost = node.bestCost + nodeTax;
-      if (budget < cost) break;
-      budget -= cost;
+      if (bitBudget < cost)
+        break;
+      bitBudget -= cost;
     }
     return i;
   }
@@ -543,17 +569,15 @@ public class Encoder {
     }
   }
 
-  // TODO(eustas): combine targetSize and imageTax
-  private static float simulateEncode(int targetSize, float imageTax, List<Fragment> partition, CodecParams cp) {
-    int numNonLeaf = subpartition(targetSize, imageTax, partition, cp);
+  private static float simulateEncode(float bitBudget, List<Fragment> partition, CodecParams cp, Cache cache) {
+    int numNonLeaf = subpartition(bitBudget, partition, cp);
     if (numNonLeaf <= 1) {
       // Let's deal with flat image separately.
       return 1e35f;
     }
-    // TODO(eustas): cache patches?
     int n = numNonLeaf + 1;
     int m = cp.paletteSize;
-    Patches patches = new Patches(n);
+    Patches patches = cache.getPatches(n);
     gatherPatches(partition, numNonLeaf, patches);
 
     float result = 0.0f;
@@ -561,8 +585,8 @@ public class Encoder {
     float quant = vMax / 255.0f;
     float dequant = 255.0f / ((vMax != 0) ? vMax : 1);
 
-    float[] orig = new float[3];  // TODO: cache
-    float[] rgb = new float[3];  // TODO: cache
+    float[] orig = cache.orig;
+    float[] rgb = cache.rgb;
     for (int i = 0; i < n; ++i) {
       orig[0] = patches.r[i];
       orig[1] = patches.g[i];
@@ -584,8 +608,8 @@ public class Encoder {
     return result;
   }
 
-  static byte[] encode(int targetSize, float imageTax, List<Fragment> partition, CodecParams cp) {
-    int numNonLeaf = subpartition(targetSize, imageTax, partition, cp);
+  static byte[] encode(float bitBudget, List<Fragment> partition, CodecParams cp) {
+    int numNonLeaf = subpartition(bitBudget, partition, cp);
     //Patches patches = new Patches(numNonLeaf + 1);
     //gatherPatches(partition, numNonLeaf, patches);
     int m = cp.paletteSize;
@@ -627,19 +651,19 @@ public class Encoder {
     public void run() {
       Cache cache = new Cache(uber);
       CodecParams cp = new CodecParams(uber.width, uber.height);
-      int targetSize = params.targetSize;
+      float bitBudget = uber.bitBudget(params.targetSize);
       while (true) {
         int taskId = nextTask.getAndIncrement();
         if (taskId >= params.variants.size()) return;
         Variant task = params.variants.get(taskId);
         cp.setPartitionCode(task.partitionCode);
         cp.lineLimit = task.lineLimit + 1;
-        List<Fragment> partition = buildPartition(params.targetSize, cp, cache);
+        List<Fragment> partition = buildPartition(bitBudget + 8.0f, cp, cache);
         // Palette (..CodecParams.MAX_COLOR_CODE) is not supported yet.
         for (int colorCode = 0; colorCode < CodecParams.MAX_COLOR_QUANT_OPTIONS; ++colorCode) {
           if ((task.colorOptions & (1L << colorCode)) == 0) continue;
           cp.setColorCode(colorCode);
-          float sqe = simulateEncode(targetSize, uber.imageTax, partition, cp);
+          float sqe = simulateEncode(bitBudget, partition, cp, cache);
           if (sqe < bestSqe) {
             bestSqe = sqe;
             bestVariant = task;
@@ -652,9 +676,10 @@ public class Encoder {
   }
 
   static Result encode(BufferedImage src, Params params) {
-    // TODO: validate params
     int width = src.getWidth();
     int height = src.getHeight();
+    if (width < 8 || width > 2048) throw new IllegalArgumentException("width should be in the range [8..2048]");
+    if (height < 8 || height > 2048) throw new IllegalArgumentException("height should be in the range [8..2048]");
     UberCache uber = new UberCache(src.getRGB(0, 0, width, height, null, 0, width), width);
     AtomicInteger nextTask = new AtomicInteger(0);
 
@@ -699,7 +724,8 @@ public class Encoder {
     cp.setPartitionCode(variant.partitionCode);
     cp.lineLimit = variant.lineLimit + 1;
     cp.setColorCode(bestTaskExecutor.bestColorCode);
-    result.data = encode(params.targetSize, uber.imageTax, bestTaskExecutor.bestPartition, cp);
+    // TODO(eustas): dedupe;
+    result.data = encode(uber.bitBudget(params.targetSize), bestTaskExecutor.bestPartition, cp);
     result.mse = (uber.sqeBase + bestTaskExecutor.bestSqe) / ((width + 0.0f) * height);
     return result;
   }

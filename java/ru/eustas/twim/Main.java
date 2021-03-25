@@ -41,8 +41,10 @@ public class Main {
       } else if (arg.equals("-e")) {
         mode = Mode.ENCODE;
         continue;
+      } else if (arg.equals("-j")) {
+        params.numThreads = Integer.parseInt(arg.substring(2));
+        continue;
       }
-      // TODO(eustas): add "-j"
       String path = arg;
 
       if (mode == Mode.ENCODE || mode == Mode.ENCODE_DECODE) {

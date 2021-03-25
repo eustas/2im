@@ -153,6 +153,17 @@ cc_library(
 )
 
 cc_test(
+    name = "codec_params_test",
+    srcs = ["codec_params_test.cc"],
+    copts = TEST_COPTS,
+    deps = [
+        ":encoder",
+        ":xrange_encoder",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
     name = "crc64_test",
     srcs = ["crc64_test.cc"],
     copts = TEST_COPTS,

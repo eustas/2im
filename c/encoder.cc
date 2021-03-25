@@ -42,19 +42,10 @@ void writeSize(XRangeEncoder* dst, uint32_t value) {
   XRangeEncoder::writeNumber(dst, 2, 0);
 }
 
-// NB: keep in sync with writeSize
-// TODO(eustas): use simple ranges?
 uint32_t simulateWriteSize(uint32_t value) {
-  value -= 8;
-  uint32_t chunks = 2;
-  while (value > (1u << (chunks * 3))) {
-    value -= (1u << (chunks * 3));
-    chunks++;
-  }
-  return chunks * 4 - 2;
+  return (value >= 585) ? 15 : (value >= 73) ? 11 : 7;
 }
 
-// NB: keep in sync with "getTax".
 void CodecParams::write(XRangeEncoder* dst) const {
   writeSize(dst, width);
   writeSize(dst, height);
@@ -66,14 +57,10 @@ void CodecParams::write(XRangeEncoder* dst) const {
   XRangeEncoder::writeNumber(dst, kMaxColorCode, color_code);
 }
 
-// TODO(eustas): write a test that checks that this function does not lie.
-// Simulates CodecParams::write
-// TODO(eustas): remove "NB: sync"
-INLINE float calculateImageTax(const Image& src) {
+float calculateImageTax(uint32_t width, uint32_t height) {
   // F1..F4 + line limit + color code
   constexpr const double kFlatTax = 20.5577740523;
-  return kFlatTax + simulateWriteSize(src.width) +
-      simulateWriteSize(src.height);
+  return kFlatTax + simulateWriteSize(width) + simulateWriteSize(height);
 }
 
 UberCache::UberCache(const Image& src)
@@ -82,7 +69,7 @@ UberCache::UberCache(const Image& src)
       // 4 == [r, g, b, count].length
       stride(vecSize(4 * (src.width + 1))),
       sum(allocVector<int32_t>(stride * src.height)),
-      imageTax(calculateImageTax(src)) {
+      imageTax(calculateImageTax(src.width, src.height)) {
   int32_t* RESTRICT sum = this->sum->data();
   float sum2 = 0.0f;
   for (size_t y = 0; y < src.height; ++y) {

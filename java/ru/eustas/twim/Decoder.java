@@ -9,6 +9,8 @@ import static ru.eustas.twim.XRangeDecoder.readNumber;
 
 public class Decoder {
 
+  private Decoder() {}
+
   private static int readColor(XRangeDecoder src, CodecParams cp, int[] palette) {
     if (cp.paletteSize == 0) {
       int argb = 0xFF;  // alpha = 1
@@ -47,7 +49,6 @@ public class Decoder {
       }
 
       // Cutting with half-planes does not increase the number of scans.
-      // TODO: region will remain unused; split to region and donate it to child?
       int step = Region.vectorFriendlySize(region[region.length - 1]);
       int[] inner = new int[3 * step + 1];
       int[] outer = new int[3 * step + 1];

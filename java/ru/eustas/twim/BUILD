@@ -30,7 +30,9 @@ java_library(
 
 java_library(
     name = "encoder",
-    srcs = ["Encoder.java"],
+    srcs = [
+        "Encoder.java",
+    ],
     deps = [
         ":codec_params",
         ":xrange_encoder",

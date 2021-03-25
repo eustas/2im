@@ -407,6 +407,7 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
       Store(Load(df, centers_acc_g + j) * inv_c, df, centers_g + j);
       Store(Load(df, centers_acc_b + j) * inv_c, df, centers_b + j);
     }
+    // if (score != score) break; // TODO(eustas): is NaN possible?
     if (last_score - score < 1.0f) break;
     last_score = score;
   }
