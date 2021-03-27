@@ -31,14 +31,9 @@ class DistanceRange {
     this.max = ma;
 
     int lineQuant = cp.getLineQuant();
-    while (true) {
-      this.numLines = (ma - mi) / lineQuant;
-      if (this.numLines > cp.lineLimit) {
-        lineQuant += lineQuant >> 4;
-      } else {
-        break;
-      }
-    }
+    int delta = ma - mi;
+    if (delta > lineQuant * cp.lineLimit) lineQuant = (2 * delta + cp.lineLimit) / (2 * cp.lineLimit);
+    this.numLines = delta / lineQuant;
     this.lineQuant = lineQuant;
   }
 

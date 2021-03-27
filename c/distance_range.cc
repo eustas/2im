@@ -38,14 +38,9 @@ DistanceRange::DistanceRange(const Vector<int32_t>& region, int32_t angle,
   max = static_cast<uint32_t>(ma);
 
   line_quant = cp.getLineQuant();
-  while (true) {
-    num_lines = (ma - mi) / line_quant;
-    if (num_lines > cp.line_limit) {
-      line_quant += line_quant >> 4;
-    } else {
-      break;
-    }
-  }
+  uint32_t delta = ma - mi;
+  if (delta > line_quant * cp.line_limit) line_quant = (2 * delta + cp.line_limit) / (2 * cp.line_limit);
+  num_lines = delta / line_quant;
 }
 
 }  // namespace twim
