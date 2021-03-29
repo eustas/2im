@@ -35,13 +35,20 @@ bool parseInt(const char* str, uint32_t min, uint32_t max, uint32_t* result) {
   return true;
 }
 
+constexpr uint64_t kAny = ~((uint64_t)0);
+
 size_t parseHex(const char* str, uint64_t* result, char t1, char t2) {
+  // Special case: asterisk
+  if ((str[0] == '*') && (str[1] == t1 || str[1] == t2)) {
+    *result = kAny;
+    return 2;
+  }
   uint64_t val = 0;
   size_t len = 0;
   while (true) {
     char c = str[len++];
     if ((c == t1) || (c == t2)) break;
-    if (len > 13) return 0;
+    if (len > 16) return 0;
     bool ok = false;
     uint64_t d = 0;
     if ((c >= '0') && (c <= '9')) { d = c - '0'; ok = true; }
@@ -111,8 +118,7 @@ void fillAllVariants(std::vector<Variant>* variants) {
 }
 
 bool parseVariants(std::vector<Variant>* variants, const char* params) {
-  variants->resize(CodecParams::kMaxPartitionCode * CodecParams::kMaxLineLimit);
-  size_t idx = 0;
+  variants->clear();
   size_t offset = 0;
   while (true) {
     uint64_t partitionCode;
@@ -124,19 +130,40 @@ bool parseVariants(std::vector<Variant>* variants, const char* params) {
     offset += plus;
     plus = parseHex(params + offset, &lineLimit, ':', ':');
     if (plus < 2) return false;
-    if (lineLimit >= CodecParams::kMaxLineLimit) return false;
+    if (lineLimit == kAny) {
+      lineLimit = ((uint64_t)1 << CodecParams::kMaxLineLimit) - 1;
+    }
+    if ((lineLimit >> CodecParams::kMaxLineLimit) > 0) return false;
     offset += plus;
     plus = parseHex(params + offset, &colorOptions, ',', 0);
     if (plus < 2) return false;
+    if (colorOptions == kAny) {
+      colorOptions = ((uint64_t)1 << CodecParams::kMaxColorCode) - 1;
+    }
     if ((colorOptions >> CodecParams::kMaxColorCode) > 0) return false;
     offset += plus;
-    Variant& v = variants->at(idx++);
-    v.partitionCode = static_cast<uint32_t>(partitionCode);
-    v.lineLimit = static_cast<uint32_t>(lineLimit);
-    v.colorOptions = colorOptions;
+    variants->reserve(64);
+    for (size_t i = 0; i < 4; ++i) {
+      // See https://twitter.com/eustasru/status/1279418273612865536
+      // N = 19; tuples = [((1 << i) % N, i) for i in range(N - 1)]
+      // print([N] + [t[1] for t in sorted(tuples, key=lambda x: x[0])])
+      constexpr const uint32_t kPow2r[19] = {
+          99, 0, 1, 13, 2, 99, 14, 6, 3, 8, 99, 12, 15, 5, 7, 11, 4, 10, 9};
+      uint32_t word = (lineLimit >> (i * 16)) & 0xFFFF;
+      while (word != 0) {
+        uint32_t newWord = word & (word - 1);
+        uint32_t bit = word ^ newWord;
+        word = newWord;
+        uint32_t bitPos = kPow2r[bit % 19] + 16 * i;
+        Variant v;
+        v.partitionCode = static_cast<uint32_t>(partitionCode);
+        v.lineLimit = bitPos;
+        v.colorOptions = colorOptions;
+        variants->emplace_back(std::move(v));
+      }
+    }
     if (params[offset - 1] == 0) break;
   }
-  variants->resize(idx);
   return true;
 }
 
@@ -209,8 +236,8 @@ int main(int argc, char* argv[]) {
       std::stringstream out;
       out << std::fixed << std::setprecision(2) << std::setfill('0');
       out << "size=" << result.data.size << ", PSNR=" << psnr << std::uppercase
-          << std::hex << ", variant=" << std::setw(3) << partitionCode << ":"
-          << std::setw(2) << lineLimit << ":" << std::setw(13) << colorCode;
+          << std::hex << ", variant=" << partitionCode << ":"
+          << ((uint64_t)1 << lineLimit) << ":" << colorCode;
       fprintf(stderr, "%s\n", out.str().c_str());
       path += ".2im";
       Io::writeFile(path, result.data.data, result.data.size);
