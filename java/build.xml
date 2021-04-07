@@ -1,0 +1,49 @@
+<!--
+  Industry is ill. Bazel does not support jdk16. Please.build is incompatible with Bazel.
+  Gradle as does not support jdk16. Maven forces some ill project structure.
+
+  Surprisingly, ANT works... kind of... 
+   * there is no easy way to check jdk version out of the box (numerically, not as strings)
+   * asking user to install/configure additional crap is wrong
+   * there is no way to extend ANT from within build.xml
+
+  I'm so sorry... Please use this build.xml only if your JDK supports jdk.incubator.vector.
+  Build-system authors will burn in hell. Definetely.
+ -->
+<project name="twim" basedir="." default="main">
+  <property name="src.dir" value="."/>
+  <property name="build.dir" value="build"/>
+  <property name="classes.dir" value="${build.dir}/classes"/>
+  <property name="jar.dir" value="${build.dir}/jar"/>
+  <property name="main-class" value="ru.eustas.twim.Main"/>
+
+  <target name="clean">
+    <delete dir="${build.dir}"/>
+  </target>
+
+  <target name="compile">
+    <mkdir dir="${classes.dir}"/>
+    <javac includeantruntime="false" sourcepath="" srcdir="${src.dir}" destdir="${classes.dir}">
+      <include name="ru/eustas/twim/*.java"/>
+      <exclude name="**/*Test.java"/>
+      <compilerarg value="--add-modules=jdk.incubator.vector" />
+    </javac>
+  </target>
+
+  <target name="jar" depends="compile">
+    <mkdir dir="${jar.dir}"/>
+    <jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
+      <manifest>
+        <attribute name="Main-Class" value="${main-class}"/>
+      </manifest>
+    </jar>
+  </target>
+
+  <target name="run" depends="jar">
+    <java jar="${jar.dir}/${ant.project.name}.jar" fork="true"/>
+  </target>
+
+  <target name="clean-build" depends="clean,jar"/>
+
+  <target name="main" depends="clean,run"/>
+</project>

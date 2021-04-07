@@ -2,8 +2,6 @@ package ru.eustas.twim;
 
 import javax.imageio.ImageIO;
 
-import ru.eustas.twim.Encoder;
-
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;

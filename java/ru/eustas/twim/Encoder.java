@@ -14,16 +14,19 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Encoder {
-  private static boolean checkSimdEnabled() {
-    try {
-      Class.forName("jdk.incubator.vector.Vector");
-    } catch (ClassNotFoundException ex) {
-      return false;
-    }
-    return Boolean.parseBoolean(System.getProperty("twim.encoder.use_simd"));
-  }
+  private static final EncoderCore CORE;
+  private static final int CORE_PADDING;
 
-  private static final boolean USE_SIMD = checkSimdEnabled();
+  static {
+    EncoderCore core = new EncoderVanillaCore();
+    try {
+      core = (EncoderCore) Class.forName("ru.eustas.twim.EncoderSimdCore").getDeclaredConstructor().newInstance();
+    } catch (Throwable ex) {
+      // That's ok.
+    }
+    CORE = core;
+    CORE_PADDING = CORE.padding();
+  }
 
   private Encoder() {}
 
@@ -187,6 +190,15 @@ public class Encoder {
         x1f[i] = region[2 * step + i];
         rowOffset[i] = row * stride;
       }
+      for (int i = n; (i & (CORE_PADDING - 1)) != 0; i++) {
+        yi[i] = 0;
+        y[i] = 0;
+        x0[i] = 0;
+        x0f[i] = 0;
+        x1[i] = 0;
+        x1f[i] = 0;
+        rowOffset[i] = 0;
+      }
       this.count = n;
     }
 
@@ -199,25 +211,6 @@ public class Encoder {
         int offset = rowOffset[i] + regionX[i];
         for (int j = 0; j < 4; ++j) dst[j] += sum[(offset * 4) + j];
       }
-    }
-
-    void sumAbs(int[] regionX, int[] dst) {
-      int count = this.count;
-      int[] sum = uber.sum;
-      //for (int j = 0; j < 4; ++j) dst[j] = 0;
-      int a = 0, b = 0, c = 0, d = 0;
-      for (int i = 0; i < count; i++) {
-        int offset = regionX[i];
-        //for (int j = 0; j < 4; ++j) dst[j] += sum[offset * 4 + j];
-        a += sum[offset * 4 + 0];
-        b += sum[offset * 4 + 1];
-        c += sum[offset * 4 + 2];
-        d += sum[offset * 4 + 3];
-      }
-      dst[0] = a;
-      dst[1] = b;
-      dst[2] = c;
-      dst[3] = d;
     }
 
     // y * ny >= d
@@ -240,76 +233,6 @@ public class Encoder {
         int xOff = x + offset;
         regionX[i] = xOff;
       }
-    }
-
-    // x >= (d - y * ny) / nx
-    void updateGeGeneric(int angle, int d) {
-      float mNyNx = SinCos.MINUS_COT[angle];
-      float dNx = (float)(d * SinCos.INV_SIN[angle] + 0.5f);
-      int[] rowOffset = this.rowOffset;
-      float[] regionY = this.y;
-      int[] regionX0 = this.x0;
-      int[] regionX1 = this.x1;
-      int[] regionX = this.x;
-      int count = this.count;
-      for (int i = 0; i < count; i++) {
-        float y = regionY[i];
-        int offset = rowOffset[i];
-        float xf = y * mNyNx + dNx;
-        int xi = (int)xf;
-        int x0 = regionX0[i];
-        int x1 = regionX1[i];
-        int x = Math.min(x1, Math.max(xi, x0));
-        int xOff = x + offset;
-        regionX[i] = xOff;
-      }
-    }
-  }
-
-  private static void score(int[] whole, int n, float[] r, float[] g, float[] b, float[] c, float[] s) {
-    float wholeC = whole[3];
-    float wholeInvC = 1.0f / wholeC;
-    float wholeR = whole[0];
-    float wholeG = whole[1];
-    float wholeB = whole[2];
-    float wholeAvgR = wholeR * wholeInvC;
-    float wholeAvgG = wholeG * wholeInvC;
-    float wholeAvgB = wholeB * wholeInvC;
-
-    for (int i = 0; i < n; i++) {
-      float leftC = c[i];
-      float leftInvC = 1.0f / leftC;
-      float rightC = wholeC - leftC;
-      float rightInvC = 1.0f / rightC;
-
-      float leftR = r[i];
-      float leftAvgR = leftR * leftInvC;
-      float leftDiffR = leftAvgR - wholeAvgR;
-      float sumLeft = leftDiffR * leftDiffR;
-      float rightR = wholeR - leftR;
-      float rightAvgR = rightR * rightInvC;
-      float rightDiffR = rightAvgR - wholeAvgR;
-      float sumRight = rightDiffR * rightDiffR;
-
-      float leftG = g[i];
-      float leftAvgG = leftG * leftInvC;
-      float leftDiffG = leftAvgG - wholeAvgG;
-      sumLeft += leftDiffG * leftDiffG;
-      float rightG = wholeG - leftG;
-      float rightAvgG = rightG * rightInvC;
-      float rightDiffG = rightAvgG - wholeAvgG;
-      sumRight += rightDiffG * rightDiffG;
-
-      float leftB = b[i];
-      float leftAvgB = leftB * leftInvC;
-      float leftDiffB = leftAvgB - wholeAvgB;
-      sumLeft += leftDiffB * leftDiffB;
-      float rightB = wholeB - leftB;
-      float rightAvgB = rightB * rightInvC;
-      float rightDiffB = rightAvgB - wholeAvgB;
-      sumRight += rightDiffB * rightDiffB;
-
-      s[i] = sumLeft * leftC + sumRight * rightC;
     }
   }
 
@@ -383,9 +306,11 @@ public class Encoder {
           if (angle == 0) {
             cache.updateGeHorizontal(distance);
           } else {
-            cache.updateGeGeneric(angle, distance);
+            // CPU: 12% vs 24.6% | 2.1s vs 3.29s
+            CORE.updateGeGeneric(angle, distance, cache.y, cache.x0, cache.x0f, cache.x1, cache.x1f, cache.rowOffset, cache.x, cache.count, cache.uber.stride / 4);
           }
-          cache.sumAbs(cache.x, minus);
+          // CPU: 59% vs 39.5% | 10.3s vs 5.29s
+          CORE.sumAbs(cache.uber.sum, cache.count, cache.x, minus);
           for (int i = 0; i < 4; ++i) left[i] = plus[i] - minus[i];
           statsR[numSubdivisions] = left[0];
           statsG[numSubdivisions] = left[1];
@@ -403,7 +328,18 @@ public class Encoder {
         return;
       }
 
-      score(stats, numSubdivisions, statsR, statsG, statsB, statsC, statsS);
+      // CPU: 1% vs 1.5% | 229ms vs 200ms
+      int tail = numSubdivisions;
+      int mask = CORE_PADDING - 1;
+      while ((tail & mask) != 0) {
+        statsR[tail] = statsR[tail - 1];
+        statsG[tail] = statsB[tail - 1];
+        statsB[tail] = statsB[tail - 1];
+        statsC[tail] = statsC[tail - 1];
+        statsV[tail] = statsV[tail - 1];
+        tail++;
+      }
+      CORE.score(stats, numSubdivisions, statsR, statsG, statsB, statsC, statsS);
       int index = chooseMax(statsS, numSubdivisions);
       int bestAngleCode = statsV[index] % angleMax;
       int bestLine = statsV[index] / angleMax;
@@ -724,7 +660,6 @@ public class Encoder {
     cp.setPartitionCode(variant.partitionCode);
     cp.lineLimit = variant.lineLimit + 1;
     cp.setColorCode(bestTaskExecutor.bestColorCode);
-    // TODO(eustas): dedupe;
     result.data = encode(uber.bitBudget(params.targetSize), bestTaskExecutor.bestPartition, cp);
     result.mse = (uber.sqeBase + bestTaskExecutor.bestSqe) / ((width + 0.0f) * height);
     return result;

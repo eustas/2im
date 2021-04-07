@@ -45,6 +45,7 @@ public class Decoder {
 
       int level = cp.getLevel(region);
       if (level < 0) {
+        // TODO(eustas): check this is possible.
         throw new IllegalStateException("corrupted input");
       }
 
@@ -60,6 +61,9 @@ public class Decoder {
           int angleCode = readNumber(src, angleMax);
           int angle = angleCode * angleMult;
           distanceRange.update(region, angle, cp);
+          if (distanceRange.numLines == 0) {
+            // TODO(eustas): how to report error?
+          }
           int line = readNumber(src, distanceRange.numLines);
           Region.splitLine(region, angle, distanceRange.distance(line), inner, outer);
           break;

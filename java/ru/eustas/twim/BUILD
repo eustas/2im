@@ -32,6 +32,12 @@ java_library(
     name = "encoder",
     srcs = [
         "Encoder.java",
+        "EncoderCore.java",
+        # Shame on Bazel:
+        # * it does not support jdk16
+        # * "platforms" does not know about jdk versions
+        # "EncoderSimdCore.java",
+        "EncoderVanillaCore.java",
     ],
     deps = [
         ":codec_params",
