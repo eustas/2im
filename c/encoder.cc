@@ -26,24 +26,22 @@ static void log(const char* message) {
 }
 #endif
 
+// (1 << log2floor(value)) <= value < (2 << log2floor(value))
+// Of course, value should not be 0!
+uint32_t log2floor(uint32_t value) {
+  // TODO(eustas): add fallback / MSVC support?
+  return (8u * sizeof(unsigned int) - 1u) ^ __builtin_clz(value);
+}
+
 void writeSize(XRangeEncoder* dst, uint32_t value) {
-  value -= 8;
-  uint32_t chunks = 2;
-  while (value > (1u << (chunks * 3))) {
-    value -= (1u << (chunks * 3));
-    chunks++;
-  }
-  for (uint32_t i = 0; i < chunks; ++i) {
-    if (i > 1) {
-      XRangeEncoder::writeNumber(dst, 2, 1);
-    }
-    XRangeEncoder::writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7u);
-  }
-  XRangeEncoder::writeNumber(dst, 2, 0);
+  uint32_t num_bits = log2floor(value - 1u);
+  XRangeEncoder::writeNumber(dst, 8, num_bits - 3u);
+  uint32_t base = 1u << num_bits;
+  XRangeEncoder::writeNumber(dst, base, value - base - 1u);
 }
 
 uint32_t simulateWriteSize(uint32_t value) {
-  return (value >= 585) ? 15 : (value >= 73) ? 11 : 7;
+  return 3u + log2floor(value - 1u);
 }
 
 void CodecParams::write(XRangeEncoder* dst) const {
@@ -394,8 +392,12 @@ Result encode(const Image& src, const Params& params) {
 
   int32_t width = src.width;
   int32_t height = src.height;
-  if (width < 8 || height < 8) {
+  if (width < 9 || height < 9) {
     if (params.debug) log("image is too small");
+    return result;
+  }
+  if (width > 2048 || height > 2048) {
+    if (params.debug) log("image is too large");
     return result;
   }
   UberCache uber(src);

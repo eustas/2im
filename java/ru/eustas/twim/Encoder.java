@@ -614,8 +614,8 @@ public class Encoder {
   static Result encode(BufferedImage src, Params params) {
     int width = src.getWidth();
     int height = src.getHeight();
-    if (width < 8 || width > 2048) throw new IllegalArgumentException("width should be in the range [8..2048]");
-    if (height < 8 || height > 2048) throw new IllegalArgumentException("height should be in the range [8..2048]");
+    if (width < 9 || width > 2048) throw new IllegalArgumentException("width should be in the range [9..2048]");
+    if (height < 9 || height > 2048) throw new IllegalArgumentException("height should be in the range [9..2048]");
     UberCache uber = new UberCache(src.getRGB(0, 0, width, height, null, 0, width), width);
     AtomicInteger nextTask = new AtomicInteger(0);
 

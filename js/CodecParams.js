@@ -75,11 +75,9 @@ export let getLineQuant = () => SinCos.SCALE;
  * @return {number}
  */
 let readSize = () => {
-  let /** @type{number} */ bits = -1;
-  while ((bits < 8) || (readNumber(2) > 0)) {
-    bits = 8 * bits + readNumber(8) + 8;
-  }
-  return bits;
+  let /** number */ numBits = readNumber(8) + 3;
+  let /** number */ base = 1 << numBits;
+  return base + readNumber(base) + 1;
 };
 
 /** @return{void} */

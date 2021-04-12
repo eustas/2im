@@ -112,14 +112,9 @@ class Fragment {
 }  // namespace
 
 uint32_t readSize(XRangeDecoder* src) {
-  uint32_t plus = 0;
-  uint32_t bits = XRangeDecoder::readNumber(src, 8);
-  do {
-    plus = (plus + 1) << 3u;
-    uint32_t extra = XRangeDecoder::readNumber(src, 8);
-    bits = (bits << 3u) + extra;
-  } while ((XRangeDecoder::readNumber(src, 2) == 1));
-  return bits + plus;
+  uint32_t num_bits = XRangeDecoder::readNumber(src, 8) + 3;
+  uint32_t base = 1u << num_bits;
+  return base + XRangeDecoder::readNumber(src, base) + 1;
 }
 
 CodecParams CodecParams::read(XRangeDecoder* src) {

@@ -29,36 +29,25 @@ class CodecParams {
     return 255 * v / vMax;
   }
 
+  private static int log2floor(int value) {
+    return 31 - Integer.numberOfLeadingZeros(value);
+  }
+
   static int readSize(XRangeDecoder src) {
-    int plus = -1;
-    int bits = 0;
-    while ((plus <= 0) || (readNumber(src, 2) == 1)) {
-      plus = (plus + 1) << 3;
-      int extra = readNumber(src, 8);
-      bits = (bits << 3) + extra;
-    }
-    return bits + plus;
+    int numBits = readNumber(src, 8) + 3;
+    int base = 1 << numBits;
+    return base + readNumber(src, base) + 1;
   }
 
   static void writeSize(XRangeEncoder dst, int value) {
-    value -= 8;
-    int chunks = 2;
-    while (value > (1 << (chunks * 3))) {
-      value -= (1 << (chunks * 3));
-      chunks++;
-    }
-    for (int i = 0; i < chunks; ++i) {
-      if (i > 1) {
-        writeNumber(dst, 2, 1);
-      }
-      writeNumber(dst, 8, (value >> (3 * (chunks - i - 1))) & 7);
-    }
-    writeNumber(dst, 2, 0);
+    int numBits = log2floor(value - 1);
+    int base = 1 << numBits;
+    writeNumber(dst, 8, numBits - 3);
+    writeNumber(dst, base, value - base - 1);
   }
 
-  // TODO(eustas): test simulation
   static int simulateWriteSize(int value) {
-    return (value >= 585) ? 15 : (value >= 73) ? 11 : 7;
+    return 3 + log2floor(value - 1);
   }
 
   private static final int SCALE_STEP_FACTOR = 40;
