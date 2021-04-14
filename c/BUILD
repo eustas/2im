@@ -6,6 +6,8 @@ DEFAULT_COPTS = ["-march=native"]
 
 TEST_COPTS = DEFAULT_COPTS + ["-Iexternal/gtest/include"]
 
+#load("@rules_fuzzing//fuzzing:cc_defs.bzl", "cc_fuzz_test")
+
 cc_library(
     name = "platform",
     srcs = ["platform.cc"],
@@ -222,3 +224,9 @@ cc_binary(
         ":platform",
     ],
 )
+
+#cc_fuzz_test(
+#    name = "fuzz_decoder",
+#    srcs = ["fuzz_decoder.cc"],
+#    deps = [":decoder"],
+#)
