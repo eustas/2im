@@ -32,6 +32,7 @@ final class XRangeEncoder {
   private ArrayList<Entry> entries = new ArrayList<Entry>();
 
   static void writeNumber(XRangeEncoder dst, int max, int value) {
+    // TODO(eustas): assert(max > 0)
     if (max > 1) dst.entries.add(new Entry(value, max));
   }
 

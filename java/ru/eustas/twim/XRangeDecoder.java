@@ -18,6 +18,7 @@ final class XRangeDecoder {
   }
 
   static int readNumber(XRangeDecoder src, int max) {
+    if (max == 0) throw new IllegalStateException("max must be not less than 1");
     if (max == 1) return 0;
     int state = src.state;
     int offset = state & MASK;

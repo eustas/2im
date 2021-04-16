@@ -663,7 +663,7 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
   uint32_t* RESTRICT stats_v =
       reinterpret_cast<uint32_t*>(stats_ + 5 * stats_step);
   uint32_t level = cp.getLevel(region);
-  // TODO(eustas): assert level is not kInvalid.
+  // TODO(eustas): assert(level != CodecParams::kInvalid)
   uint32_t angle_max = 1u << cp.angle_bits[level];
   uint32_t angle_mult = (SinCos.kMaxAngle / angle_max);
   prepareCache(cache, &region);
@@ -732,6 +732,12 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
                       distance_range.distance(best_line),
                       f->leftChild->region,
                       f->rightChild->region);
+    // Check that precise splitting does not produce empty region.
+    if (f->leftChild->region->len == 0 || f->rightChild->region->len == 0) {
+      f->best_score = -1.0f;
+      f->best_cost = -1.0f;
+      return;
+    }
 
     f->best_angle_code = best_angle_code;
     f->best_num_lines = distance_range.num_lines;

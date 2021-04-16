@@ -93,6 +93,7 @@ public class Main {
       String path = arg;
 
       if (mode == Mode.ENCODE || mode == Mode.ENCODE_DECODE) {
+        System.out.println("Encdoing " + path);
         long t0 = System.nanoTime();
         BufferedImage image = ImageIO.read(new File(path));
         Encoder.Result result = Encoder.encode(image, params);
@@ -103,9 +104,15 @@ public class Main {
       }
 
       if (mode == Mode.DECODE || mode == Mode.ENCODE_DECODE) {
+        System.out.println("Decoding " + path);
         byte[] data = Files.readAllBytes(FileSystems.getDefault().getPath(path));
         path = path + ".png";
-        ImageIO.write(Decoder.decode(data), "png", new File(path));
+        BufferedImage image = Decoder.decode(data);
+        if (image == null) {
+          System.out.println("Corrupted stream");
+        } else {
+          ImageIO.write(image, "png", new File(path));
+        }
       }
     }
   }

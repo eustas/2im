@@ -47,13 +47,14 @@ class Fragment {
   bool parse(XRangeDecoder* src, const CodecParams& cp, uint32_t* palette,
              std::vector<Fragment*>* children) {
     type = XRangeDecoder::readNumber(src, NodeType::COUNT);
+
+    uint32_t level = cp.getLevel(*region);
+    if (level == CodecParams::kInvalid) return false;  // corrupted input
+
     if (type == NodeType::FILL) {
       color = readColor(src, cp, palette);
       return true;
     }
-
-    uint32_t level = cp.getLevel(*region);
-    if (level == CodecParams::kInvalid) return false;  // corrupted input
 
     if (type != NodeType::HALF_PLANE) return false;
 
@@ -62,8 +63,10 @@ class Fragment {
     uint32_t angleCode = XRangeDecoder::readNumber(src, angleMax);
     uint32_t angle = angleCode * angleMult;
     DistanceRange distance_range(*region, angle, cp);
-    if (distance_range.num_lines == DistanceRange::kInvalid) return false;
-    uint32_t line = XRangeDecoder::readNumber(src, distance_range.num_lines);
+    uint32_t numLines = distance_range.num_lines;
+    // Should never happen.
+    if (numLines == DistanceRange::kInvalid) return false;
+    uint32_t line = XRangeDecoder::readNumber(src, numLines);
 
     // Cutting with half-planes does not increase the number of scans.
     uint32_t step = vecSize(region->len);

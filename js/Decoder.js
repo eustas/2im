@@ -2,7 +2,7 @@ import * as CodecParams from "./CodecParams.js";
 import {getWidth, getHeight} from "./CodecParams.js";
 import * as EntropyDecoder from "./XRangeDecoder.js";
 import {readNumber} from "./XRangeDecoder.js";
-import {b8, forEachScan, int32ArraySet, last, newInt32Array} from './Mini.js';
+import {assertFalse, b8, forEachScan, int32ArraySet, last, newInt32Array} from './Mini.js';
 import * as DistanceRange from "./DistanceRange.js";
 import * as Region from "./Region.js";
 import * as SinCos from './SinCos.js';
@@ -46,6 +46,7 @@ let getColor = () => {
  * @return{void}
  */
 let parse = (region, children, width, rgba) => {
+  assertFalse(!region[last(region)]); 
   let /** @type{number} */ type = readNumber(CodecParams.NODE_TYPE_COUNT);
 
   if (type == CodecParams.NODE_FILL) {
@@ -59,7 +60,6 @@ let parse = (region, children, width, rgba) => {
   }
 
   let /** @type{number} */ level = CodecParams.getLevel(region);
-
   let /** @type{number} */ lastCount3_1 = region[last(region)] * 3 + 1;
   let /** @type{!Int32Array} */ inner = newInt32Array(lastCount3_1);
   let /** @type{!Int32Array} */ outer = newInt32Array(lastCount3_1);
@@ -72,7 +72,6 @@ let parse = (region, children, width, rgba) => {
   DistanceRange.update(region, angle);
   let /** @type{number} */ line = readNumber(DistanceRange.getNumLines());
   Region.splitLine(region, angle, DistanceRange.distance(line), inner, outer);
-
   children.push(inner, outer);
 };
 

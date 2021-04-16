@@ -5,6 +5,7 @@
 namespace twim {
 
 uint32_t XRangeDecoder::readNumber(XRangeDecoder* src, size_t max) {
+  // TODO(eustas): assert(max > 0)
   if (max == 1) return 0;
   size_t state = src->state;
   size_t offset = state & XRangeCode::kMask;

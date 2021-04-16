@@ -40,7 +40,7 @@ DistanceRange::DistanceRange(const Vector<int32_t>& region, int32_t angle,
   line_quant = cp.getLineQuant();
   uint32_t delta = ma - mi;
   if (delta > line_quant * cp.line_limit) line_quant = (2 * delta + cp.line_limit) / (2 * cp.line_limit);
-  num_lines = delta / line_quant;
+  num_lines = std::max<uint32_t>(delta / line_quant, 1);
 }
 
 }  // namespace twim

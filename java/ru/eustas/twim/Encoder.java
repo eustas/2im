@@ -358,6 +358,13 @@ public class Encoder {
         int[] leftRegion = new int[childStep * 3 + 1];
         int[] rightRegion = new int[childStep * 3 + 1];
         Region.splitLine(region, bestAngleCode * angleMult, distanceRange.distance(bestLine), leftRegion, rightRegion);
+        // Check that precise splitting does not produce empty region.
+        if (leftRegion[leftRegion.length - 1] == 0 || rightRegion[rightRegion.length - 1] == 0) {
+          this.bestScore = -1.0f;
+          this.bestCost = -1.0f;
+          return;
+        }
+
         this.leftChild = new Fragment(leftRegion);
         this.rightChild = new Fragment(rightRegion);
 

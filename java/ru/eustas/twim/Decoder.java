@@ -35,18 +35,17 @@ public class Decoder {
       this.region = region;
     }
 
-    void parse(XRangeDecoder src, CodecParams cp, int[] palette, List<Fragment> children, DistanceRange distanceRange) {
+    boolean parse(XRangeDecoder src, CodecParams cp, int[] palette, List<Fragment> children, DistanceRange distanceRange) {
       type = readNumber(src, CodecParams.NODE_TYPE_COUNT);
-
-      if (type == NODE_FILL) {
-        color = readColor(src, cp, palette);
-        return;
-      }
 
       int level = cp.getLevel(region);
       if (level < 0) {
-        // TODO(eustas): check this is possible.
-        throw new IllegalStateException("corrupted input");
+        return false;  // This happpens when region is empty.
+      }
+
+      if (type == NODE_FILL) {
+        color = readColor(src, cp, palette);
+        return true;
       }
 
       // Cutting with half-planes does not increase the number of scans.
@@ -60,11 +59,9 @@ public class Decoder {
           int angleMult = (SinCos.MAX_ANGLE / angleMax);
           int angleCode = readNumber(src, angleMax);
           int angle = angleCode * angleMult;
+          int numLines = distanceRange.numLines;
           distanceRange.update(region, angle, cp);
-          if (distanceRange.numLines == 0) {
-            // TODO(eustas): how to report error?
-          }
-          int line = readNumber(src, distanceRange.numLines);
+          int line = readNumber(src, numLines);
           Region.splitLine(region, angle, distanceRange.distance(line), inner, outer);
           break;
         }
@@ -78,6 +75,7 @@ public class Decoder {
       children.add(leftChild);
       rightChild = new Fragment(outer);
       children.add(rightChild);
+      return true;
     }
 
     void render(int width, int[] rgb) {
@@ -132,7 +130,9 @@ public class Decoder {
     while (cursor < children.size()) {
       int checkpoint = children.size();
       for (; cursor < checkpoint; ++cursor) {
-        children.get(cursor).parse(src, cp, palette, children, distanceRange);
+        if (!children.get(cursor).parse(src, cp, palette, children, distanceRange)) {
+          return null;
+        }
       }
     }
 
