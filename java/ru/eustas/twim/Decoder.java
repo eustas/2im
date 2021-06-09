@@ -59,8 +59,8 @@ public class Decoder {
           int angleMult = (SinCos.MAX_ANGLE / angleMax);
           int angleCode = readNumber(src, angleMax);
           int angle = angleCode * angleMult;
-          int numLines = distanceRange.numLines;
           distanceRange.update(region, angle, cp);
+          int numLines = distanceRange.numLines;
           int line = readNumber(src, numLines);
           Region.splitLine(region, angle, distanceRange.distance(line), inner, outer);
           break;

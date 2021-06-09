@@ -1,5 +1,6 @@
 package ru.eustas.twim;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.awt.image.BufferedImage;
@@ -20,6 +21,15 @@ public class EncoderTest {
       }
     }
     return result;
+  }
+
+  // TODO(eustas): move to CodecParamsTest?
+  @Test
+  public void testImageTax() {
+    XRangeEncoder dst = new XRangeEncoder();
+    CodecParams cp = new CodecParams(8, 8);
+    cp.write(dst);
+    assertEquals(dst.estimateEntropy(), CodecParams.calculateImageTax(8, 8), 1e-8f);
   }
 
   @Test

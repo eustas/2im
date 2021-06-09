@@ -174,6 +174,16 @@ cc_test(
 )
 
 cc_test(
+    name = "encoder_test",
+    srcs = ["encoder_test.cc"],
+    copts = TEST_COPTS,
+    deps = [
+        ":encoder",
+        "@gtest//:main",
+    ],
+)
+
+cc_test(
     name = "xrange_test",
     srcs = ["xrange_test.cc"],
     copts = TEST_COPTS,

@@ -13,8 +13,7 @@ public class DecoderTest {
 
   @Test
   public void testDecoder() {
-    byte[] encoded = {-125, -119, -8, 39, 89, 113, 0, -128, -1, -1, -1, 62, 75, 106, -28, -75, 70,
-        -53, -57, -52, 27, 8, 22};
+    byte[] encoded = {50, -103, -66, 110, -65, 119, 0, -128, -1, -1, -1, 110, 127, -46, 48, -77, 28, 6, -19, 111, -22, 121, 77};
     BufferedImage decoded = Decoder.decode(encoded);
     assertEquals(20, decoded.getWidth());
     assertEquals(20, decoded.getHeight());

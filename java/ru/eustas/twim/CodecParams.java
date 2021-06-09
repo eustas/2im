@@ -74,6 +74,7 @@ class CodecParams {
   CodecParams(int width, int height) {
     this.width = width;
     this.height = height;
+    setPartitionCode(0);
   }
 
   int getLineQuant() {
@@ -152,7 +153,6 @@ class CodecParams {
     writeNumber(dst, MAX_COLOR_CODE, colorCode);
   }
 
-  // TODO(eustas): test simulation
   /** Simulates {@code write}. */
   static float calculateImageTax(int width, int height) {
     return 20.5577740523f + simulateWriteSize(width) + simulateWriteSize(height);

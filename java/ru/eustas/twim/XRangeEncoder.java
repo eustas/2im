@@ -36,6 +36,14 @@ final class XRangeEncoder {
     if (max > 1) dst.entries.add(new Entry(value, max));
   }
 
+  float estimateEntropy() {
+    double v = 1.0;
+    for (int i = 0; i < entries.size(); ++i) {
+      v *= entries.get(i).max;
+    }
+    return (float)(Math.log(v) / Math.log(2));
+  }
+
   byte[] finish() {
     // First of all, reverse the input.
 
