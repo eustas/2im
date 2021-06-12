@@ -82,7 +82,7 @@ TEST(RegionTest, VerticalSplit) {
   CodecParams cp(4, 4);
   cp.line_limit = 63;
   DistanceRange distanceRange(*region, angle, cp);
-  EXPECT_EQ(3, distanceRange.num_lines);
+  EXPECT_EQ(3u, distanceRange.num_lines);
 
   // 1/3
   Vector<int32_t>* left = allocVector<int32_t>(3 * step3);

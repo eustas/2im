@@ -9,8 +9,8 @@ jobs:
       - name: Build
         run: |
           cd ${GITHUB_WORKSPACE}/c/
-          bazel build ...:all
+          bazel build -c dbg ...:all
       - name: Test
         run: |
           cd ${GITHUB_WORKSPACE}/c/
-          bazel test --test_output=errors ...:all
+          bazel test -c dbg --test_output=errors ...:all
