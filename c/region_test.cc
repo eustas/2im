@@ -47,7 +47,7 @@ TEST(RegionTest, HorizontalSplit) {
   int32_t angle = SinCos.kMaxAngle / 2;
   CodecParams cp(4, 4);
   DistanceRange distanceRange(*region, angle, cp);
-  EXPECT_EQ(3, distanceRange.num_lines);
+  EXPECT_EQ(3u, distanceRange.num_lines);
   Vector<int32_t>* left = allocVector<int32_t>(3 * step1);
   Vector<int32_t>* right = allocVector<int32_t>(3 * step1);
 

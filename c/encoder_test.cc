@@ -29,8 +29,8 @@ TEST(EncoderTest, EncodeCross) {
   params.variants = &variant;
   params.numVariants = 1;
   auto result = Encoder::encode(makeCross(), params);
-  ASSERT_LE(result.mse, 1e-3);
-  ASSERT_LE(result.data.size, 23);
+  ASSERT_LE(result.mse, 1e-3f);
+  ASSERT_LE(result.data.size, 23u);
   /*fprintf(stderr, "mse: %f, size: %zu\n", result.mse, result.data.size);
   for (size_t i = 0; i < result.data.size; ++i) {
     fprintf(stderr, "%d, ", static_cast<int8_t>(result.data.data[i]));

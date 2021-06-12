@@ -12,8 +12,8 @@ float calculateImageTax(uint32_t width, uint32_t height);
 
 class XRangeEncoderFriend {
  public:
-  static int countBits(XRangeEncoder* src) {
-    int count = 0;
+  static uint32_t countBits(XRangeEncoder* src) {
+    uint32_t count = 0;
     for (size_t i = 0; i < src->entries.size; ++i) {
       uint32_t max = src->entries.data[i].max;
       if ((max & (max - 1)) != 0) return -1;

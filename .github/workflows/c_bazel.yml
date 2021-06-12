@@ -13,4 +13,4 @@ jobs:
       - name: Test
         run: |
           cd ${GITHUB_WORKSPACE}/c/
-          bazel test ...:all
+          bazel test --test_output=errors ...:all
