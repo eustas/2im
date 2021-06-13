@@ -1,4 +1,4 @@
-name: Build / test C project with Bazel
+name: Build / test Java project with Bazel
 on: [push]
 jobs:
   build:
