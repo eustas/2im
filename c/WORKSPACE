@@ -124,7 +124,9 @@ new_local_repository(
     build_file_content = """
 cc_library(
     name = "hwy",
-    srcs = glob(["hwy/*.cc"]),
+    srcs = [
+        "hwy/targets.cc",
+    ],
     hdrs = glob([
         "hwy/*.h",
         "hwy/ops/*.h",

@@ -2,7 +2,7 @@
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "encoder_simd.cc"
 #include "hwy/foreach_target.h"
-#endif
+#endif  // __wasm__
 
 #include <algorithm>
 
@@ -13,16 +13,17 @@
 #include "region.h"
 #include "sin_cos.h"
 
-#include "hwy/targets.h"  // SupportedAndGeneratedTargets
+#include "hwy/highway.h"
+//#include "hwy/targets.h"  // SupportedAndGeneratedTargets
 
 /*extern "C" {
 void debugInt(uint32_t i);
 void debugFloat(float f);
 }*/
 
-#include <hwy/before_namespace-inl.h>
+HWY_BEFORE_NAMESPACE();
 namespace twim {
-#include <hwy/begin_target-inl.h>
+namespace HWY_NAMESPACE {
 
 struct Stats {
   /* sum_r, sum_g, sum_b, pixel_count */
@@ -62,7 +63,7 @@ void INLINE updateGeHorizontal(Cache* cache, int32_t d) {
     const auto offset = Load(di32, row_offset + i);
     const auto x0 = Load(di32, region_x0 + i);
     const auto x1 = Load(di32, region_x1 + i);
-    const auto selector = MaskFromVec(BitCast(di32, VecFromMask(y < d_ny_)));
+    const auto selector = RebindMask(di32, y < d_ny_);
     const auto x = IfThenElse(selector, x1, x0);
     const auto x_off = k4 * x + offset;
     Store(x_off, di32, region_x + i);
@@ -183,8 +184,8 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
   constexpr const HWY_FULL(int32_t) kDi32;
   HWY_ALIGN static const int32_t kIotaArray[] = {0, 1, 2,  3,  4,  5,  6,  7,
                                                   8, 9, 10, 11, 12, 13, 14, 15};
-  static const I32xN kIota = Load(kDi32, kIotaArray);
-  static const I32xN kStep = Set(kDi32, static_cast<int32_t>(Lanes(kDi32)));
+  static const decltype(Zero(kDi32)) kIota = Load(kDi32, kIotaArray);
+  static const decltype(Zero(kDi32)) kStep = Set(kDi32, static_cast<int32_t>(Lanes(kDi32)));
 
   auto limit = Set(di32, static_cast<uint32_t>(length));
   auto idx = kIota;
@@ -193,25 +194,15 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
   for (size_t i = Lanes(df); i < length; i += Lanes(df)) {
     idx = idx + kStep;
     const auto value = Load(df, values + i);
-    const auto selector = BitCast(di32, VecFromMask(op.select(value, bestValue))) & VecFromMask(idx < limit);
-    bestValue = IfThenElse(MaskFromVec(BitCast(df, selector)), value, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(selector), idx, bestIdx);
+    const auto selector = And(op.select(value, bestValue), RebindMask(df, idx < limit));
+    bestValue = IfThenElse(selector, value, bestValue);
+    bestIdx = IfThenElse(RebindMask(di32, selector), idx, bestIdx);
   }
 
 #if HWY_TARGET == HWY_AVX3
   {
-    const decltype(bestIdx) shuffledIdx1{Blocks2301(bestIdx.raw)};
-    const decltype(bestValue) shuffledValue1{Blocks2301(bestValue.raw)};
-    const auto selector1 = op.select(shuffledValue1, bestValue);
-    bestValue = IfThenElse(selector1, shuffledValue1, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector1))),
-                         shuffledIdx1, bestIdx);
-    const decltype(bestIdx) shuffledIdx2{Blocks1032(bestIdx.raw)};
-    const decltype(bestValue) shuffledValue2{Blocks1032(bestValue.raw)};
-    const auto selector2 = op.select(shuffledValue2, bestValue);
-    bestValue = IfThenElse(selector2, shuffledValue2, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector2))),
-                         shuffledIdx2, bestIdx);
+    const auto winnerValue = op.reduce(bestValue);
+    return GetLane(Compress(bestIdx, RebindMask(di32, bestValue == winnerValue)));
   }
 #elif HWY_TARGET == HWY_AVX2
   {
@@ -219,8 +210,7 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
     const auto shuffledValue = ConcatLowerUpper(bestValue, bestValue);
     const auto selector = op.select(shuffledValue, bestValue);
     bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector))),
-                         shuffledIdx, bestIdx);
+    bestIdx = IfThenElse(RebindMask(di32, selector), shuffledIdx, bestIdx);
   }
 #endif
 #if HWY_TARGET != HWY_SCALAR
@@ -229,16 +219,14 @@ INLINE uint32_t choose(Op op, const float* RESTRICT values, size_t length) {
     const auto shuffledValue = Shuffle1032(bestValue);
     const auto selector = op.select(shuffledValue, bestValue);
     bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector))),
-                         shuffledIdx, bestIdx);
+    bestIdx = IfThenElse(RebindMask(di32, selector), shuffledIdx, bestIdx);
   }
   {
     const auto shuffledIdx = Shuffle0321(bestIdx);
     const auto shuffledValue = Shuffle0321(bestValue);
     const auto selector = op.select(shuffledValue, bestValue);
     // bestValue = IfThenElse(selector, shuffledValue, bestValue);
-    bestIdx = IfThenElse(MaskFromVec(BitCast(di32, VecFromMask(selector))),
-                         shuffledIdx, bestIdx);
+    bestIdx = IfThenElse(RebindMask(di32, selector), shuffledIdx, bestIdx);
   }
 #endif
   return GetLane(bestIdx);
@@ -248,6 +236,10 @@ struct OpMin {
   template <typename T>
   INLINE auto select(T a, T b) -> decltype(a < b) {
     return a < b;
+  }
+  template <typename T>
+  INLINE auto reduce(T v) -> T {
+    return MinOfLanes(v);
   }
   INLINE uint32_t scalarChoose(const float* RESTRICT values, size_t length) {
     return std::distance(values, std::min_element(values, values + length));
@@ -262,6 +254,10 @@ struct OpMax {
   template <typename T>
   INLINE auto select(T a, T b) -> decltype(a > b) {
     return a > b;
+  }
+  template <typename T>
+  INLINE auto reduce(T v) -> T {
+    return MaxOfLanes(v);
   }
   INLINE uint32_t scalarChoose(const float* RESTRICT values, size_t length) {
     return std::distance(values, std::max_element(values, values + length));
@@ -747,9 +743,9 @@ void findBestSubdivision(Fragment* f, Cache* cache, const CodecParams& cp) {
   }
 }
 
-#include <hwy/end_target-inl.h>
+}  // namespace HWY_NAMESPACE
 }  // namespace twim
-#include <hwy/after_namespace-inl.h>
+HWY_AFTER_NAMESPACE();
 
 #if HWY_ONCE
 
@@ -760,7 +756,7 @@ extern void debugFloat(float f);
 #else
 void debugInt(uint32_t i) { fprintf(stderr, "i %u\n", i); }
 void debugFloat(float f) { fprintf(stderr, "f %f\n", f); }
-#endif
+#endif  // __wasm__
 }*/
 
 namespace twim {
@@ -769,12 +765,12 @@ namespace twim {
 #define CALL HWY_STATIC_DISPATCH
 #else
 #define CALL HWY_DYNAMIC_DISPATCH
-HWY_EXPORT(simulateEncode)
-HWY_EXPORT(chooseColor)
-HWY_EXPORT(findBestSubdivision)
-HWY_EXPORT(gatherPatches)
-HWY_EXPORT(buildPalette)
-#endif
+HWY_EXPORT(simulateEncode);
+HWY_EXPORT(chooseColor);
+HWY_EXPORT(findBestSubdivision);
+HWY_EXPORT(gatherPatches);
+HWY_EXPORT(buildPalette);
+#endif  // __wasm__
 
 float simulateEncode(float imageTax, const Partition& partition_holder,
                      uint32_t target_size, const CodecParams& cp) {
