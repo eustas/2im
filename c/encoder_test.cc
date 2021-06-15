@@ -20,7 +20,7 @@ Image makeCross() {
 }  // namespace
 
 TEST(EncoderTest, EncodeCross) {
-  Encoder::Params params;
+  Encoder::Params params = {};
   params.targetSize = 24;
   Encoder::Variant variant;
   variant.partitionCode = 0xD7;
