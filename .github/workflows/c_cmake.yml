@@ -1,4 +1,4 @@
-name: Build / test C project with Bazel
+name: Build / test C project with CMake
 on: [push]
 jobs:
   build:
@@ -11,5 +11,5 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/
           export BUILD_DIR=build-default
-          cmake -B ${BUILD_DIR}
+          cmake -B ${BUILD_DIR} ./c/
           cmake --build ${BUILD_DIR}
