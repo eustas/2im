@@ -3,6 +3,8 @@ project(c)
 
 set(CMAKE_CXX_STANDARD 11)
 
+add_subdirectory( ../third_party/highway hwy EXCLUDE_FROM_ALL)
+
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msimd128")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -flto -fno-exceptions -fno-rtti")
 #set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -flto -fno-exceptions -fno-rtti -g2")
@@ -67,8 +69,7 @@ add_library(twimEncoder STATIC
   xrange_encoder.cc
   xrange_encoder.h
 )
-target_include_directories(twimEncoder PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" ../third_party/highway)
-target_link_libraries(twimEncoder PUBLIC twimBase)
+target_link_libraries(twimEncoder PUBLIC twimBase hwy)
 
 add_library(simpleAlloc STATIC
   simple_alloc.cc

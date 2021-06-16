@@ -1,0 +1,15 @@
+name: Build / test C project with Bazel
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Build
+        run: |
+          cd ${GITHUB_WORKSPACE}/
+          export BUILD_DIR=build-default
+          cmake -B ${BUILD_DIR}
+          cmake --build ${BUILD_DIR}
