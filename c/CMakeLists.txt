@@ -32,6 +32,7 @@ check_cxx_source_compiles(
 if (NOT "${TWIM_WASM}")
   find_package(ZLIB REQUIRED)  # dependency of PNG
   find_package(PNG REQUIRED)
+  find_package(Threads REQUIRED)
 endif()
 
 add_library(twimBase STATIC
@@ -70,6 +71,10 @@ add_library(twimEncoder STATIC
   xrange_encoder.h
 )
 target_link_libraries(twimEncoder PUBLIC twimBase hwy)
+if (NOT "${TWIM_WASM}")
+  target_link_libraries(twimEncoder PRIVATE Threads::Threads)
+endif()
+
 
 add_library(simpleAlloc STATIC
   simple_alloc.cc
