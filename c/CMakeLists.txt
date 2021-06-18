@@ -1,7 +1,18 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.11)
 project(c)
 
 set(CMAKE_CXX_STANDARD 11)
+
+include(FetchContent)
+
+FetchContent_Declare(
+  GTest
+  URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip
+)
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(BUILD_GMOCK OFF CACHE INTERNAL "")
+FetchContent_MakeAvailable(GTest)
 
 add_subdirectory( ../third_party/highway hwy EXCLUDE_FROM_ALL)
 
@@ -75,7 +86,6 @@ if (NOT "${TWIM_WASM}")
   target_link_libraries(twimEncoder PRIVATE Threads::Threads)
 endif()
 
-
 add_library(simpleAlloc STATIC
   simple_alloc.cc
 )
@@ -128,3 +138,26 @@ if ("${TWIM_WASM}")
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   )
 endif()
+
+# Testing ----------------------------------------------------------------------
+
+enable_testing()
+include(GoogleTest)
+
+set(TWIM_TEST_FILES
+  codec_params_test.cc
+  crc64_test.cc
+  encoder_test.cc
+  region_test.cc
+  sin_cos_test.cc
+  xrange_test.cc
+)
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tests)
+foreach (TESTFILE IN LISTS TWIM_TEST_FILES)
+  # The TESTNAME is the name without the extension or directory.
+  get_filename_component(TESTNAME ${TESTFILE} NAME_WE)
+  add_executable(${TESTNAME} ${TESTFILE})
+  target_link_libraries(${TESTNAME} twimDecoder twimEncoder gtest_main)
+  gtest_discover_tests(${TESTNAME})
+endforeach()
