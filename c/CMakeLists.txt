@@ -14,7 +14,11 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 set(BUILD_GMOCK OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(GTest)
 
-add_subdirectory( ../third_party/highway hwy EXCLUDE_FROM_ALL)
+FetchContent_Declare(
+  highway
+  URL https://github.com/eustas/highway/archive/refs/heads/master.zip
+)
+FetchContent_MakeAvailable(highway)
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msimd128")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -flto -fno-exceptions -fno-rtti")

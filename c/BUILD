@@ -159,7 +159,7 @@ cc_test(
     deps = [
         ":encoder",
         ":xrange_encoder",
-        "@gtest//:main",
+        "@gtest//:gtest_main",
     ],
 )
 
@@ -169,7 +169,7 @@ cc_test(
     copts = TEST_COPTS,
     deps = [
         ":crc64",
-        "@gtest//:main",
+        "@gtest//:gtest_main",
     ],
 )
 
@@ -179,7 +179,7 @@ cc_test(
     copts = TEST_COPTS,
     deps = [
         ":encoder",
-        "@gtest//:main",
+        "@gtest//:gtest_main",
     ],
 )
 
@@ -190,7 +190,7 @@ cc_test(
     deps = [
         ":xrange_decoder",
         ":xrange_encoder",
-        "@gtest//:main",
+        "@gtest//:gtest_main",
     ],
     shard_count = 5,
 )
@@ -205,7 +205,7 @@ cc_test(
         ":platform",
         ":region",
         ":sin_cos",
-        "@gtest//:main",
+        "@gtest//:gtest_main",
     ],
 )
 
@@ -216,7 +216,7 @@ cc_test(
     deps = [
         ":crc64",
         ":sin_cos",
-        "@gtest//:main",
+        "@gtest//:gtest_main",
     ],
 )
 
