@@ -104,21 +104,19 @@ http_archive(
 
 http_archive(
     name = "hwy",
-    url = "https://github.com/eustas/highway/archive/refs/heads/master.zip",
-    sha256 = "30b84d76bddc1afecfd075a07eef4ac2bdbf3fba0b865bf14b6bad8dc37d5d9d",
-    build_file_content = """
-cc_library(
-    name = "hwy",
-    srcs = [
-        "hwy/targets.cc",
+    url = "https://github.com/google/highway/archive/8e5750125c02fb75a348cdc02382758f763bcd06.zip",
+    sha256 = "2d17ef44a5aa5fc935b0584c88146e37a01720295a76f19a025307c2c0535011",
+    strip_prefix = "highway-8e5750125c02fb75a348cdc02382758f763bcd06",
+)
+
+# TODO(eustas): looks like bazel bug - no reson to include this project here.
+http_archive(
+    name = "bazel_skylib",
+    urls = [
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
     ],
-    hdrs = glob([
-        "hwy/*.h",
-        "hwy/ops/*.h",
-    ]),
-    includes = ["."],
-    visibility = ["//visibility:public"],
+    sha256 = "1c531376ac7e5a180e0237938a2536de0c54d93f5c278634818e0efc952dd56c",
 )
-    """,
-    strip_prefix = "highway-master",
-)
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+bazel_skylib_workspace()
