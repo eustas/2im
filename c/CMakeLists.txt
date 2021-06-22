@@ -175,6 +175,8 @@ if ("${TWIM_WASM}")
 endif()
 
 # Testing ----------------------------------------------------------------------
+# TODO(eustas): enable WASM tests
+if (NOT TWIM_WASM)
 
 enable_testing()
 include(GoogleTest)
@@ -196,3 +198,5 @@ foreach (TEST_FILE IN LISTS TWIM_TEST_FILES)
   target_link_libraries(${TEST_NAME} twimDecoder twimEncoder gtest_main)
   gtest_discover_tests(${TEST_NAME})
 endforeach()
+
+endif()  # TWIM_WASM

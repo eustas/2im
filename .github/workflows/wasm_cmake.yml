@@ -1,0 +1,21 @@
+name: Build / test WASM project with CMake
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: mymindstorm/setup-emsdk@v9
+        with:
+          version: 2.0.24
+          actions-cache-folder: 'emsdk-cache'
+      - name: Build
+        run: |
+          cd ${GITHUB_WORKSPACE}/
+          export BUILD_DIR=build-default
+          emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release ./c/
+          cmake --build ${BUILD_DIR}
+      - uses: actions/upload-artifact@v2
+        with:
+          name: twim.wasm
+          path: ${BUILD_DIR}/twim.wasm
