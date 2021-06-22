@@ -1,6 +1,6 @@
 # Minimal version for "FetchContent"
 cmake_minimum_required(VERSION 3.11)
-project(twim c)
+project(twim CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 
