@@ -5,9 +5,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: mymindstorm/setup-emsdk@v9
+      - uses: mymindstorm/setup-emsdk@v10
         with:
-          version: 2.0.24
+          version: 2.0.23
           actions-cache-folder: 'emsdk-cache'
       - name: Build
         run: |
