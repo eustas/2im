@@ -9,9 +9,22 @@ jobs:
         with:
           version: 2.0.23
           actions-cache-folder: 'emsdk-cache'
+      - name: Cache Binaryen
+        id: cache-binaryen
+        uses: actions/cache@v2
+        with:
+          path: binaryen
+          key: binaryen
+      - name: Download Binaryen
+        if: steps.cache-binaryen.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ${GITHUB_WORKSPACE}/binaryen
+          cd ${GITHUB_WORKSPACE}/binaryen
+          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_101/binaryen-version_101-x86_64-linux.tar.gz | tar -xz --strip-components=1
       - name: Build
         run: |
           cd ${GITHUB_WORKSPACE}/
+          export PATH=${PATH}:${GITHUB_WORKSPACE}/binaryen/bin
           export BUILD_DIR=build-default
           emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release ./c/
           cmake --build ${BUILD_DIR}
