@@ -21,14 +21,27 @@ jobs:
           mkdir -p ${GITHUB_WORKSPACE}/binaryen
           cd ${GITHUB_WORKSPACE}/binaryen
           curl -L https://github.com/WebAssembly/binaryen/releases/download/version_101/binaryen-version_101-x86_64-linux.tar.gz | tar -xz --strip-components=1
-      - name: Build
+      - name: Set Environment
+        run: |
+          echo "SCALAR_BUILD_DIR=${GITHUB_WORKSPACE}/build-scalar" >> ${GITHUB_ENV}
+          echo "SIMD_BUILD_DIR=${GITHUB_WORKSPACE}/build-simd" >> ${GITHUB_ENV}
+      - name: Build Scalar
         run: |
           cd ${GITHUB_WORKSPACE}/
           export PATH=${PATH}:${GITHUB_WORKSPACE}/binaryen/bin
-          export BUILD_DIR=build-default
+          export BUILD_DIR=${SCALAR_BUILD_DIR}
+          emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release ./c/
+          cmake --build ${BUILD_DIR}
+      - name: Build SIMD
+        run: |
+          cd ${GITHUB_WORKSPACE}/
+          export PATH=${PATH}:${GITHUB_WORKSPACE}/binaryen/bin
+          export BUILD_DIR=${SIMD_BUILD_DIR}
           emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release ./c/
           cmake --build ${BUILD_DIR}
       - uses: actions/upload-artifact@v2
         with:
-          name: twim.wasm
-          path: ${BUILD_DIR}/twim.wasm
+          name: wasm
+          path: |
+            ${SCALAR_BUILD_DIR}/twim.wasm
+            ${SIMD_BUILD_DIR}/simd-twim.wasm
