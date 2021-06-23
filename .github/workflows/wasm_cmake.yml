@@ -1,5 +1,5 @@
-name: Build / test WASM project with CMake
-on: [push]
+name: Build / test WASM project with CMake / update node modules
+on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -49,3 +49,6 @@ jobs:
           name: wasm
           path: ${{ env.ARTIFACTS_DIR }}
           if-no-files-found: error
+      - name: Update  node modules
+        run: |
+          echo "${GITHUB_EVENT_NAME}"
