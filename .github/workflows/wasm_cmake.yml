@@ -48,4 +48,5 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: wasm
-          path: ${ARTIFACTS_DIR}
+          path: ${{ARTIFACTS_DIR}}
+          if-no-files-found: error
