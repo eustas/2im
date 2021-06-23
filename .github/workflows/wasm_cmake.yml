@@ -25,6 +25,7 @@ jobs:
         run: |
           echo "SCALAR_BUILD_DIR=${GITHUB_WORKSPACE}/build-scalar" >> ${GITHUB_ENV}
           echo "SIMD_BUILD_DIR=${GITHUB_WORKSPACE}/build-simd" >> ${GITHUB_ENV}
+          echo "ARTIFACTS_DIR=${GITHUB_WORKSPACE}/artifacts" >> ${GITHUB_ENV}
       - name: Build Scalar
         run: |
           cd ${GITHUB_WORKSPACE}/
@@ -37,11 +38,14 @@ jobs:
           cd ${GITHUB_WORKSPACE}/
           export PATH=${PATH}:${GITHUB_WORKSPACE}/binaryen/bin
           export BUILD_DIR=${SIMD_BUILD_DIR}
-          emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release ./c/
+          emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release -D TWIM_WASM_ENABLE_SIMD=ON ./c/
           cmake --build ${BUILD_DIR}
+      - name: Collect Artifacts
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/
+          cp ${SCALAR_BUILD_DIR}/twim.wasm ${ARTIFACTS_DIR}/
+          cp ${SIMD_BUILD_DIR}/simd-twim.wasm ${ARTIFACTS_DIR}/
       - uses: actions/upload-artifact@v2
         with:
           name: wasm
-          path: |
-            ${SCALAR_BUILD_DIR}/twim.wasm
-            ${SIMD_BUILD_DIR}/simd-twim.wasm
+          path: ${ARTIFACTS_DIR}/*
