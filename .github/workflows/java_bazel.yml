@@ -14,3 +14,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/java/
           bazel test --test_output=errors ...:all
+      - name: Clean
+        run: |
+          cd ${GITHUB_WORKSPACE}/java/
+          bazel clean

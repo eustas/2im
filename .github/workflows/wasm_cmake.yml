@@ -4,6 +4,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Set Environment Variables
+        run: |
+          echo "SCALAR_BUILD_DIR=${RUNNER_TEMP}/build-scalar" >> ${GITHUB_ENV}
+          echo "SIMD_BUILD_DIR=${RUNNER_TEMP}/build-simd" >> ${GITHUB_ENV}
+          echo "ARTIFACTS_DIR=${RUNNER_TEMP}/artifacts" >> ${GITHUB_ENV}
+          echo "BINARYEN_DIR=${RUNNER_TEMP}/binaryen" >> ${GITHUB_ENV}
       - uses: actions/checkout@v2
       - uses: mymindstorm/setup-emsdk@v10
         with:
@@ -13,32 +19,25 @@ jobs:
         id: cache-binaryen
         uses: actions/cache@v2
         with:
-          path: binaryen
+          path: ${{ env.BINARYEN_DIR }}
           key: binaryen
       - name: Download Binaryen
         if: steps.cache-binaryen.outputs.cache-hit != 'true'
         run: |
-          mkdir -p ${GITHUB_WORKSPACE}/binaryen
-          cd ${GITHUB_WORKSPACE}/binaryen
+          mkdir -p ${BINARYEN_DIR}
+          cd ${BINARYEN_DIR}
           curl -L https://github.com/WebAssembly/binaryen/releases/download/version_101/binaryen-version_101-x86_64-linux.tar.gz | tar -xz --strip-components=1
-      - name: Set Environment
-        run: |
-          echo "SCALAR_BUILD_DIR=${GITHUB_WORKSPACE}/build-scalar" >> ${GITHUB_ENV}
-          echo "SIMD_BUILD_DIR=${GITHUB_WORKSPACE}/build-simd" >> ${GITHUB_ENV}
-          echo "ARTIFACTS_DIR=${GITHUB_WORKSPACE}/artifacts" >> ${GITHUB_ENV}
       - name: Build Scalar
         run: |
-          cd ${GITHUB_WORKSPACE}/
-          export PATH=${PATH}:${GITHUB_WORKSPACE}/binaryen/bin
+          export PATH=${PATH}:${BINARYEN_DIR}/bin
           export BUILD_DIR=${SCALAR_BUILD_DIR}
-          emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release ./c/
+          emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release ${GITHUB_WORKSPACE}/c/
           cmake --build ${BUILD_DIR}
       - name: Build SIMD
         run: |
-          cd ${GITHUB_WORKSPACE}/
-          export PATH=${PATH}:${GITHUB_WORKSPACE}/binaryen/bin
+          export PATH=${PATH}:${BINARYEN_DIR}/bin
           export BUILD_DIR=${SIMD_BUILD_DIR}
-          emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release -D TWIM_WASM_ENABLE_SIMD=ON ./c/
+          emcmake cmake -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=Release -D TWIM_WASM_ENABLE_SIMD=ON ${GITHUB_WORKSPACE}/c/
           cmake --build ${BUILD_DIR}
       - name: Collect Artifacts
         run: |
