@@ -4,7 +4,6 @@ jobs:
   make-commit:
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifacts
       - uses: actions/checkout@v2
       - name: Set Environment Variables
         run: |
