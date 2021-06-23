@@ -43,12 +43,9 @@ jobs:
       - name: Collect Artifacts
         run: |
           mkdir -p ${ARTIFACTS_DIR}/
-          ls -la ${SCALAR_BUILD_DIR}/
-          ls -la ${SIMD_BUILD_DIR}/
           cp ${SCALAR_BUILD_DIR}/twim.wasm ${ARTIFACTS_DIR}/
           cp ${SIMD_BUILD_DIR}/simd-twim.wasm ${ARTIFACTS_DIR}/
-          ls -la ${ARTIFACTS_DIR}/
       - uses: actions/upload-artifact@v2
         with:
           name: wasm
-          path: ${ARTIFACTS_DIR}/*
+          path: ${ARTIFACTS_DIR}
