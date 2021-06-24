@@ -77,6 +77,8 @@ jobs:
       - name: Commit
         if: ${{ env.HAS_CHANGES == 'true' }}
         run: |
+          git config user.name 'Bot'
+          git config user.email '203457+eustas@users.noreply.github.com'
           git commit -m "Update WASM binaries"
       - name: Push
         if: ${{ env.HAS_CHANGES == 'true' }}
