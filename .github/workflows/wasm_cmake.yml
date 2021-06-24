@@ -64,4 +64,21 @@ jobs:
           path: ${{ env.ARTIFACTS_DIR }}
       - name: Update files
         run: |
-          ls -la ${ARTIFACTS_DIR}/
+          cp ${ARTIFACTS_DIR}/*.wasm ${GITHUB_WORKSPACE}/node/twim-encode
+          # TODO(eustas): update docs?
+      - name: Prepare commit
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          git add ${GITHUB_WORKSPACE}/node/twim-encode/twim.wasm
+          git add ${GITHUB_WORKSPACE}/node/twim-encode/simd-twim.wasm
+          export HAS_CHANGES=true
+          git diff --cached --exit-code && export HAS_CHANGES=false
+          echo "HAS_CHANGES=${HAS_CHANGES}" >> ${GITHUB_ENV}
+      - name: Commit
+        if: ${{ env.HAS_CHANGES == 'true' }}
+        run: |
+          git commit -m "Update WASM binaries"
+      - name: Push
+        if: ${{ env.HAS_CHANGES == 'true' }}
+        run: |
+          echo "TODO"
