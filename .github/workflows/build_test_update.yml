@@ -17,7 +17,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/c/
           bazel test -c dbg --test_output=errors ...:all
-      - name: clean C
+      - name: Clean C
         run: |
           cd ${GITHUB_WORKSPACE}/c/
           bazel clean
@@ -107,8 +107,8 @@ jobs:
       - name: Collect Artifacts
         run: |
           mkdir -p ${ARTIFACTS_DIR}/
-          cp ${SCALAR_BUILD_DIR}/twim.wasm ${ARTIFACTS_DIR}/
-          cp ${SIMD_BUILD_DIR}/simd-twim.wasm ${ARTIFACTS_DIR}/
+          cp ${WASM_SCALAR_OUT}/twim.wasm ${ARTIFACTS_DIR}/
+          cp ${WASM_SIMD_OUT}/simd-twim.wasm ${ARTIFACTS_DIR}/
       - uses: actions/upload-artifact@v2
         with:
           name: wasm
