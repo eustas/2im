@@ -1,0 +1,153 @@
+name: Build / test / update
+on: [push]
+jobs:
+
+  # JOB
+  bazel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: bazelbuild/setup-bazelisk@v1
+
+      - name: Build C
+        run: |
+          cd ${GITHUB_WORKSPACE}/c/
+          bazel build -c dbg ...:all
+      - name: Test C
+        run: |
+          cd ${GITHUB_WORKSPACE}/c/
+          bazel test -c dbg --test_output=errors ...:all
+      - name: clean C
+        run: |
+          cd ${GITHUB_WORKSPACE}/c/
+          bazel clean
+
+      - name: Build Java
+        run: |
+          cd ${GITHUB_WORKSPACE}/java/
+          bazel build ...:all
+      - name: Test Java
+        run: |
+          cd ${GITHUB_WORKSPACE}/java/
+          bazel test --test_output=errors ...:all
+      - name: Clean Java
+        run: |
+          cd ${GITHUB_WORKSPACE}/java/
+          bazel clean
+
+      - name: Build JS
+        run: |
+          cd ${GITHUB_WORKSPACE}/js/
+          bazel build ...:all
+      - name: Test JS
+        run: |
+          cd ${GITHUB_WORKSPACE}/js/
+          bazel test --test_output=errors ...:all
+      - name: Clean JS
+        run: |
+          cd ${GITHUB_WORKSPACE}/js/
+          bazel clean
+
+  # JOB
+  cmake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Environment Variables
+        run: |
+          echo "NATIVE_OUT=${RUNNER_TEMP}/native-out" >> ${GITHUB_ENV}
+          echo "WASM_SCALAR_OUT=${RUNNER_TEMP}/wasm-scalar-out" >> ${GITHUB_ENV}
+          echo "WASM_SIMD_OUT=${RUNNER_TEMP}/wasm-simd-out" >> ${GITHUB_ENV}
+          echo "ARTIFACTS_DIR=${RUNNER_TEMP}/artifacts" >> ${GITHUB_ENV}
+          echo "BINARYEN_DIR=${RUNNER_TEMP}/binaryen" >> ${GITHUB_ENV}
+
+      - uses: actions/checkout@v2
+      - uses: mymindstorm/setup-emsdk@v10
+        with:
+          version: 2.0.23
+          actions-cache-folder: 'emsdk-cache'
+      - name: Cache Binaryen
+        id: cache-binaryen
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.BINARYEN_DIR }}
+          key: binaryen
+      - name: Download Binaryen
+        if: steps.cache-binaryen.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ${BINARYEN_DIR}
+          cd ${BINARYEN_DIR}
+          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_101/binaryen-version_101-x86_64-linux.tar.gz | tar -xz --strip-components=1
+
+      - name: Build native C
+        run: |
+          cmake -B ${NATIVE_OUT} ${GITHUB_WORKSPACE}/c/
+          cmake --build ${NATIVE_OUT}
+      - name: Test native C
+        run: |
+          echo "TODO"
+
+      - name: Build Scalar WASM C
+        run: |
+          export PATH=${PATH}:${BINARYEN_DIR}/bin
+          emcmake cmake -B ${WASM_SCALAR_OUT} -D CMAKE_BUILD_TYPE=Release ${GITHUB_WORKSPACE}/c/
+          cmake --build ${WASM_SCALAR_OUT}
+      - name: Test Scalar WASM C
+        run: |
+          echo "TODO"
+
+      - name: Build SIMD WASM C
+        run: |
+          export PATH=${PATH}:${BINARYEN_DIR}/bin
+          emcmake cmake -B ${WASM_SIMD_OUT} -D CMAKE_BUILD_TYPE=Release -D TWIM_WASM_ENABLE_SIMD=ON ${GITHUB_WORKSPACE}/c/
+          cmake --build ${WASM_SIMD_OUT}
+      - name: Test SIMD WASM C
+        run: |
+          echo "TODO"
+
+      - name: Collect Artifacts
+        run: |
+          mkdir -p ${ARTIFACTS_DIR}/
+          cp ${SCALAR_BUILD_DIR}/twim.wasm ${ARTIFACTS_DIR}/
+          cp ${SIMD_BUILD_DIR}/simd-twim.wasm ${ARTIFACTS_DIR}/
+      - uses: actions/upload-artifact@v2
+        with:
+          name: wasm
+          path: ${{ env.ARTIFACTS_DIR }}
+          if-no-files-found: error
+
+  # JOB
+  update:
+    runs-on: ubuntu-latest
+    needs: [cmake]
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Set Environment Variables
+        run: |
+          echo "ARTIFACTS_DIR=${RUNNER_TEMP}/artifacts" >> ${GITHUB_ENV}
+          echo "TWIM_ENCODE_DIR=${GITHUB_WORKSPACE}/node/twim-encode" >> ${GITHUB_ENV}
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: wasm
+          path: ${{ env.ARTIFACTS_DIR }}
+      - name: Update files
+        run: |
+          cp ${ARTIFACTS_DIR}/*.wasm ${TWIM_ENCODE_DIR}
+      - name: Prepare commit
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          git add ${TWIM_ENCODE_DIR}/twim.wasm
+          git add ${TWIM_ENCODE_DIR}/simd-twim.wasm
+          export HAS_CHANGES=true
+          git diff --cached --exit-code && export HAS_CHANGES=false
+          echo "HAS_CHANGES=${HAS_CHANGES}" >> ${GITHUB_ENV}
+      - name: Commit
+        if: ${{ env.HAS_CHANGES == 'true' }}
+        run: |
+          git config user.name 'Bot'
+          git config user.email '203457+eustas@users.noreply.github.com'
+          git commit -m "Update WASM binaries"
+      - name: Push
+        if: ${{ env.HAS_CHANGES == 'true' }}
+        run: |
+          git push
