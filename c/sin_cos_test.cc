@@ -30,4 +30,6 @@ TEST(SinCosTest, Log2) {
   }
 }
 
+// TODO(eustas): add Pow2 test
+
 }  // namespace twim

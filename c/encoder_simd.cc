@@ -277,7 +277,7 @@ NOINLINE uint32_t chooseColor(float r, float g, float b,
   constexpr HWY_FULL(float) df;
   const size_t m = palette_size;
 
-  HWY_ALIGN float d2[32];
+  HWY_ALIGN float d2[2048];
 
   const auto cr = Set(df, r);
   const auto cg = Set(df, g);
@@ -324,7 +324,7 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
   const auto kOne = Set(df, 1.0f);
 
   uint32_t random = 0x23DE605F;
-
+/*
   {
     // Choose one center uniformly at random from among the data points.
     float total = 0.0f;
@@ -374,9 +374,31 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
     centers_r[j] = stats_r[i];
     centers_g[j] = stats_g[i];
     centers_b[j] = stats_b[i];
+  }*/
+
+  for (uint32_t j = 1; j < m; ++j) {
+    {
+      random ^= random << 13;
+      random ^= random >> 17;
+      random ^= random << 5;
+    }
+    centers_r[j] = (random >> 24);
+    {
+      random ^= random << 13;
+      random ^= random >> 17;
+      random ^= random << 5;
+    }
+    centers_g[j] = (random >> 24);
+    {
+      random ^= random << 13;
+      random ^= random >> 17;
+      random ^= random << 5;
+    }
+    centers_b[j] = (random >> 24);
   }
 
   float last_score = 1e35f;
+  size_t iters = 0;
   while (true) {
     for (size_t j = 0; j < m; j += Lanes(df)) {
       Store(k0, df, centers_acc_r + j);
@@ -404,6 +426,7 @@ INLINE void makePalette(const float* stats, float* RESTRICT palette,
       Store(Load(df, centers_acc_b + j) * inv_c, df, centers_b + j);
     }
     // if (score != score) break; // TODO(eustas): is NaN possible?
+    iters++;
     if (last_score - score < 1.0f) break;
     last_score = score;
   }

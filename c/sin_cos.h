@@ -22,7 +22,9 @@ class SinCosT {
   // -kCos[i] / kSin[i]
   std::array<float, kMaxAngle> kMinusCot;
   // log(i) / log(2)
-  std::array<float, 66> kLog2;
+  std::array<float, 2049> kLog2;
+  // 2**(i / 3.0)
+  std::array<uint16_t, 34> kPow2;
 };
 
 extern const SinCosT SinCos;

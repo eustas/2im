@@ -57,7 +57,7 @@ void CodecParams::write(XRangeEncoder* dst) const {
 
 float calculateImageTax(uint32_t width, uint32_t height) {
   // F1..F4 + line limit + color code
-  constexpr const double kFlatTax = 20.5577740523;
+  constexpr const double kFlatTax = 20.5280267089; // 20.5577740523;
   return kFlatTax + simulateWriteSize(width) + simulateWriteSize(height);
 }
 

@@ -38,13 +38,13 @@ class CodecParams {
 
   static constexpr const uint32_t kMaxLineLimit = 63;
 
-  static constexpr const uint32_t kNumColorQuantOptions = 17;
-  static constexpr const uint32_t kNumPaletteOptions = 32;
+  static constexpr const uint32_t kNumColorQuantOptions = 18;
+  static constexpr const uint32_t kNumPaletteOptions = 30;
   static constexpr const uint32_t kMaxColorCode =
       kNumColorQuantOptions + kNumPaletteOptions;
 
-  static constexpr uint32_t makeColorQuant(uint32_t code) {
-    return 1u + ((4u + (code & 3u)) << (code >> 2u));
+  static uint32_t makeColorQuant(uint32_t code) {
+    return SinCos.kPow2[code + 7];
   }
 
   static constexpr uint32_t dequantizeColor(uint32_t v, uint32_t q) {

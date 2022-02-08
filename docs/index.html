@@ -14,6 +14,7 @@
 <div class="w3-top">
   <div class="w3-bar w3-black w3-card">
     <a href="#twim" class="w3-bar-item w3-button w3-padding-large">2im</a>
+    <a href="#examples" class="w3-bar-item w3-button w3-padding-large">Examples</a>
     <a href="#demo" class="w3-bar-item w3-button w3-padding-large">Demo</a>
   </div>
 </div>
@@ -46,25 +47,27 @@
     </p>
   </div></div>
 
-  <div id="demo"><div class="w3-container w3-content w3-center" style="max-width:800px">
-    <h2 class="w3-wide">Demo</h2>
+  <div id="examples"><div class="w3-container w3-content w3-center" style="max-width:800px">
+    <h2 class="w3-wide">Examples</h2>
     <p class="w3-opacity"><i>一畫勝千言</i></p>
-    <input class="w3-input w3-border w3-round" type="text" id="encoded" placeholder="Insert base64-encoded 2im image here">
-    <div class="w3-xlarge">⇩</div>
+    <p class="w3-justify">Click "copy" buttons on the right of input fields to unveal (decode) the images.</p>
     <canvas class="w3-card-4 w3-white w3-margin-bottom drawboard" id="canvas" width="64" height="64"></canvas>
-    <div id="demo-placeholder" class="w3-hide"></div>
+    <div id="examples-placeholder" class="w3-hide"></div>
+    <div class="w3-margin-bottom"></div>
   </div></div>
 
-  <div class="w3-margin-bottom"></div>
+  <div class="w3-light-gray" id="demo"><div class="w3-container w3-content w3-center" style="max-width:800px">
+    <h2 class="w3-wide">Demo</h2>
+    <p class="w3-opacity"><i>If you want a thing done well, do it yourself.</i></p>
+  </div>
 </div>
 
 <script type="text/javascript" src="twim.js"></script>
 <script type="text/javascript">
-let input = document.getElementById('encoded');
-function onInput() {
+function onChoose(text) {
   let ctx = document.getElementById('canvas').getContext('2d');
   ctx.clearRect(0, 0, 64, 64);
-  let encoded = new Uint8Array(Array.from(atob(input.value)).map(s => s.codePointAt(0)));
+  let encoded = new Uint8Array(Array.from(atob(text)).map(s => s.codePointAt(0)));
   let pixels = window.decode2im(encoded);
   if ((pixels.width == 64) && (pixels.height == 64)) {
     let image = new ImageData(pixels.rgba, pixels.width);
@@ -77,12 +80,10 @@ function onCopyClick(id) {
   src.select();
   document.execCommand("copy");
   src.setAttribute('disabled', 1);
-  input.value = src.value;
-  onInput();
+  onChoose(src.value);
 }
 document.addEventListener('DOMContentLoaded', () => {
-input.addEventListener('input', onInput);
-document.getElementById('demo-placeholder').outerHTML = [
+document.getElementById('examples-placeholder').outerHTML = [
   ['The Swiss flag – a plus for the country (25 bytes):', 'Dqf4Yo9Zarz///8AA6HEgsU4HRLZzUUlRA=='],
   ['No effort to learn and improve over time (128 bytes):', 'DifgrJxhf78vQWQ93d1f8zXvJYYV6UuX1OUhz0mq0C4BRmeEd8P8g84IbX0DW/3nkDuRqCiF+ooO259rra4WdiQM1uX16R8EUgbupgkEteS+w/f+thOzSX+SI+h3Fun56h91J3iShnaYtrq6hwLgiIKh8A5q2GWBorsJ4DOGHgM='],
   ['That cat\'s something I can\'t explain (256 bytes):', 'Dhf4bNtyTrkwN+IwOQ3lZUtrNwbD7YuwQFHeyXNYiru3nmuOS5sj+aaaP2C1PTU/jJmuVYMTgd8d2z4m2GfTEvKWjmFZVzHYxCu4BwZJC4J+CHbzliwbddUhfYoMNDBkwjrZsxDtOdm/lwsOwdtYkjY2Xy2HeeYfxNXFdkppquDgDxkhNJsHPdYsOgzijY1UQ/owjHwXd/9310lai54qjUy7CXi92k022wjsGZxfilGgageYdAgKQu50ps7TxMDXJi1FtG1o3NY56mN+NNLVkwcV/cur8pDJIzeENO4mVGrDfGEuL4LaXHm+pqwXx5Vjg4s/gR8zrV2YKsod5LcETQ=='],

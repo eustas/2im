@@ -42,6 +42,12 @@ static SinCosT makeSinCos() {
     kLog2[j] = r;
   }
 
+  auto& kPow2 = result.kPow2;
+  double pow2 = 1.0;
+  for (size_t j = 0; j < kPow2.size(); ++j) {
+    kPow2[j] = static_cast<uint16_t>(pow2);
+    pow2 *= 1.2599210499;
+  }
   return result;
 }
 

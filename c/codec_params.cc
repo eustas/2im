@@ -16,7 +16,7 @@ void CodecParams::setColorCode(uint32_t code) {
     palette_size = 0;
   } else {
     color_quant = 0;
-    palette_size = code - kNumColorQuantOptions + 1;
+    palette_size = SinCos.kPow2[code - kNumColorQuantOptions + 4];
   }
 }
 
