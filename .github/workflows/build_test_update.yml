@@ -126,7 +126,7 @@ jobs:
           echo "ARTIFACTS_DIR=${RUNNER_TEMP}/artifacts" >> ${GITHUB_ENV}
           echo "TWIM_ENCODE_DIR=${GITHUB_WORKSPACE}/node/twim-encode" >> ${GITHUB_ENV}
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: wasm
           path: ${{ env.ARTIFACTS_DIR }}
